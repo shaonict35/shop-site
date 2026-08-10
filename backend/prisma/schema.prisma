@@ -1,0 +1,301 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  phone        String?
+  role         String   @default("Customer") // SuperAdmin, Manager, Salesman, Rider, Customer
+  points       Int      @default(0) // Loyalty Points / GlowGoodly Balance
+  status       String   @default("Active") // Active, Suspicious, Fraud
+  addresses    Address[]
+  orders       Order[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Address {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addressLine  String
+  city         String
+  zone         String   // Inside Dhaka, Outside Dhaka
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Brand {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  logoUrl     String?
+  isTopBrand  Boolean   @default(false)
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  imageUrl    String?
+  parentId    String?   // For Sub-categories
+  parent      Category? @relation("SubCategories", fields: [parentId], references: [id], onDelete: Cascade)
+  subCategories Category[] @relation("SubCategories")
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Product {
+  id              String         @id @default(uuid())
+  name            String
+  description     String
+  ingredients     String?
+  howToUse        String?
+  brandId         String
+  brand           Brand          @relation(fields: [brandId], references: [id])
+  categoryId      String
+  category        Category       @relation(fields: [categoryId], references: [id])
+  status          String         @default("Active") // Active, Inactive
+  metaTitle       String?
+  metaDescription String?
+  metaKeywords    String?
+  campaignName    String?        // e.g. BOGO, COMBO, CLEARANCE, EXCLUSIVE
+  images          ProductImage[]
+  variants        Variant[]
+  reviews         Review[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([brandId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([campaignName])
+}
+
+model ProductImage {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+}
+
+model Variant {
+  id            String      @id @default(uuid())
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name          String      // e.g. "Shade 01", "100ml", "Red"
+  shadeColor    String?     // Hex color code (e.g. #FF5733) for cosmetics
+  sizeValue     String?     // e.g. "50ml", "100g"
+  price         Float
+  discountPrice Float?      // Promotional price
+  costPrice     Float?      // Purchase price
+  stock         Int         @default(0)
+  sku           String      @unique
+  imageUrl      String?
+  orderItems    OrderItem[]
+  inventoryLogs InventoryLog[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([productId])
+}
+
+model Order {
+  id             String      @id @default(uuid())
+  orderNumber    String      @unique
+  customerId     String?
+  customer       User?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName   String
+  customerEmail  String
+  customerPhone  String
+  address        String
+  zone           String      // Inside Dhaka, Outside Dhaka
+  deliveryCharge Float
+  subTotal       Float
+  discount       Float       @default(0)
+  total          Float
+  paymentStatus  String      @default("Pending") // Pending, Paid, Failed
+  paymentMethod  String      @default("COD") // COD, bKash, SSLCommerz, aamarpay
+  orderStatus    String      @default("Pending") // Pending, Processing, Shipped, Delivered, Cancelled
+  notes          String?
+  trackingLink   String?
+  salesmanId     String?     // Track which salesperson handled it
+  orderItems     OrderItem[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model OrderItem {
+  id          String   @id @default(uuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variantId   String?
+  variant     Variant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  productName String
+  variantName String
+  quantity    Int
+  price       Float
+  total       Float
+}
+
+model Coupon {
+  id             String    @id @default(uuid())
+  code           String    @unique
+  discountType   String    // Fixed, Percentage
+  discountValue  Float
+  minOrderValue  Float     @default(0)
+  maxDiscount    Float?
+  expiryDate     DateTime
+  usageLimit     Int       @default(1)
+  timesUsed      Int       @default(0)
+  categoryLimit  String?   // Comma-separated category IDs
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Setting {
+  id        String   @id @default(uuid())
+  key       String   @unique // e.g. "SMS_API_KEY", "PAYMENT_MERCHANT_ID", etc.
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model Review {
+  id           String   @id @default(uuid())
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customerName String
+  rating       Int      // 1 to 5
+  comment      String
+  isApproved   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+}
+
+model PromoBanner {
+  id             String   @id @default(uuid())
+  title          String   // Used as alt text and aria-label (SEO friendly)
+  imageUrl       String   // Full-width desktop banner image URL
+  mobileImageUrl String?  // Mobile version banner image URL
+  tabletImageUrl String?  // Tablet version banner image URL
+  linkUrl        String?  // Optional click-through link
+  bgColor        String   @default("#1a1a2e") // Fallback background color
+  page           String   @default("Homepage") // Homepage, Hair Care 101, Skin Care 101, Makeup 101
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0) // For ordering multiple banners
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Vendor {
+  id          String    @id @default(uuid())
+  name        String
+  contactName String?
+  email       String?   @unique
+  phone       String?
+  address     String?
+  status      String    @default("Active")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Campaign {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  bannerUrl   String?
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model InventoryLog {
+  id          String    @id @default(uuid())
+  variantId   String
+  variant     Variant   @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  quantity    Int       // Positive for stock in, Negative for stock out
+  reason      String    // e.g. "Restock", "Sale", "Damage", "Return"
+  userId      String?   // Staff who made the change
+  createdAt   DateTime  @default(now())
+}
+
+model Visitor {
+  id          String    @id @default(uuid())
+  ipAddress   String?
+  device      String?
+  browser     String?
+  lastVisit   DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  chatId    String   // Session ID or User ID to group the conversation
+  sender    String   // "Customer" or "Admin"
+  message   String
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  title     String
+  message   String
+  imageUrl  String?
+  linkUrl   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FcmToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  device    String?  // Desktop, Android, iOS, Chrome, Firefox, Safari
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MenuItem {
+  id        String     @id @default(uuid())
+  title     String
+  url       String
+  location  String     @default("Header") // Header or Footer
+  parentId  String?
+  parent    MenuItem?  @relation("SubMenuItems", fields: [parentId], references: [id], onDelete: Cascade)
+  subItems  MenuItem[] @relation("SubMenuItems")
+  sortOrder Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model CmsPage {
+  id              String   @id @default(uuid())
+  slug            String   @unique // e.g. "about", "authenticity", "privacy-policy"
+  title           String
+  contentHtml     String
+  metaTitle       String?
+  metaDescription String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+
+
