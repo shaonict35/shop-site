@@ -1,14 +1,9 @@
-import { PrismaClient } from "@prisma/client";
-import { PrismaLibSql } from "@prisma/adapter-libsql";
+import prisma from "./prisma";
 import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
 import db from "./firebase";
 
 dotenv.config();
-
-const dbUrl = process.env.DATABASE_URL || "file:./dev.db";
-const adapter = new PrismaLibSql({ url: dbUrl });
-const prisma = new PrismaClient({ adapter });
 
 async function resetAdmin() {
   console.log("Resetting Admin credentials...");

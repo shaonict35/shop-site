@@ -10,3 +10,4 @@ frontend/node_modules/
 frontend/.next/
 website/
 website_2/
+*.zip

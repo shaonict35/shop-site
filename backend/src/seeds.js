@@ -1,14 +1,37 @@
 const { PrismaClient } = require("@prisma/client");
-const { PrismaLibSql } = require("@prisma/adapter-libsql");
+const { PrismaMariaDb } = require("@prisma/adapter-mariadb");
 const bcrypt = require("bcryptjs");
 require("dotenv").config();
 
-const dbUrl = process.env.DATABASE_URL || "file:./dev.db";
+const dbUrl = process.env.DATABASE_URL || "mysql://root:root@localhost:3306/glowgoodly_db";
 
-const adapter = new PrismaLibSql({
-  url: dbUrl,
-});
+function parseDbUrl(urlStr) {
+  try {
+    const normalized = urlStr.replace(/^mysql:\/\//, "http://").replace(/^mariadb:\/\//, "http://");
+    const parsed = new URL(normalized);
+    return {
+      host: parsed.hostname || "localhost",
+      port: parsed.port ? parseInt(parsed.port, 10) : 3306,
+      user: decodeURIComponent(parsed.username || "root"),
+      password: decodeURIComponent(parsed.password || ""),
+      database: parsed.pathname.replace(/^\//, "") || "glowgoodly_db",
+      connectionLimit: 5,
+    };
+  } catch (e) {
+    return {
+      host: "localhost",
+      port: 3306,
+      user: "root",
+      password: "",
+      database: "glowgoodly_db",
+      connectionLimit: 5,
+    };
+  }
+}
+
+const adapter = new PrismaMariaDb(parseDbUrl(dbUrl));
 const prisma = new PrismaClient({ adapter });
+
 
 async function main() {
   console.log("Starting full seeding for all GlowGoodly categories...");
