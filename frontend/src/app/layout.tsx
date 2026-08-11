@@ -7,7 +7,7 @@ import ChatWidget from "../components/ChatWidget";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://shop.glowgoodly.com"),
-  title: "GlowGoodly | Buy Authentic Cosmetics & Skincare in Bangladesh",
+  title: "Home-Glowgoodly",
   description: "Shop 100% authentic makeup, skincare, and hair care products at GlowGoodly. Fast delivery across Bangladesh. Buy original brands like CeraVe, COSRX, and The Ordinary in BD.",
   keywords: ["cosmetics in bangladesh", "skincare bd", "authentic makeup bangladesh", "buy cosmetics online bd", "GlowGoodly", "best beauty shop dhaka", "korean skincare bd", "buy makeup online dhaka"],
   alternates: {
@@ -37,10 +37,11 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "https://shop.glowgoodly.com/wp-content/uploads/2026/04/cropped-glow-2-01-2-192x192.png", type: "image/png" },
+      { url: "/icon.png", type: "image/png" },
+      { url: "/favicon.ico" },
     ],
-    shortcut: ["https://shop.glowgoodly.com/wp-content/uploads/2026/04/cropped-glow-2-01-2-192x192.png"],
-    apple: ["https://shop.glowgoodly.com/wp-content/uploads/2026/04/cropped-glow-2-01-2-180x180.png"],
+    shortcut: ["/favicon.ico"],
+    apple: ["/apple-icon.png"],
   },
   robots: {
     index: true,
@@ -106,9 +107,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         {/* Favicon & Browser Tab Icons */}
-        <link rel="icon" href="https://shop.glowgoodly.com/wp-content/uploads/2026/04/cropped-glow-2-01-2-192x192.png" type="image/png" sizes="192x192" />
-        <link rel="shortcut icon" href="https://shop.glowgoodly.com/wp-content/uploads/2026/04/cropped-glow-2-01-2-192x192.png" />
-        <link rel="apple-touch-icon" href="https://shop.glowgoodly.com/wp-content/uploads/2026/04/cropped-glow-2-01-2-180x180.png" />
+        <link rel="icon" href="/icon.png" type="image/png" />
+        <link rel="shortcut icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" href="/apple-icon.png" />
         {/* Resource Preconnect & Performance Hints */}
         <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://bk.shajgoj.com" crossOrigin="anonymous" />

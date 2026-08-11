@@ -104,6 +104,7 @@ export default function Home() {
   // Parse query parameters
   useEffect(() => {
     if (typeof window !== "undefined") {
+      document.title = "Home-Glowgoodly";
       const params = new URLSearchParams(window.location.search);
       const search = params.get("search");
       if (search) setSearchQuery(search);
@@ -479,48 +480,7 @@ export default function Home() {
             </Link>
           </div>
 
-          {/* DYNAMIC AUTHENTIC BRANDS LOGO DIRECTORY */}
-          {brands.length > 0 && (
-            <div style={{ marginTop: "24px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
-                <h3 style={{ fontSize: "13px", fontWeight: "800", textTransform: "uppercase", letterSpacing: "1px", color: "#475569", margin: 0 }}>
-                  ✨ EXPLORE BEAUTY BRANDS ({brands.length})
-                </h3>
-                <Link href="/brands" style={{ fontSize: "12px", color: "#e2136e", fontWeight: "800", textDecoration: "none" }}>
-                  VIEW ALL BRANDS ›
-                </Link>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: "12px" }}>
-                {brands.slice(0, 12).map((b: any) => (
-                  <Link
-                    key={b.id}
-                    href={`/shop?brand=${b.id}`}
-                    className="promo-card-hover"
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backgroundColor: "#ffffff",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "10px",
-                      padding: "10px",
-                      height: "85px",
-                      textDecoration: "none",
-                      boxShadow: "0 2px 6px rgba(0,0,0,0.02)"
-                    }}
-                  >
-                    {b.logoUrl ? (
-                      <img src={b.logoUrl} alt={b.name} style={{ maxHeight: "38px", maxWidth: "85%", objectFit: "contain", marginBottom: "4px" }} />
-                    ) : (
-                      <span style={{ fontSize: "12px", fontWeight: "800", color: "#1e293b", textAlign: "center" }}>{b.name}</span>
-                    )}
-                    <span style={{ fontSize: "10px", fontWeight: "700", color: "#64748b", textTransform: "uppercase", marginTop: "2px", textAlign: "center", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", width: "100%" }}>{b.name}</span>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
+
         </section>
 
         {/* BOGO Section */}
