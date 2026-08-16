@@ -125,7 +125,7 @@ export default function ProductPage() {
     fetchProductDetails();
   }, [productId]);
 
-  // Dynamic SEO meta tags updater (safe non-destructive DOM update)
+  // Dynamic SEO meta tags and Schema.org JSON-LD updater
   useEffect(() => {
     if (product) {
       document.title = `${product.name} | GlowGoodly`;
@@ -150,8 +150,54 @@ export default function ProductPage() {
       if (primaryImg) {
         ogImage.setAttribute('content', primaryImg);
       }
+
+      // Inject / Update Google Schema.org JSON-LD Structured Data
+      let schemaScript = document.getElementById('product-schema-jsonld') as HTMLScriptElement;
+      if (!schemaScript) {
+        schemaScript = document.createElement('script');
+        schemaScript.id = 'product-schema-jsonld';
+        schemaScript.type = 'application/ld+json';
+        document.head.appendChild(schemaScript);
+      }
+
+      const activePrice = selectedVariant?.discountPrice || selectedVariant?.price || 500;
+      const imagesList = product.images?.map(i => i.url) || [primaryImg];
+
+      const schemaData = {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        "name": product.name,
+        "image": imagesList,
+        "description": product.description.substring(0, 300),
+        "brand": {
+          "@type": "Brand",
+          "name": product.brand?.name || "GlowGoodly"
+        },
+        "category": product.category?.name || "Beauty & Cosmetics",
+        "offers": {
+          "@type": "Offer",
+          "url": typeof window !== "undefined" ? window.location.href : `https://shop.glowgoodly.com/product/${product.id}`,
+          "priceCurrency": "BDT",
+          "price": activePrice,
+          "itemCondition": "https://schema.org/NewCondition",
+          "availability": (selectedVariant?.stock ?? 10) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+          "seller": {
+            "@type": "Organization",
+            "name": "GlowGoodly Bangladesh"
+          }
+        },
+        ...(product.reviews && product.reviews.length > 0 ? {
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": (product.reviews.reduce((acc, r) => acc + r.rating, 0) / product.reviews.length).toFixed(1),
+            "reviewCount": product.reviews.length
+          }
+        } : {})
+      };
+
+      schemaScript.text = JSON.stringify(schemaData);
     }
-  }, [product]);
+  }, [product, selectedVariant]);
 
   const handleAddToCart = () => {
     if (!product || !selectedVariant) return;
