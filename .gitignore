@@ -13,3 +13,5 @@ website_2/
 *.zip
 *.md
 creds
+.vscode/
+.tools/
