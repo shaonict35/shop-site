@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { trackAddToCart } from "../utils/pixel";
+import { API_BASE } from "../utils/api";
 
 export interface CartItem {
   id: string; // variantId
@@ -67,7 +68,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Fetch dynamic integration settings for tracking scripts & navigation links
   const refreshTracking = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/settings/public");
+      const res = await fetch(`${API_BASE}/settings/public`);
       if (res.ok) {
         const data = await res.json();
         setTrackingSettings(data);

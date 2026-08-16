@@ -4,7 +4,17 @@ const cache: Record<string, { data: any; expiry: number }> = {};
 // Cache duration is short to reflect admin changes quickly
 const CACHE_DURATION = 5000;
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+// Base API URL calculation supporting full URLs, paths, and trailing slash normalization
+const getBaseApiUrl = () => {
+  if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.trim()) {
+    const raw = process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, "");
+    return raw.endsWith("/api") ? raw : `${raw}/api`;
+  }
+  return "http://localhost:5000/api";
+};
+
+export const API_BASE = getBaseApiUrl();
+export const API_ROOT = API_BASE.replace(/\/api\/?$/, "");
 
 export async function fetchWithCache(url: string, bypassCache: boolean = false) {
   const now = Date.now();

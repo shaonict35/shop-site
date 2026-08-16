@@ -3,6 +3,7 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ShieldCheck, ArrowRight, Lock, CheckCircle2, AlertCircle } from "lucide-react";
+import { API_BASE } from "../../utils/api";
 
 function BkashPortalContent() {
   const searchParams = useSearchParams();
@@ -58,7 +59,7 @@ function BkashPortalContent() {
       const generatedTrxId = `8N7A${Math.floor(100000 + Math.random() * 900000)}`;
       setTrxID(generatedTrxId);
 
-      const res = await fetch("http://localhost:5000/api/bkash/execute-payment", {
+      const res = await fetch(`${API_BASE}/bkash/execute-payment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

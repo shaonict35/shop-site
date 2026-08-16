@@ -8,6 +8,7 @@ import { useApp } from "../../context/AppContext";
 import { trackInitiateCheckout } from "../../utils/pixel";
 import Link from "next/link";
 import { CreditCard, Truck, ShieldCheck, ArrowRight, Smartphone, AlertTriangle } from "lucide-react";
+import { API_BASE } from "../../utils/api";
 
 export default function CheckoutPage() {
   const {
@@ -114,7 +115,7 @@ export default function CheckoutPage() {
         setCouponMessage(`🎉 Loyalty Points Reward Coupon ${code} applied: ৳${discAmount} OFF your order!`);
       } else {
         // Fetch from backend coupons endpoint
-        const res = await fetch(`http://localhost:5000/api/coupons/validate?code=${encodeURIComponent(code)}`);
+        const res = await fetch(`${API_BASE}/coupons/validate?code=${encodeURIComponent(code)}`);
         if (res.ok) {
           const data = await res.json();
           setCouponDiscount(data.discount || 0);
@@ -157,7 +158,7 @@ export default function CheckoutPage() {
         couponCode: couponDiscount > 0 ? couponCode : null,
       };
 
-      const res = await fetch("http://localhost:5000/api/orders", {
+      const res = await fetch(`${API_BASE}/orders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

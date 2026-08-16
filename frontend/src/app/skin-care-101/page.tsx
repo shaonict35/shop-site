@@ -5,12 +5,13 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import MobileNavbar from "../../components/MobileNavbar";
 import Link from "next/link";
+import { API_BASE } from "../../utils/api";
 
 export default function SkinCare101Page() {
   const [banner, setBanner] = useState<any>(null);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/banners")
+    fetch(`${API_BASE}/banners`)
       .then(res => res.json())
       .then(data => {
         const found = data.find((b: any) => b.page === "Skin Care 101");

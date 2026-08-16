@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import Link from "next/link";
 import { Sparkles, X, Tag, ExternalLink, Copy, Check } from "lucide-react";
+import { API_ROOT } from "../utils/api";
 
 interface PromoData {
   id: string;
@@ -22,8 +23,7 @@ export default function PromoSocketListener() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const socketUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-    const socket: Socket = io(socketUrl, {
+    const socket: Socket = io(API_ROOT, {
       transports: ["websocket", "polling"]
     });
 

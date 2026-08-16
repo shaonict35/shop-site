@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Send, Sparkles, Radio, Users, Tag, Image as ImageIcon, Upload, RefreshCw, Trash2, Edit3, CheckCircle, AlertCircle, Clock } from "lucide-react";
+import { API_BASE } from "../utils/api";
 
 interface PromoItem {
   id: string;
@@ -30,7 +31,7 @@ export default function SocketIoPromoBroadcaster({ token }: { token: string | nu
   // Fetch past promo history from backend & local storage
   const fetchPromoHistory = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/admin/broadcast-promo");
+      const res = await fetch(`${API_BASE}/admin/broadcast-promo`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
@@ -91,7 +92,7 @@ export default function SocketIoPromoBroadcaster({ token }: { token: string | nu
     setStatusMsg("");
 
     try {
-      const res = await fetch("http://localhost:5000/api/admin/broadcast-promo", {
+      const res = await fetch(`${API_BASE}/admin/broadcast-promo`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -130,7 +131,7 @@ export default function SocketIoPromoBroadcaster({ token }: { token: string | nu
     setStatusMsg(`Sending broadcast for "${item.title}"...`);
 
     try {
-      const res = await fetch("http://localhost:5000/api/admin/broadcast-promo", {
+      const res = await fetch(`${API_BASE}/admin/broadcast-promo`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -3,8 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { CheckCircle2, ShoppingBag, Truck, ShieldCheck, Sparkles, Phone, MapPin, User, Clock } from "lucide-react";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+import { API_BASE } from "../../utils/api";
 
 interface OfferData {
   title: string;

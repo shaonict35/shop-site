@@ -1,9 +1,10 @@
 import { MetadataRoute } from 'next';
+import { API_BASE } from '../utils/api';
 
 export const dynamic = "force-static";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://shop.glowgoodly.com';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://shop.glowgoodly.com';
 
   const staticPages = [
     '',
@@ -50,7 +51,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   let productPages: MetadataRoute.Sitemap = [];
   try {
-    const res = await fetch('http://localhost:5000/api/products', { next: { revalidate: 3600 } });
+    const res = await fetch(`${API_BASE}/products`, { next: { revalidate: 3600 } });
     if (res.ok) {
       const products = await res.json();
       if (Array.isArray(products)) {

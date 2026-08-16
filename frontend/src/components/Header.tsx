@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useApp } from "../context/AppContext";
-import { fetchWithCache } from "../utils/api";
+import { fetchWithCache, API_BASE } from "../utils/api";
 
 function BrandLogo({ src, alt, fallbackText }: { src: string; alt: string; fallbackText: string }) {
   const [error, setError] = useState(false);
@@ -158,7 +158,7 @@ export default function Header() {
 
   const loadHeaderMenus = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/menus?location=Header", { cache: "no-store" });
+      const res = await fetch(`${API_BASE}/menus?location=Header`, { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
@@ -198,7 +198,7 @@ export default function Header() {
     }
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/products?limit=200`);
+        const res = await fetch(`${API_BASE}/products?limit=200`);
         const data = await res.json();
         const q = searchQuery.toLowerCase().trim();
         const matched = (data || []).filter((p: any) =>

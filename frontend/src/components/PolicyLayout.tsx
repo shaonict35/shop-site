@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { fetchWithCache } from "../utils/api";
+import { fetchWithCache, API_BASE } from "../utils/api";
 
 interface PolicyLayoutProps {
   currentTab: string;
@@ -34,7 +34,7 @@ export default function PolicyLayout({ currentTab, slug, children }: PolicyLayou
     if (!currentSlug) return;
     setLoading(true);
     try {
-      const data = await fetchWithCache(`http://localhost:5000/api/pages/${currentSlug}`, true);
+      const data = await fetchWithCache(`${API_BASE}/pages/${currentSlug}`, true);
 
       if (data && data.contentHtml) {
         setPageData(data);

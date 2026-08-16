@@ -1,4 +1,4 @@
-"use client";
+import { API_BASE } from "./api";
 
 // Meta (Facebook) Pixel Utility Functions for Standard E-commerce Tracking
 
@@ -17,7 +17,7 @@ export const trackPixelEvent = (eventName: string, params?: Record<string, any>)
     }
 
     // 2. Meta Conversions API (CAPI - Server Side)
-    fetch("http://localhost:5000/api/marketing/capi", {
+    fetch(`${API_BASE}/marketing/capi`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

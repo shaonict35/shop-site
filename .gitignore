@@ -11,3 +11,5 @@ frontend/.next/
 website/
 website_2/
 *.zip
+*.md
+creds

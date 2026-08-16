@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, Suspense } from "react";
-import { fetchWithCache } from "../../utils/api";
+import { fetchWithCache, API_BASE } from "../../utils/api";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Header from "../../components/Header";
@@ -319,8 +319,8 @@ function ShopPageContent() {
       setLoading(true);
       try {
         const [prodData, brandData] = await Promise.all([
-          fetchWithCache("http://localhost:5000/api/products"),
-          fetchWithCache("http://localhost:5000/api/brands"),
+          fetchWithCache(`${API_BASE}/products`),
+          fetchWithCache(`${API_BASE}/brands`),
         ]);
         setProducts(prodData);
         setVisibleProducts(prodData);

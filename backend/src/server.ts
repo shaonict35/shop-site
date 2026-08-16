@@ -21,10 +21,13 @@ import menuRouter from "./routes/menu";
 import pagesRouter from "./routes/pages";
 import bkashRouter from "./routes/bkash";
 import db from "./firebase";
+import { autoSeedDatabase } from "./auto-seed";
 
 dotenv.config();
 
 const app = express();
+app.set("trust proxy", 1);
+
 const httpServer = createServer(app);
 const io = new SocketIOServer(httpServer, {
   cors: {
@@ -299,6 +302,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(500).json({ error: "Internal Server Error" });
 });
 
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, async () => {
   console.log(`🚀 GlowGoodly Custom Backend & Socket.io Server running at http://localhost:${PORT}`);
+  await autoSeedDatabase();
 });

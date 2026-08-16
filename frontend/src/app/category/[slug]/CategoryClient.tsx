@@ -8,6 +8,7 @@ import PromoBanner from "../../../components/PromoBanner";
 import Footer from "../../../components/Footer";
 import MobileNavbar from "../../../components/MobileNavbar";
 import { useApp } from "../../../context/AppContext";
+import { API_BASE } from "../../../utils/api";
 
 interface Variant {
   id: string;
@@ -202,14 +203,14 @@ function CategoryPageContent() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        let url = `http://localhost:5000/api/products?`;
+        let url = `${API_BASE}/products?`;
         if (slug) {
           let catQuery = slug;
           if (slug.toLowerCase() === "skin") catQuery = "Skincare";
           else if (slug.toLowerCase() === "hair") catQuery = "Haircare";
           url += `categoryName=${encodeURIComponent(catQuery)}&`;
         }
-        const [res, brandRes] = await Promise.all([fetch(url), fetch("http://localhost:5000/api/brands")]);
+        const [res, brandRes] = await Promise.all([fetch(url), fetch(`${API_BASE}/brands`)]);
         if (res.ok) { const data = await res.json(); setProducts(data); setVisibleProducts(data); }
         if (brandRes.ok) setBrands(await brandRes.json());
       } catch (e) {

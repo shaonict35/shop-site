@@ -338,7 +338,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
     }
     setReplySending(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/contact-messages/${selectedMessage.id}/reply`, {
+      const res = await fetch(`${API_BASE}/admin/contact-messages/${selectedMessage.id}/reply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ replyText: ticketReplyText, senderName: `${user?.name || "Admin"} (GlowGoodly Support)` }),
@@ -370,7 +370,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
     setIsSendingPush(true);
     setPushStatus("Dispatching FCM Rich Web Push Notification...");
     try {
-      const res = await fetch("http://localhost:5000/api/notifications/push", {
+      const res = await fetch(`${API_BASE}/notifications/push`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(pushForm),
@@ -396,7 +396,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
       return;
     }
     try {
-      const url = menuForm.id ? `http://localhost:5000/api/admin/menus/${menuForm.id}` : `http://localhost:5000/api/admin/menus`;
+      const url = menuForm.id ? `${API_BASE}/admin/menus/${menuForm.id}` : `${API_BASE}/admin/menus`;
       const method = menuForm.id ? "PUT" : "POST";
       const res = await fetch(url, {
         method,
@@ -417,7 +417,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
   const handleDeleteMenu = async (id: string) => {
     if (!confirm("Are you sure you want to delete this menu item?")) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/menus/${id}`, { method: "DELETE" });
+      const res = await fetch(`${API_BASE}/admin/menus/${id}`, { method: "DELETE" });
       if (res.ok) {
         fetchData();
         triggerGlobalDataSync();
@@ -431,7 +431,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
     e.preventDefault();
     setCmsStatus("Saving page content...");
     try {
-      const res = await fetch("http://localhost:5000/api/admin/pages", {
+      const res = await fetch(`${API_BASE}/admin/pages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(cmsPageForm)
@@ -458,7 +458,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
       return;
     }
     try {
-      const res = await fetch("http://localhost:5000/api/auth/login", {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim(), password: password.trim() })
@@ -517,20 +517,20 @@ const DEFAULT_ALL_SITE_BANNERS = [
     if (!activeToken) return;
     try {
       const [settingsRes, statsRes, ordersRes, catRes, brandRes, prodRes, bannerRes, blogRes, custRes, staffRes, notifRes, menuRes, pageRes, msgRes] = await Promise.all([
-        fetch("http://localhost:5000/api/settings", { headers: { Authorization: `Bearer ${activeToken}` } }),
-        fetch("http://localhost:5000/api/admin/dashboard-stats", { headers: { Authorization: `Bearer ${activeToken}` } }),
-        fetch("http://localhost:5000/api/orders/all", { headers: { Authorization: `Bearer ${activeToken}` } }),
-        fetch("http://localhost:5000/api/admin/categories"),
-        fetch("http://localhost:5000/api/admin/brands" + (bypass ? `?t=${Date.now()}` : ""), { headers: { Authorization: `Bearer ${activeToken}`, "Cache-Control": "no-cache" } }),
-        fetch("http://localhost:5000/api/products" + (bypass ? `?t=${Date.now()}` : "")),
-        fetch("http://localhost:5000/api/admin/banners"),
-        fetch("http://localhost:5000/api/admin/blogs"),
-        fetch("http://localhost:5000/api/admin/customers", { headers: { Authorization: `Bearer ${token}` } }),
-        fetch("http://localhost:5000/api/admin/staff", { headers: { Authorization: `Bearer ${token}` } }),
-        fetch("http://localhost:5000/api/notifications"),
-        fetch("http://localhost:5000/api/admin/menus"),
-        fetch("http://localhost:5000/api/admin/pages"),
-        fetch("http://localhost:5000/api/admin/contact-messages")
+        fetch(`${API_BASE}/settings`, { headers: { Authorization: `Bearer ${activeToken}` } }),
+        fetch(`${API_BASE}/admin/dashboard-stats`, { headers: { Authorization: `Bearer ${activeToken}` } }),
+        fetch(`${API_BASE}/orders/all`, { headers: { Authorization: `Bearer ${activeToken}` } }),
+        fetch(`${API_BASE}/admin/categories`),
+        fetch(`${API_BASE}/admin/brands` + (bypass ? `?t=${Date.now()}` : ""), { headers: { Authorization: `Bearer ${activeToken}`, "Cache-Control": "no-cache" } }),
+        fetch(`${API_BASE}/products` + (bypass ? `?t=${Date.now()}` : "")),
+        fetch(`${API_BASE}/admin/banners`),
+        fetch(`${API_BASE}/admin/blogs`),
+        fetch(`${API_BASE}/admin/customers`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_BASE}/admin/staff`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_BASE}/notifications`),
+        fetch(`${API_BASE}/admin/menus`),
+        fetch(`${API_BASE}/admin/pages`),
+        fetch(`${API_BASE}/admin/contact-messages`)
       ]);
 
       const safeJson = async (res: Response) => {
@@ -623,7 +623,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
   const handleRemoveAdminBanner = async (id: string) => {
     if (!confirm("Are you sure you want to PERMANENTLY delete this banner?")) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/banners/${id}`, {
+      const res = await fetch(`${API_BASE}/banners/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -643,7 +643,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
   const handleRemoveCatalogProduct = async (id: string) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/products/${id}`, {
+      const res = await fetch(`${API_BASE}/admin/products/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -758,7 +758,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
     const itemPrices = inventoryPrices[productId];
     if (!itemPrices) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/products/${productId}`, {
+      const res = await fetch(`${API_BASE}/products/${productId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ price: itemPrices.price, costPrice: itemPrices.costPrice, discountPrice: itemPrices.discountPrice, stock: itemPrices.stock })
@@ -779,7 +779,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
   // User Actions
   const handleUpdateUser = async (userId: string, updatePayload: any) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/users/${userId}`, {
+      const res = await fetch(`${API_BASE}/admin/users/${userId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(updatePayload)
@@ -821,7 +821,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
   const handleDeleteUser = async (userId: string, name: string) => {
     if (!confirm(`Are you sure you want to delete user ${name}?`)) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/users/${userId}`, {
+      const res = await fetch(`${API_BASE}/admin/users/${userId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -838,7 +838,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
   const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch("http://localhost:5000/api/admin/staff", {
+      const res = await fetch(`${API_BASE}/admin/staff`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(staffForm)
@@ -866,7 +866,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
     }
     try {
       const method = bannerForm.id ? "PATCH" : "POST";
-      const url = bannerForm.id ? `http://localhost:5000/api/banners/${bannerForm.id}` : "http://localhost:5000/api/banners";
+      const url = bannerForm.id ? `${API_BASE}/banners/${bannerForm.id}` : `${API_BASE}/banners`;
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -890,8 +890,8 @@ const DEFAULT_ALL_SITE_BANNERS = [
     if (!confirm("Are you sure you want to permanently delete this banner?")) return;
     try {
       setBanners((prev) => prev.filter((b) => b.id !== id));
-      await fetch(`http://localhost:5000/api/banners/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-      await fetch(`http://localhost:5000/api/admin/banners/${id}`, { method: "DELETE" });
+      await fetch(`${API_BASE}/banners/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      await fetch(`${API_BASE}/admin/banners/${id}`, { method: "DELETE" });
       clearAllCache();
       triggerGlobalDataSync();
       fetchData();
@@ -905,7 +905,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
     const form = isSub ? subCategoryForm : categoryForm;
     if (!form.name) return;
     try {
-      const res = await fetch("http://localhost:5000/api/categories", {
+      const res = await fetch(`${API_BASE}/categories`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form)
@@ -929,7 +929,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
   const handleDeleteCategory = async (id: string) => {
     if (!confirm("Delete category?")) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/categories/${id}`, { method: "DELETE" });
+      const res = await fetch(`${API_BASE}/categories/${id}`, { method: "DELETE" });
       if (res.ok) fetchData();
     } catch (e) { alert("Error deleting category"); }
   };
@@ -942,7 +942,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
       return;
     }
     try {
-      const res = await fetch("http://localhost:5000/api/products", {
+      const res = await fetch(`${API_BASE}/products`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(productForm)
@@ -966,7 +966,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
   const handleDeleteProduct = async (id: string) => {
     if (!confirm("Delete product?")) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/products/${id}`, { method: "DELETE" });
+      const res = await fetch(`${API_BASE}/products/${id}`, { method: "DELETE" });
       if (res.ok) fetchData();
     } catch (e) { alert("Error deleting product"); }
   };
@@ -981,7 +981,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
       // Optimistically update local state so preview appears immediately in table
       setAdminBrands((prev) => prev.map((b) => b.id === brandId ? { ...b, logoUrl } : b));
       try {
-        const res = await fetch(`http://localhost:5000/api/admin/brands/${brandId}`, {
+        const res = await fetch(`${API_BASE}/admin/brands/${brandId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ logoUrl })
@@ -1003,7 +1003,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
     e.preventDefault();
     setSettingsMessage("");
     try {
-      const res = await fetch("http://localhost:5000/api/settings/bulk", {
+      const res = await fetch(`${API_BASE}/settings/bulk`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(settings)
@@ -1016,7 +1016,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
   const handleSendCourier = async (orderId: string, provider: string) => {
     if (!token) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/send-${provider.toLowerCase()}`, {
+      const res = await fetch(`${API_BASE}/orders/${orderId}/send-${provider.toLowerCase()}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -3123,7 +3123,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                             return;
                           }
                           try {
-                            const res = await fetch("http://localhost:5000/api/admin/staff", {
+                            const res = await fetch(`${API_BASE}/admin/staff`, {
                               method: "POST",
                               headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                               body: JSON.stringify(staffForm)
@@ -4254,7 +4254,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                           alert("Banner updated successfully!");
                           setEditingBanner(null);
                           try {
-                            await fetch(`http://localhost:5000/api/admin/banners/${editingBanner.id}`, {
+                            await fetch(`${API_BASE}/admin/banners/${editingBanner.id}`, {
                               method: "PATCH",
                               headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                               body: JSON.stringify(editingBanner)
@@ -4322,7 +4322,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                       <button onClick={() => setEditingCategory(null)} style={{ backgroundColor: "#f1f5f9", padding: "8px 16px", border: "none", borderRadius: "6px", fontWeight: "700", cursor: "pointer" }}>Cancel</button>
                       <button onClick={async () => {
                         try {
-                          const res = await fetch(`http://localhost:5000/api/admin/categories/${editingCategory.id}`, {
+                          const res = await fetch(`${API_BASE}/admin/categories/${editingCategory.id}`, {
                             method: "PATCH",
                             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                             body: JSON.stringify({ name: editingCategory.name, imageUrl: editingCategory.imageUrl })
@@ -4822,7 +4822,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                         <button onClick={() => setEditingProduct(null)} style={{ backgroundColor: "#f1f5f9", padding: "8px 16px", border: "none", borderRadius: "6px", fontWeight: "700", cursor: "pointer" }}>Cancel</button>
                         <button onClick={async () => {
                           try {
-                            const res = await fetch(`http://localhost:5000/api/admin/products/${editingProduct.id}`, {
+                            const res = await fetch(`${API_BASE}/admin/products/${editingProduct.id}`, {
                               method: "PATCH",
                               headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                               body: JSON.stringify({
@@ -4865,7 +4865,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                   e.preventDefault();
                   if (!brandForm.name) return;
                   try {
-                    const res = await fetch("http://localhost:5000/api/admin/brands", {
+                    const res = await fetch(`${API_BASE}/admin/brands`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                       body: JSON.stringify(brandForm)
@@ -4944,7 +4944,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                           <td style={{ textAlign: "center" }}>
                             <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
                               <button onClick={() => setEditingBrand({ ...b })} style={{ backgroundColor: "#f1f5f9", color: "#334155", border: "1px solid #cbd5e1", padding: "4px 10px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>✏️ Edit</button>
-                              <button onClick={async () => { if (!confirm(`Delete brand ${b.name}?`)) return; try { await fetch(`http://localhost:5000/api/admin/brands/${b.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); setAdminBrands(prev => prev.filter(item => item.id !== b.id)); fetchData(true); } catch (e) { alert("Error deleting brand"); } }} style={{ backgroundColor: "#fee2e2", color: "#ef4444", border: "none", padding: "4px 10px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Delete</button>
+                              <button onClick={async () => { if (!confirm(`Delete brand ${b.name}?`)) return; try { await fetch(`${API_BASE}/admin/brands/${b.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); setAdminBrands(prev => prev.filter(item => item.id !== b.id)); fetchData(true); } catch (e) { alert("Error deleting brand"); } }} style={{ backgroundColor: "#fee2e2", color: "#ef4444", border: "none", padding: "4px 10px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Delete</button>
                             </div>
                           </td>
                         </tr>
@@ -4984,7 +4984,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                           try {
                             // Optimistically update adminBrands state immediately
                             setAdminBrands((prev) => prev.map((b) => b.id === editingBrand.id ? { ...b, name: editingBrand.name, originCountry: editingBrand.originCountry, logoUrl: editingBrand.logoUrl } : b));
-                            const res = await fetch(`http://localhost:5000/api/admin/brands/${editingBrand.id}`, {
+                            const res = await fetch(`${API_BASE}/admin/brands/${editingBrand.id}`, {
                               method: "PATCH",
                               headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                               body: JSON.stringify({ name: editingBrand.name, originCountry: editingBrand.originCountry, logoUrl: editingBrand.logoUrl })
@@ -5396,7 +5396,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                             type="button"
                             onClick={async () => {
                               try {
-                                const res = await fetch("http://localhost:5000/api/admin/courier/pathao/test", {
+                                const res = await fetch(`${API_BASE}/admin/courier/pathao/test`, {
                                   method: "POST",
                                   headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                                   body: JSON.stringify({
@@ -5438,7 +5438,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                             type="button"
                             onClick={async () => {
                               try {
-                                const res = await fetch("http://localhost:5000/api/admin/courier/steadfast/test", {
+                                const res = await fetch(`${API_BASE}/admin/courier/steadfast/test`, {
                                   method: "POST",
                                   headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                                   body: JSON.stringify({
@@ -5477,7 +5477,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                             type="button"
                             onClick={async () => {
                               try {
-                                const res = await fetch("http://localhost:5000/api/admin/courier/redx/test", {
+                                const res = await fetch(`${API_BASE}/admin/courier/redx/test`, {
                                   method: "POST",
                                   headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                                   body: JSON.stringify({
@@ -5541,7 +5541,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                             type="button"
                             onClick={async () => {
                               try {
-                                const res = await fetch("http://localhost:5000/api/admin/courier/carrybee/issue-token", {
+                                const res = await fetch(`${API_BASE}/admin/courier/carrybee/issue-token`, {
                                   method: "POST",
                                   headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                                   body: JSON.stringify({
@@ -5628,7 +5628,7 @@ function LiveChatPanel({ token, staffList }: { token: string | null; staffList?:
   useEffect(() => {
     const fetchThreads = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/chat/admin/threads", {
+        const res = await fetch(`${API_BASE}/chat/admin/threads`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
@@ -5650,7 +5650,7 @@ function LiveChatPanel({ token, staffList }: { token: string | null; staffList?:
     if (!selectedChatId) return;
     const fetchHistory = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/chat/history/${selectedChatId}`);
+        const res = await fetch(`${API_BASE}/chat/history/${selectedChatId}`);
         if (res.ok) {
           const data = await res.json();
           setChatHistory(data);
@@ -5676,7 +5676,7 @@ function LiveChatPanel({ token, staffList }: { token: string | null; staffList?:
     // Optimistic
     setChatHistory(prev => [...prev, { id: "tmp_" + Date.now(), chatId: selectedChatId, sender: "Admin", message: text, createdAt: new Date().toISOString() }]);
     try {
-      await fetch("http://localhost:5000/api/chat/admin/reply", {
+      await fetch(`${API_BASE}/chat/admin/reply`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ chatId: selectedChatId, message: text }),
@@ -5890,7 +5890,7 @@ function AbandonedCartsPanel({ token }: { token: string | null }) {
 
   const fetchCarts = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/admin/abandoned-carts", {
+      const res = await fetch(`${API_BASE}/admin/abandoned-carts`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) setCarts(await res.json());
@@ -5902,7 +5902,7 @@ function AbandonedCartsPanel({ token }: { token: string | null }) {
 
   const handleNotify = async (cartId: string, name: string) => {
     try {
-      const res = await fetch("http://localhost:5000/api/admin/abandoned-carts/notify", {
+      const res = await fetch(`${API_BASE}/admin/abandoned-carts/notify`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ cartId, method: "Email & SMS" })
@@ -5976,7 +5976,7 @@ function UpsellOffersPanel({ token }: { token: string | null }) {
 
   const fetchUpsells = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/admin/upsells");
+      const res = await fetch(`${API_BASE}/admin/upsells`);
       if (res.ok) setRules(await res.json());
     } catch (e) {}
   };
@@ -5986,7 +5986,7 @@ function UpsellOffersPanel({ token }: { token: string | null }) {
   const handleAddRule = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch("http://localhost:5000/api/admin/upsells", {
+      const res = await fetch(`${API_BASE}/admin/upsells`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(form)
@@ -6058,7 +6058,7 @@ function InfluencersPanel({ token }: { token: string | null }) {
 
   const fetchInfluencers = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/admin/influencers", {
+      const res = await fetch(`${API_BASE}/admin/influencers`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) setList(await res.json());
@@ -6070,7 +6070,7 @@ function InfluencersPanel({ token }: { token: string | null }) {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch("http://localhost:5000/api/admin/influencers", {
+      const res = await fetch(`${API_BASE}/admin/influencers`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(form)
@@ -6308,7 +6308,7 @@ function SupportTicketsPanel({ token }: { token: string | null }) {
 
   const fetchTickets = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/admin/tickets", {
+      const res = await fetch(`${API_BASE}/admin/tickets`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) setTickets(await res.json());
@@ -6319,7 +6319,7 @@ function SupportTicketsPanel({ token }: { token: string | null }) {
 
   const handleUpdateStatus = async (id: string, status: string) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/tickets/${id}`, {
+      const res = await fetch(`${API_BASE}/admin/tickets/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ status })
@@ -6429,7 +6429,7 @@ function MenuBuilderPanel() {
 
   const [localCategories, setLocalCategories] = useState<{id: string; name: string; parentId?: string; slug?: string}[]>([]);
   React.useEffect(() => {
-    fetch("http://localhost:5000/api/categories").then(r => r.json()).then(d => setLocalCategories(d.data || d || [])).catch(() => {});
+    fetch(`${API_BASE}/categories`).then(r => r.json()).then(d => setLocalCategories(d.data || d || [])).catch(() => {});
   }, []);
 
   const handleAddHeaderLink = (e: React.FormEvent) => {
@@ -6586,7 +6586,7 @@ function AuditLogsPanel({ token }: { token: string | null }) {
   useEffect(() => {
     const fetchLogs = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/admin/audit-logs", {
+        const res = await fetch(`${API_BASE}/admin/audit-logs`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.ok) setLogs(await res.json());
@@ -6669,7 +6669,7 @@ function BatchExpiryPanel({ token }: { token: string | null }) {
 
   const fetchBatches = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/admin/batches", {
+      const res = await fetch(`${API_BASE}/admin/batches`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) setBatches(await res.json());
@@ -6681,7 +6681,7 @@ function BatchExpiryPanel({ token }: { token: string | null }) {
   const handleAddBatch = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch("http://localhost:5000/api/admin/batches", {
+      const res = await fetch(`${API_BASE}/admin/batches`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(form)
@@ -6750,7 +6750,7 @@ function SubscriptionsPanel({ token }: { token: string | null }) {
   useEffect(() => {
     const fetchSubs = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/admin/subscriptions", {
+        const res = await fetch(`${API_BASE}/admin/subscriptions`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.ok) setSubs(await res.json());
@@ -6829,7 +6829,7 @@ function CustomerWalletPanel({ token, customerList }: { token: string | null; cu
 
   const fetchWallets = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/admin/wallet", {
+      const res = await fetch(`${API_BASE}/admin/wallet`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) setWallets(await res.json());
@@ -6841,7 +6841,7 @@ function CustomerWalletPanel({ token, customerList }: { token: string | null; cu
   const handleCreditWallet = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch("http://localhost:5000/api/admin/wallet/credit", {
+      const res = await fetch(`${API_BASE}/admin/wallet/credit`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(creditForm)
@@ -6901,7 +6901,7 @@ function SystemHealthPanel({ token }: { token: string | null }) {
   useEffect(() => {
     const fetchHealth = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/admin/system-health", {
+        const res = await fetch(`${API_BASE}/admin/system-health`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.ok) setHealth(await res.json());
@@ -6951,7 +6951,7 @@ function RmaWorkflowPanel({ token }: { token: string | null }) {
 
   const fetchRMA = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/admin/rma", {
+      const res = await fetch(`${API_BASE}/admin/rma`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) setRmas(await res.json());
@@ -6962,7 +6962,7 @@ function RmaWorkflowPanel({ token }: { token: string | null }) {
 
   const handleUpdateStep = async (id: string, rmaStep: string) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/rma/${id}`, {
+      const res = await fetch(`${API_BASE}/admin/rma/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ rmaStep })
@@ -7030,7 +7030,7 @@ function MenuManagementPanel({ token }: { token: string | null }) {
   const fetchAdminMenus = async () => {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/api/admin/menus");
+      const res = await fetch(`${API_BASE}/admin/menus`);
       if (res.ok) {
         const data = await res.json();
         setMenus(data);
@@ -7050,7 +7050,7 @@ function MenuManagementPanel({ token }: { token: string | null }) {
     e.preventDefault();
     if (!form.title || !form.url) { alert("Title and URL required"); return; }
     try {
-      const res = await fetch("http://localhost:5000/api/admin/menus", {
+      const res = await fetch(`${API_BASE}/admin/menus`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(form)
@@ -7074,7 +7074,7 @@ function MenuManagementPanel({ token }: { token: string | null }) {
     e.preventDefault();
     if (!editingItem) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/menus/${editingItem.id}`, {
+      const res = await fetch(`${API_BASE}/admin/menus/${editingItem.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(editingItem)
@@ -7095,7 +7095,7 @@ function MenuManagementPanel({ token }: { token: string | null }) {
   const handleDeleteMenu = async (id: string, title: string) => {
     if (!confirm(`Are you sure you want to delete menu item "${title}"?`)) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/menus/${id}`, {
+      const res = await fetch(`${API_BASE}/admin/menus/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });

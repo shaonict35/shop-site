@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { fetchWithCache } from "../utils/api";
+import { fetchWithCache, API_BASE } from "../utils/api";
 import { registerFcmToken } from "../utils/fcm";
 
 import Header from "../components/Header";
@@ -129,10 +129,10 @@ export default function Home() {
     const fetchMetadata = async (bypass: boolean = false) => {
       try {
         const [catData, brandData, bannerData, notifRes] = await Promise.all([
-          fetchWithCache("http://localhost:5000/api/categories", bypass),
-          fetchWithCache("http://localhost:5000/api/brands", bypass),
-          fetchWithCache("http://localhost:5000/api/banners", bypass),
-          fetchWithCache("http://localhost:5000/api/notifications/active", bypass)
+          fetchWithCache(`${API_BASE}/categories`, bypass),
+          fetchWithCache(`${API_BASE}/brands`, bypass),
+          fetchWithCache(`${API_BASE}/banners`, bypass),
+          fetchWithCache(`${API_BASE}/notifications/active`, bypass)
         ]);
         setCategories(Array.isArray(catData) ? catData : []);
         setBrands(Array.isArray(brandData) ? brandData : []);
@@ -188,7 +188,7 @@ export default function Home() {
     const fetchProducts = async (bypass: boolean = false) => {
       setLoading(true);
       try {
-        let url = `http://localhost:5000/api/products?`;
+        let url = `${API_BASE}/products?`;
         if (activeCategory) url += `category=${activeCategory}&`;
         if (activeBrand) url += `brand=${activeBrand}&`;
         if (searchQuery) url += `search=${encodeURIComponent(searchQuery)}&`;

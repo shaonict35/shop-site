@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { MessageSquare, X, Send, Camera, Smile, ChevronDown } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { API_BASE } from "../utils/api";
 
 interface ChatMessage {
   id?: string;
@@ -41,7 +42,7 @@ export default function ChatWidget() {
 
     const fetchHistory = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/chat/history/${chatId}`);
+        const res = await fetch(`${API_BASE}/chat/history/${chatId}`);
         if (res.ok) {
           const data = await res.json();
           setMessages(data);
@@ -85,7 +86,7 @@ export default function ChatWidget() {
     setMessages((prev) => [...prev, optimisticMsg]);
 
     try {
-      const res = await fetch("http://localhost:5000/api/chat/send", {
+      const res = await fetch(`${API_BASE}/chat/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chatId, message: msgText }),
@@ -128,7 +129,7 @@ export default function ChatWidget() {
       setMessages((prev) => [...prev, optimisticMsg]);
 
       try {
-        const res = await fetch("http://localhost:5000/api/chat/send", {
+        const res = await fetch(`${API_BASE}/chat/send`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ chatId, message: base64data }),

@@ -6,6 +6,7 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import MobileNavbar from "../../components/MobileNavbar";
 import { useApp } from "../../context/AppContext";
+import { API_BASE } from "../../utils/api";
 
 export default function CustomerAccountPage() {
   const { user, logout, wishlist, toggleWishlist, updateUser } = useApp();
@@ -35,7 +36,7 @@ export default function CustomerAccountPage() {
     if (!token) return;
     setSavingAddress(true);
     try {
-      const res = await fetch("http://localhost:5000/api/auth/profile", {
+      const res = await fetch(`${API_BASE}/auth/profile`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -77,11 +78,11 @@ export default function CustomerAccountPage() {
     const fetchAccountData = async () => {
       const token = localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token");
       try {
-        const prodRes = await fetch("http://localhost:5000/api/products");
+        const prodRes = await fetch(`${API_BASE}/products`);
         if (prodRes.ok) setProducts(await prodRes.json());
 
         if (token) {
-          const res = await fetch("http://localhost:5000/api/orders/my-orders", {
+          const res = await fetch(`${API_BASE}/orders/my-orders`, {
             headers: { Authorization: `Bearer ${token}` }
           });
           if (res.ok) {
@@ -488,7 +489,7 @@ export default function CustomerAccountPage() {
                                   onClick={async () => {
                                     const token = localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token");
                                     try {
-                                      const res = await fetch(`http://localhost:5000/api/orders/${ord.id}/customer-edit`, {
+                                      const res = await fetch(`${API_BASE}/orders/${ord.id}/customer-edit`, {
                                         method: "PUT",
                                         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                                         body: JSON.stringify(editForm)

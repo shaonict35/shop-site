@@ -1,3 +1,5 @@
+import { API_BASE } from "./api";
+
 // Utility to request notification permission and subscribe device to FCM
 export async function registerFcmToken() {
   if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator)) {
@@ -32,7 +34,7 @@ export async function registerFcmToken() {
       : "Desktop Web Browser";
 
     // Send token to backend API
-    await fetch("http://localhost:5000/api/notifications/subscribe-fcm", {
+    await fetch(`${API_BASE}/notifications/subscribe-fcm`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token, device }),

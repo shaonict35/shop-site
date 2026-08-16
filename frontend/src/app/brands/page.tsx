@@ -6,7 +6,7 @@ import Header from "../../components/Header";
 import PromoBanner from "../../components/PromoBanner";
 import Footer from "../../components/Footer";
 import MobileNavbar from "../../components/MobileNavbar";
-import { fetchWithCache } from "../../utils/api";
+import { fetchWithCache, API_BASE } from "../../utils/api";
 
 interface Brand {
   id: string;
@@ -33,7 +33,7 @@ export default function BrandsPage() {
     const fetchBrands = async (bypass: boolean = false) => {
       setLoading(true);
       try {
-        const data = await fetchWithCache("http://localhost:5000/api/brands", bypass);
+        const data = await fetchWithCache(`${API_BASE}/brands`, bypass);
         if (Array.isArray(data)) {
           setBrands(data);
         }

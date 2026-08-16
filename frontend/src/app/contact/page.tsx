@@ -6,6 +6,7 @@ import PageBanner from "../../components/PageBanner";
 import Footer from "../../components/Footer";
 import MobileNavbar from "../../components/MobileNavbar";
 import PolicyLayout from "../../components/PolicyLayout";
+import { API_BASE } from "../../utils/api";
 
 export default function ContactPage() {
   const [name, setName] = useState("");
@@ -24,7 +25,7 @@ export default function ContactPage() {
     setLoading(true);
     setStatus("");
     try {
-      const res = await fetch("http://localhost:5000/api/contact", {
+      const res = await fetch(`${API_BASE}/contact`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, phone, email, message }),

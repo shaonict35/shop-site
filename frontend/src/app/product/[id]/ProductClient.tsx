@@ -7,6 +7,7 @@ import Footer from "../../../components/Footer";
 import { useApp } from "../../../context/AppContext";
 import { trackViewContent } from "../../../utils/pixel";
 import Link from "next/link";
+import { API_BASE } from "../../../utils/api";
 
 interface Variant {
   id: string;
@@ -90,7 +91,7 @@ export default function ProductPage() {
     const fetchProductDetails = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`http://localhost:5000/api/products/${productId}`, { cache: "no-store" });
+        const res = await fetch(`${API_BASE}/products/${productId}`, { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
           setProduct(data.product);
@@ -180,7 +181,7 @@ export default function ProductPage() {
     }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/products/${unwrappedParams.id}/reviews`, {
+      const res = await fetch(`${API_BASE}/products/${unwrappedParams.id}/reviews`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ customerName, rating, comment }),

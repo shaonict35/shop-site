@@ -6,6 +6,7 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import MobileNavbar from "../../components/MobileNavbar";
 import { useApp } from "../../context/AppContext";
+import { API_BASE } from "../../utils/api";
 
 interface Variant {
   id: string;
@@ -39,7 +40,7 @@ export default function WishlistPage() {
       setLoading(true);
       try {
         const idsParam = wishlist.join(",");
-        const res = await fetch(`http://localhost:5000/api/products?ids=${encodeURIComponent(idsParam)}`);
+        const res = await fetch(`${API_BASE}/products?ids=${encodeURIComponent(idsParam)}`);
         if (res.ok) {
           const fetchedProducts = await res.json();
           setProducts(Array.isArray(fetchedProducts) ? fetchedProducts : []);

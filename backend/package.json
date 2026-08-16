@@ -1,11 +1,17 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "app.js",
+  "prisma": {
+    "schema": "prisma/schema.prisma"
+  },
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "seed": "node src/seeds.js",
     "build": "tsc",
+    "start": "node dist/server.js",
+    "postinstall": "prisma generate --schema=./prisma/schema.prisma || true",
+    "db:push": "prisma db push --schema=./prisma/schema.prisma",
+    "seed": "node dist/auto-seed.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

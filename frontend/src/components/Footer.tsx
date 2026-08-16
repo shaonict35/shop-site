@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { useApp } from "../context/AppContext";
+import { API_BASE } from "../utils/api";
 
 export default function Footer() {
   const { siteSettings } = useApp();
@@ -10,7 +11,7 @@ export default function Footer() {
 
   const loadFooterMenus = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/menus?location=Footer", { cache: "no-store" });
+      const res = await fetch(`${API_BASE}/menus?location=Footer`, { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {

@@ -5,6 +5,7 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import MobileNavbar from "../../components/MobileNavbar";
 import { useParams } from "next/navigation";
+import { API_BASE } from "../../utils/api";
 
 export default function CustomCmsPage() {
   const params = useParams();
@@ -16,7 +17,7 @@ export default function CustomCmsPage() {
     if (!slug) return;
     const fetchPage = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/pages/${slug}`, { cache: "no-store" });
+        const res = await fetch(`${API_BASE}/pages/${slug}`, { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
           setPage(data);
