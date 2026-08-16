@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation";
+import NotFound from "../not-found";
 
-// Redirect /admin to /valobasa
-export default function AdminPageRedirect() {
-  redirect("/valobasa");
+export default function AdminPage() {
+  return <NotFound />;
 }

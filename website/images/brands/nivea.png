@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>404 Not Found</title>
+        <link rel="shortcut icon" href="https://bk.shajgoj.com/img/favicon.ico" type='image/x-icon' />
+        <link rel="stylesheet" href="/css/app.css?id=924da6c2b4b6bc2257af" />
+
+    </head>
+    <body>
+        <div class="error-section" style="text-align: center; margin-top: 70px;">
+            <img src="https://bk.shajgoj.com/img/error.gif" alt="" height="300px">
+            
+                <div class="h1 mt-5" style="font-size: 100px; font-weight: bold">404</div>
+    <div class="h1 text-uppercase">The route storage/2021/04/nivea.png could not be found.</div>
+            
+            <a data-toggle="tooltip" title="go back to previous page" href="javascript:history.back()" class="btn btn-outline-dark mt-3 mr-1">&laquo;</a>
+            <a href="https://bk.shajgoj.com/dashboard" class="btn btn-dark mt-3">Back to Dashboard</a>
+        </div>
+    </body>
+</html>
+
+
