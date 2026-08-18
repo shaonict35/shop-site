@@ -1,10 +1,9 @@
 import { PrismaClient } from "@prisma/client";
-import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-const dbUrl = process.env.DATABASE_URL || "";
+const dbUrl = process.env.DATABASE_URL || "file:./dev.db";
 
 function parseDbUrl(urlStr: string) {
   // If discrete DB environment variables are set, prioritize them
@@ -69,7 +68,25 @@ function parseDbUrl(urlStr: string) {
   }
 }
 
-const adapter = new PrismaMariaDb(parseDbUrl(dbUrl));
-const prisma = new PrismaClient({ adapter });
+let adapter: any;
+if (dbUrl.startsWith("file:") || dbUrl.endsWith(".db")) {
+  try {
+    const { PrismaLibSql } = require("@prisma/adapter-libsql");
+    adapter = new PrismaLibSql({ url: dbUrl });
+  } catch (err) {
+    console.warn("⚠️ PrismaLibSql not available:", err);
+  }
+} else {
+  try {
+    const { PrismaMariaDb } = require("@prisma/adapter-mariadb");
+    adapter = new PrismaMariaDb(parseDbUrl(dbUrl));
+  } catch (err) {
+    console.warn("⚠️ PrismaMariaDb not available, using default PrismaClient:", err);
+  }
+}
+
+const prisma = adapter ? new PrismaClient({ adapter }) : new PrismaClient();
 
 export default prisma;
+
+

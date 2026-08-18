@@ -10,9 +10,17 @@
   Options -Indexes
 
   # 3. Dynamic Route Fallbacks (Next.js SSG Dynamic Routes)
-  RewriteRule ^product/([^/]+)/?$ product/[id].html [L]
-  RewriteRule ^category/([^/]+)/?$ category/[slug].html [L]
-  RewriteRule ^landing/([^/]+)/?$ landing/[slug].html [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^product/([^/]+)/?$ product/default.html [L]
+
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^category/([^/]+)/?$ category/skincare.html [L]
+
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^landing/([^/]+)/?$ landing/seasonal-offer.html [L]
 
   # 4. Clean URLs: Check if request maps to an HTML file (e.g. /shop -> /shop.html)
   RewriteCond %{REQUEST_FILENAME} !-d

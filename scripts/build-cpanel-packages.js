@@ -98,7 +98,9 @@ if (fs.existsSync(path.join(rootDir, 'frontend', 'public'))) {
 fs.copyFileSync(path.join(rootDir, 'frontend', 'server.js'), path.join(frontendStageDir, 'server.js'));
 fs.copyFileSync(path.join(rootDir, 'frontend', 'package.json'), path.join(frontendStageDir, 'package.json'));
 fs.copyFileSync(path.join(rootDir, 'frontend', 'package-lock.json'), path.join(frontendStageDir, 'package-lock.json'));
-fs.copyFileSync(path.join(rootDir, 'frontend', '.env.production.example'), path.join(frontendStageDir, '.env.production.example'));
+if (fs.existsSync(path.join(rootDir, 'frontend', '.env.production.example'))) {
+  fs.copyFileSync(path.join(rootDir, 'frontend', '.env.production.example'), path.join(frontendStageDir, '.env.production.example'));
+}
 if (fs.existsSync(path.join(rootDir, 'frontend', '.env'))) {
   fs.copyFileSync(path.join(rootDir, 'frontend', '.env'), path.join(frontendStageDir, '.env'));
 }

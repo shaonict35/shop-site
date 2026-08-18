@@ -322,19 +322,21 @@ function ShopPageContent() {
           fetchWithCache(`${API_BASE}/products`),
           fetchWithCache(`${API_BASE}/brands`),
         ]);
-        setProducts(prodData);
-        setVisibleProducts(prodData);
-        setBrands(brandData);
+        const validProds = Array.isArray(prodData) ? prodData : [];
+        const validBrands = Array.isArray(brandData) ? brandData : [];
+
+        setProducts(validProds);
+        setVisibleProducts(validProds);
+        setBrands(validBrands);
 
         // Dynamically compute the maximum price bound
-        if (prodData && prodData.length > 0) {
-          const maxVal = prodData.reduce((max: number, p: any) => {
-            const v = p.variants[0];
-            if (!v) return max;
-            const pVal = v.discountPrice !== null ? v.discountPrice : v.price;
+        if (validProds.length > 0) {
+          const maxVal = validProds.reduce((max: number, p: any) => {
+            const v = p.variants && p.variants[0];
+            const pVal = v ? (v.discountPrice !== null && v.discountPrice !== undefined ? v.discountPrice : v.price) : (p.price || 0);
             return pVal > max ? pVal : max;
-          }, 3000);
-          const roundedMax = Math.ceil(maxVal / 500) * 500;
+          }, 5000);
+          const roundedMax = Math.max(50000, Math.ceil(maxVal / 500) * 500);
           setMaxPriceBound(roundedMax);
           setPriceRange(roundedMax);
         }
@@ -349,6 +351,7 @@ function ShopPageContent() {
     window.addEventListener("glowgoodly_data_updated", handleSync);
     return () => window.removeEventListener("glowgoodly_data_updated", handleSync);
   }, []);
+
 
 
 
@@ -436,9 +439,8 @@ function ShopPageContent() {
     }
 
     filtered = filtered.filter((p) => {
-      const v = p.variants[0];
-      if (!v) return false;
-      const dp = v.discountPrice !== null ? v.discountPrice : v.price;
+      const v = p.variants && p.variants[0];
+      const dp = v ? (v.discountPrice !== null && v.discountPrice !== undefined ? v.discountPrice : v.price) : (p.price || 0);
       return dp <= priceRange;
     });
 

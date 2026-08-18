@@ -6,6 +6,12 @@ const CACHE_DURATION = 5000;
 
 // Base API URL calculation supporting full URLs, paths, and trailing slash normalization
 const getBaseApiUrl = () => {
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host.includes("glowgoodly.com")) {
+      return "https://api.glowgoodly.com/api";
+    }
+  }
   if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.trim()) {
     const raw = process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, "");
     return raw.endsWith("/api") ? raw : `${raw}/api`;
@@ -15,6 +21,7 @@ const getBaseApiUrl = () => {
 
 export const API_BASE = getBaseApiUrl();
 export const API_ROOT = API_BASE.replace(/\/api\/?$/, "");
+
 
 export async function fetchWithCache(url: string, bypassCache: boolean = false) {
   const now = Date.now();

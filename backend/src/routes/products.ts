@@ -192,32 +192,40 @@ router.get("/products/:id", async (req: Request, res: Response) => {
 
     const productData = { id: doc.id, ...doc.data() } as any;
 
-    // Fetch approved reviews
-    const reviewsSnapshot = await db.collection("reviews")
-      .where("productId", "==", id)
-      .where("isApproved", "==", true)
-      .get();
-      
-    const reviews: any[] = [];
-    reviewsSnapshot.forEach(rDoc => {
-      reviews.push({ id: rDoc.id, ...rDoc.data() });
-    });
-    reviews.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    // Fetch approved reviews safely
+    let reviews: any[] = [];
+    try {
+      const reviewsSnapshot = await db.collection("reviews")
+        .where("productId", "==", id)
+        .where("isApproved", "==", true)
+        .get();
+        
+      reviewsSnapshot.forEach(rDoc => {
+        reviews.push({ id: rDoc.id, ...rDoc.data() });
+      });
+      reviews.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch (e) {
+      console.warn("Could not fetch reviews for product", id, e);
+    }
     productData.reviews = reviews;
 
-    // Get related products
-    const relatedSnapshot = await db.collection("products")
-      .where("categoryId", "==", productData.categoryId)
-      .where("status", "==", "Active")
-      .limit(9)
-      .get();
+    // Get related products safely
+    let relatedProducts: any[] = [];
+    try {
+      const relatedSnapshot = await db.collection("products")
+        .where("categoryId", "==", productData.categoryId)
+        .where("status", "==", "Active")
+        .limit(9)
+        .get();
 
-    const relatedProducts: any[] = [];
-    relatedSnapshot.forEach(rDoc => {
-      if (rDoc.id !== id && relatedProducts.length < 8) {
-        relatedProducts.push({ id: rDoc.id, ...rDoc.data() });
-      }
-    });
+      relatedSnapshot.forEach(rDoc => {
+        if (rDoc.id !== id && relatedProducts.length < 8) {
+          relatedProducts.push({ id: rDoc.id, ...rDoc.data() });
+        }
+      });
+    } catch (e) {
+      console.warn("Could not fetch related products for category", productData.categoryId, e);
+    }
 
     res.json({ product: productData, relatedProducts });
   } catch (error: any) {

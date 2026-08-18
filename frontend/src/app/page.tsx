@@ -22,7 +22,16 @@ interface Product {
   variants: { id: string; name: string; price: number; discountPrice: number | null; stock: number; shadeColor: string | null; size?: string | null }[];
 }
 
-const initialHeroSlides: any[] = [];
+const initialHeroSlides: any[] = [
+  {
+    title: "Exclusive Beauty & Skincare Deals",
+    desc: "Up to 50% Off Top Brands",
+    bg: "linear-gradient(135deg, #e63b7a 0%, #ff758c 100%)",
+    img: "https://bk.shajgoj.com/storage/2026/07/prime-banner-web.png",
+    mobileImg: "https://bk.shajgoj.com/storage/2026/07/prime-banner-web.png",
+    link: "/shop"
+  }
+];
 
 const DEFAULT_BEAUTY_CATEGORIES = [
   { id: "cat-makeup", name: "Makeup", slug: "makeup", image: "https://bk.shajgoj.com/storage/2026/04/makeup.png" },
@@ -138,7 +147,7 @@ export default function Home() {
         setBrands(Array.isArray(brandData) ? brandData : []);
         if (bannerData && bannerData.length > 0) {
           setHomepageBanners(bannerData);
-          const homeBanners = bannerData.filter((b: any) => 
+          let homeBanners = bannerData.filter((b: any) => 
             !b.page || 
             b.page === "Homepage" || 
             b.page === "Hero Slides" || 
@@ -147,14 +156,18 @@ export default function Home() {
             (b.title && b.title.toLowerCase().includes("hero"))
           );
 
+          if (homeBanners.length === 0) {
+            homeBanners = bannerData.filter((b: any) => b.imageUrl && (b.isActive !== false));
+          }
+
           if (homeBanners.length > 0) {
             setDynamicSlides(homeBanners.map((b: any) => ({
               title: b.title,
               desc: "Exclusive Collection at GlowGoodly",
               bg: b.bgColor || "linear-gradient(135deg, #e63b7a 0%, #ff758c 100%)",
               img: b.imageUrl,
-              mobileImg: b.mobileImageUrl,
-              tabletImg: b.tabletImageUrl,
+              mobileImg: b.mobileImageUrl || b.imageUrl,
+              tabletImg: b.tabletImageUrl || b.imageUrl,
               link: b.linkUrl || "/shop"
             })));
           }

@@ -16,5 +16,6 @@ website_2/
 *.zip
 *.md
 creds
-.vscode/
-.tools/
+deploy/frontend_staging/
+deploy/backend_staging/
+
