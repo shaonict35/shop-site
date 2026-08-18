@@ -48,8 +48,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// Middleware
-app.use(cors({ origin: true, credentials: true }));
+// Explicit CORS Middleware allowing all origins for seamless client-side fetching
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Cache-Control"]
+}));
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
