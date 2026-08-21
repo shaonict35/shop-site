@@ -16,7 +16,7 @@ const getBaseApiUrl = () => {
     const raw = process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, "");
     return raw.endsWith("/api") ? raw : `${raw}/api`;
   }
-  return "http://localhost:5000/api";
+  return "https://api.glowgoodly.com/api";
 };
 
 export const API_BASE = getBaseApiUrl();

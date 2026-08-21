@@ -198,14 +198,10 @@ export default function Header() {
     }
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`${API_BASE}/products?limit=200`);
-        const data = await res.json();
         const q = searchQuery.toLowerCase().trim();
-        const matched = (data || []).filter((p: any) =>
-          p.name?.toLowerCase().includes(q) ||
-          p.brand?.name?.toLowerCase().includes(q) ||
-          p.category?.name?.toLowerCase().includes(q)
-        ).slice(0, 8);
+        const res = await fetch(`${API_BASE}/products?search=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        const matched = (data || []).slice(0, 8);
         setSearchSuggestions(matched);
         setShowSuggestions(matched.length > 0);
       } catch {}

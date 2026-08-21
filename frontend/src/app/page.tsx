@@ -147,18 +147,13 @@ export default function Home() {
         setBrands(Array.isArray(brandData) ? brandData : []);
         if (bannerData && bannerData.length > 0) {
           setHomepageBanners(bannerData);
-          let homeBanners = bannerData.filter((b: any) => 
-            !b.page || 
-            b.page === "Homepage" || 
-            b.page === "Hero Slides" || 
-            b.page === "Hero Slides Carousel" || 
-            (b.page && b.page.toLowerCase().includes("hero")) || 
-            (b.title && b.title.toLowerCase().includes("hero"))
+          const homeBanners = bannerData.filter((b: any) => 
+            b.isActive !== false &&
+            (b.page === "Hero Slides" || 
+             b.page === "Hero Slides Carousel" || 
+             (b.page && b.page.toLowerCase().includes("hero")) || 
+             (b.title && b.title.toLowerCase().includes("hero")))
           );
-
-          if (homeBanners.length === 0) {
-            homeBanners = bannerData.filter((b: any) => b.imageUrl && (b.isActive !== false));
-          }
 
           if (homeBanners.length > 0) {
             setDynamicSlides(homeBanners.map((b: any) => ({
@@ -170,6 +165,8 @@ export default function Home() {
               tabletImg: b.tabletImageUrl || b.imageUrl,
               link: b.linkUrl || "/shop"
             })));
+          } else {
+            setDynamicSlides(initialHeroSlides);
           }
         }
 
