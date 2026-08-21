@@ -1,3 +1,5 @@
+DirectoryIndex index.html index.php
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
@@ -6,12 +8,14 @@
   RewriteCond %{HTTPS} off
   RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
-  # 2. Prevent directory listings
-  # Security: Block /admin and force 404 for security
-  RewriteRule ^admin/?$ 404.html [L]
-  RewriteRule ^valobasa/?$ valobasa.html [L]
+  # 2. Security & Explicit Admin Routes
+  RewriteRule ^admin/?$ /404.html [L,R=301]
+  RewriteRule ^valobasa/?$ /valobasa.html [L]
 
-  # 3. Dynamic Route Fallbacks (Next.js SSG Dynamic Routes)
+  # 3. Clean Route Rewrites to HTML Files (Shop, Brands, Cart, etc.)
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{DOCUMENT_ROOT}/$1.html -f
+  RewriteRule ^([^/]+)/?$ /$1.html [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule ^product/([^/]+)/?$ product/default.html [L]
@@ -24,11 +28,9 @@
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule ^landing/([^/]+)/?$ landing/seasonal-offer.html [L]
 
-  # 4. Clean URLs: Check if request maps to an HTML file (e.g. /shop -> /shop.html)
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME}.html -f
-  RewriteRule ^([^\.]+)$ $1.html [NC,L]
+  # 4. Clean URLs: Map page names to .html files first (e.g. /shop -> shop.html, /valobasa -> valobasa.html)
+  RewriteCond %{DOCUMENT_ROOT}/$1.html -f
+  RewriteRule ^([^\.]+)$ /$1.html [L]
 
   # 5. Check if directory has an index.html
   RewriteCond %{REQUEST_FILENAME} -d
