@@ -22,6 +22,13 @@
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule ^landing/([^/]+)/?$ landing/seasonal-offer.html [L]
 
+  # Explicit page rewrites for clean URLs without .html
+  RewriteRule ^valobasa/?$ valobasa.html [L]
+  RewriteRule ^shop/?$ shop.html [L]
+  RewriteRule ^brands/?$ brands.html [L]
+  RewriteRule ^wishlist/?$ wishlist.html [L]
+  RewriteRule ^login/?$ login.html [L]
+
   # 4. Clean URLs: Check if request maps to an HTML file (e.g. /valobasa -> /valobasa.html)
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteCond %{REQUEST_FILENAME} !-f
