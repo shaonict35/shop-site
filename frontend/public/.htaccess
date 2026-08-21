@@ -22,7 +22,7 @@
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule ^landing/([^/]+)/?$ landing/seasonal-offer.html [L]
 
-  # 4. Clean URLs: Check if request maps to an HTML file (e.g. /shop -> /shop.html)
+  # 4. Clean URLs: Check if request maps to an HTML file (e.g. /valobasa -> /valobasa.html)
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME}.html -f
