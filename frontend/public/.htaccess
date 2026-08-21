@@ -7,7 +7,9 @@
   RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
   # 2. Prevent directory listings
-  Options -Indexes
+  # Security: Block /admin and force 404 for security
+  RewriteRule ^admin/?$ 404.html [L]
+  RewriteRule ^valobasa/?$ valobasa.html [L]
 
   # 3. Dynamic Route Fallbacks (Next.js SSG Dynamic Routes)
   RewriteCond %{REQUEST_FILENAME} !-f
