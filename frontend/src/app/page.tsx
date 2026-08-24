@@ -295,7 +295,7 @@ export default function Home() {
       <Header />
       <PromoBanner />
 
-      {/* Full-width Dynamic Promotional Banner Slider - Responsive with Shajgoj-like sizing */}
+      {/* Full-width Dynamic Promotional Banner Slider - Exact Shajgoj Layout */}
       {(() => {
         const safeSlideIdx = activeSlide % (activeSlidesList.length || 1);
         const currentSlide = activeSlidesList[safeSlideIdx] || activeSlidesList[0];
@@ -306,10 +306,68 @@ export default function Home() {
             width: "100%",
             position: "relative",
             overflow: "hidden",
-            backgroundColor: "#fcf8fa",
+            backgroundColor: "#ffffff",
           }}
         >
         <div style={{ position: "relative", width: "100%", display: "block" }}>
+          {/* Left Navigation Arrow */}
+          <button
+            onClick={() => setActiveSlide((prev) => (prev === 0 ? activeSlidesList.length - 1 : prev - 1))}
+            style={{
+              position: "absolute",
+              left: "15px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              backgroundColor: "rgba(255, 255, 255, 0.75)",
+              color: "#000000",
+              border: "none",
+              borderRadius: "50%",
+              width: "36px",
+              height: "36px",
+              display: "flex",
+              alignItems: "center",
+              justify-content: "center",
+              cursor: "pointer",
+              zIndex: 10,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+              fontSize: "18px",
+              fontWeight: "bold",
+              transition: "all 0.2s ease"
+            }}
+            aria-label="Previous Slide"
+          >
+            ‹
+          </button>
+
+          {/* Right Navigation Arrow */}
+          <button
+            onClick={() => setActiveSlide((prev) => (prev + 1) % activeSlidesList.length)}
+            style={{
+              position: "absolute",
+              right: "15px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              backgroundColor: "rgba(255, 255, 255, 0.75)",
+              color: "#000000",
+              border: "none",
+              borderRadius: "50%",
+              width: "36px",
+              height: "36px",
+              display: "flex",
+              alignItems: "center",
+              justify-content: "center",
+              cursor: "pointer",
+              zIndex: 10,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+              fontSize: "18px",
+              fontWeight: "bold",
+              transition: "all 0.2s ease"
+            }}
+            aria-label="Next Slide"
+          >
+            ›
+          </button>
+
           {currentSlide?.link?.startsWith("http") ? (
             <a
               href={currentSlide?.link}
@@ -329,8 +387,7 @@ export default function Home() {
                   alt={currentSlide?.title || "Hero Slider"}
                   style={{
                     width: "100%",
-                    maxHeight: "450px",
-                    objectFit: "cover",
+                    height: "auto",
                     display: "block",
                   }}
                 />
@@ -353,8 +410,7 @@ export default function Home() {
                   alt={currentSlide?.title || "Hero Slider"}
                   style={{
                     width: "100%",
-                    maxHeight: "450px",
-                    objectFit: "cover",
+                    height: "auto",
                     display: "block",
                   }}
                 />
@@ -362,11 +418,11 @@ export default function Home() {
             </Link>
           )}
 
-          {/* Dots Indicator */}
+          {/* Shajgoj Dots Indicator */}
           <div
             style={{
               position: "absolute",
-              bottom: "15px",
+              bottom: "12px",
               left: "50%",
               transform: "translateX(-50%)",
               display: "flex",
@@ -379,13 +435,13 @@ export default function Home() {
                 key={idx}
                 onClick={() => setActiveSlide(idx)}
                 style={{
-                  width: "10px",
-                  height: "10px",
-                  borderRadius: "50%",
-                  backgroundColor: safeSlideIdx === idx ? "#e63b7a" : "rgba(255, 255, 255, 0.6)",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                  width: safeSlideIdx === idx ? "24px" : "8px",
+                  height: "8px",
+                  borderRadius: "4px",
+                  backgroundColor: safeSlideIdx === idx ? "#e2136e" : "rgba(255, 255, 255, 0.7)",
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
                   cursor: "pointer",
-                  transition: "all 0.2s",
+                  transition: "all 0.3s ease",
                 }}
               />
             ))}
