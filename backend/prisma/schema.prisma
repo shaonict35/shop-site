@@ -29,7 +29,7 @@ model Address {
   id          String   @id @default(uuid())
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  addressLine String   @db.Text
+  addressLine String  
   city        String
   zone        String   // Inside Dhaka, Outside Dhaka
   isDefault   Boolean  @default(false)
@@ -40,7 +40,7 @@ model Address {
 model Brand {
   id         String    @id @default(uuid())
   name       String    @unique
-  logoUrl    String?   @db.Text
+  logoUrl    String?  
   isTopBrand Boolean   @default(false)
   products   Product[]
   createdAt  DateTime  @default(now())
@@ -50,7 +50,7 @@ model Brand {
 model Category {
   id            String     @id @default(uuid())
   name          String     @unique
-  imageUrl      String?    @db.Text
+  imageUrl      String?   
   parentId      String?    // For Sub-categories
   parent        Category?  @relation("SubCategories", fields: [parentId], references: [id], onDelete: Cascade)
   subCategories Category[] @relation("SubCategories")
@@ -62,17 +62,17 @@ model Category {
 model Product {
   id              String         @id @default(uuid())
   name            String
-  description     String         @db.Text
-  ingredients     String?        @db.Text
-  howToUse        String?        @db.Text
+  description     String        
+  ingredients     String?       
+  howToUse        String?       
   brandId         String
   brand           Brand          @relation(fields: [brandId], references: [id])
   categoryId      String
   category        Category       @relation(fields: [categoryId], references: [id])
   status          String         @default("Active") // Active, Inactive
   metaTitle       String?
-  metaDescription String?        @db.Text
-  metaKeywords    String?        @db.Text
+  metaDescription String?       
+  metaKeywords    String?       
   campaignName    String?        // e.g. BOGO, COMBO, CLEARANCE, EXCLUSIVE
   images          ProductImage[]
   variants        Variant[]
@@ -90,7 +90,7 @@ model ProductImage {
   id        String   @id @default(uuid())
   productId String
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  url       String   @db.Text
+  url       String  
   isPrimary Boolean  @default(false)
   createdAt DateTime @default(now())
 
@@ -109,7 +109,7 @@ model Variant {
   costPrice     Float?         // Purchase price
   stock         Int            @default(0)
   sku           String         @unique
-  imageUrl      String?        @db.Text
+  imageUrl      String?       
   orderItems    OrderItem[]
   inventoryLogs InventoryLog[]
   createdAt     DateTime       @default(now())
@@ -126,7 +126,7 @@ model Order {
   customerName   String
   customerEmail  String
   customerPhone  String
-  address        String      @db.Text
+  address        String     
   zone           String      // Inside Dhaka, Outside Dhaka
   deliveryCharge Float
   subTotal       Float
@@ -135,8 +135,8 @@ model Order {
   paymentStatus  String      @default("Pending") // Pending, Paid, Failed
   paymentMethod  String      @default("COD") // COD, bKash, SSLCommerz, aamarpay
   orderStatus    String      @default("Pending") // Pending, Processing, Shipped, Delivered, Cancelled
-  notes          String?     @db.Text
-  trackingLink   String?     @db.Text
+  notes          String?    
+  trackingLink   String?    
   salesmanId     String?     // Track which salesperson handled it
   orderItems     OrderItem[]
   createdAt      DateTime    @default(now())
@@ -166,7 +166,7 @@ model Coupon {
   expiryDate    DateTime
   usageLimit    Int       @default(1)
   timesUsed     Int       @default(0)
-  categoryLimit String?   @db.Text // Comma-separated category IDs
+  categoryLimit String?   // Comma-separated category IDs
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -174,7 +174,7 @@ model Coupon {
 model Setting {
   id        String   @id @default(uuid())
   key       String   @unique // e.g. "SMS_API_KEY", "PAYMENT_MERCHANT_ID", etc.
-  value     String   @db.LongText
+  value     String  
   updatedAt DateTime @updatedAt
 }
 
@@ -184,7 +184,7 @@ model Review {
   product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   customerName String
   rating       Int      // 1 to 5
-  comment      String   @db.Text
+  comment      String  
   isApproved   Boolean  @default(false)
   createdAt    DateTime @default(now())
 }
@@ -192,10 +192,10 @@ model Review {
 model PromoBanner {
   id             String   @id @default(uuid())
   title          String   // Used as alt text and aria-label (SEO friendly)
-  imageUrl       String   @db.LongText // Full-width desktop banner image URL (supports base64 images)
-  mobileImageUrl String?  @db.LongText // Mobile version banner image URL
-  tabletImageUrl String?  @db.LongText // Tablet version banner image URL
-  linkUrl        String?  @db.Text // Optional click-through link
+  imageUrl       String   // Full-width desktop banner image URL (supports base64 images)
+  mobileImageUrl String?  // Mobile version banner image URL
+  tabletImageUrl String?  // Tablet version banner image URL
+  linkUrl        String?  // Optional click-through link
   bgColor        String   @default("#1a1a2e") // Fallback background color
   page           String   @default("Homepage") // Homepage, Hair Care 101, Skin Care 101, Makeup 101
   isActive       Boolean  @default(true)
@@ -210,7 +210,7 @@ model Vendor {
   contactName String?
   email       String?  @unique
   phone       String?
-  address     String?  @db.Text
+  address     String? 
   status      String   @default("Active")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -219,8 +219,8 @@ model Vendor {
 model Campaign {
   id          String   @id @default(uuid())
   name        String
-  description String?  @db.Text
-  bannerUrl   String?  @db.Text
+  description String? 
+  bannerUrl   String? 
   startDate   DateTime
   endDate     DateTime
   isActive    Boolean  @default(true)
@@ -241,8 +241,8 @@ model InventoryLog {
 model Visitor {
   id        String   @id @default(uuid())
   ipAddress String?
-  device    String?  @db.Text
-  browser   String?  @db.Text
+  device    String? 
+  browser   String? 
   lastVisit DateTime @default(now())
   createdAt DateTime @default(now())
 }
@@ -251,16 +251,16 @@ model ChatMessage {
   id        String   @id @default(uuid())
   chatId    String   // Session ID or User ID to group the conversation
   sender    String   // "Customer" or "Admin"
-  message   String   @db.Text
+  message   String  
   createdAt DateTime @default(now())
 }
 
 model Notification {
   id        String   @id @default(uuid())
   title     String
-  message   String   @db.Text
-  imageUrl  String?  @db.Text
-  linkUrl   String?  @db.Text
+  message   String  
+  imageUrl  String? 
+  linkUrl   String? 
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -277,7 +277,7 @@ model FcmToken {
 model MenuItem {
   id        String     @id @default(uuid())
   title     String
-  url       String     @db.Text
+  url       String    
   location  String     @default("Header") // Header or Footer
   parentId  String?
   parent    MenuItem?  @relation("SubMenuItems", fields: [parentId], references: [id], onDelete: Cascade)
@@ -291,9 +291,9 @@ model CmsPage {
   id              String   @id @default(uuid())
   slug            String   @unique // e.g. "about", "authenticity", "privacy-policy"
   title           String
-  contentHtml     String   @db.LongText
+  contentHtml     String  
   metaTitle       String?
-  metaDescription String?  @db.Text
+  metaDescription String? 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
