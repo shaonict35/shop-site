@@ -127,7 +127,12 @@ class MockCollection {
         updatedAt: b.updatedAt.toISOString(),
       }));
     } else if (this.colName === "banners") {
-      const items = await prisma.promoBanner.findMany();
+      let items: any[] = [];
+      try {
+        items = await prisma.promoBanner.findMany();
+      } catch (e) {
+        items = [];
+      }
       data = items.map(b => ({
         id: b.id,
         title: b.title,
@@ -137,8 +142,8 @@ class MockCollection {
         page: b.page || "Homepage",
         isActive: b.isActive,
         sortOrder: b.sortOrder,
-        createdAt: b.createdAt.toISOString(),
-        updatedAt: b.updatedAt.toISOString(),
+        createdAt: b.createdAt ? b.createdAt.toISOString() : new Date().toISOString(),
+        updatedAt: b.updatedAt ? b.updatedAt.toISOString() : new Date().toISOString(),
       }));
     } else if (this.colName === "settings") {
       const items = await prisma.setting.findMany();
