@@ -618,7 +618,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
 
       if (bnData && Array.isArray(bnData)) setBanners(bnData);
       if (stfData && Array.isArray(stfData)) setStaffList(stfData);
-      if (csData && Array.isArray(csData)) setCustomersList(csData);
+      if (csData && Array.isArray(csData)) setCustomerList(csData);
 
       if (nData && Array.isArray(nData)) setNotificationLogs(nData);
       if (mData && Array.isArray(mData)) setAdminMenus(mData);
