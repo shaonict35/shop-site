@@ -2560,6 +2560,9 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                     }}
                     style={{ fontSize: "12px" }}
                   />
+                  {bannerForm.imageUrl && (
+                    <img src={bannerForm.imageUrl} alt="Desktop Preview" style={{ maxHeight: "80px", marginTop: "8px", borderRadius: "6px", border: "1px solid #cbd5e1", display: "block" }} />
+                  )}
                 </div>
 
                 {/* Mobile Image Section */}
@@ -2594,6 +2597,9 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                     }}
                     style={{ fontSize: "12px" }}
                   />
+                  {bannerForm.mobileImageUrl && (
+                    <img src={bannerForm.mobileImageUrl} alt="Mobile Preview" style={{ maxHeight: "80px", marginTop: "8px", borderRadius: "6px", border: "1px solid #cbd5e1", display: "block" }} />
+                  )}
                 </div>
 
                 <button
