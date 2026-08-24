@@ -4299,12 +4299,22 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                               <div style={{ marginTop: "6px" }}><span className="badge badge-info">{b.page || "Homepage"}</span></div>
                             </div>
                             <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
-                              <button onClick={() => setEditingBanner({ ...b })} style={{ flex: 1, backgroundColor: "#f1f5f9", color: "#334155", border: "1px solid #cbd5e1", padding: "6px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>✏️ Edit Banner</button>
                               <button onClick={() => {
-                                if (confirm("Delete this banner?")) {
-                                  setBanners(banners.filter(x => x.id !== b.id));
-                                }
-                              }} style={{ backgroundColor: "#fee2e2", color: "#ef4444", border: "none", padding: "6px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>Delete</button>
+                                setBannerForm({
+                                  id: b.id,
+                                  title: b.title,
+                                  imageUrl: b.imageUrl,
+                                  mobileImageUrl: b.mobileImageUrl || b.imageUrl,
+                                  tabletImageUrl: b.tabletImageUrl || b.imageUrl,
+                                  linkUrl: b.linkUrl || "/",
+                                  bgColor: b.bgColor || "#1a1a2e",
+                                  page: b.page || "Hero Slides",
+                                  isActive: b.isActive ?? true,
+                                  sortOrder: String(b.sortOrder || "1")
+                                });
+                                setEditingBannerModal(true);
+                              }} style={{ flex: 1, backgroundColor: "#f1f5f9", color: "#334155", border: "1px solid #cbd5e1", padding: "6px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>✏️ Edit Banner</button>
+                              <button onClick={() => handleDeleteBanner(b.id)} style={{ backgroundColor: "#fee2e2", color: "#ef4444", border: "none", padding: "6px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>Delete</button>
                             </div>
                           </div>
                         </div>
