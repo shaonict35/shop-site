@@ -315,16 +315,9 @@ class MockBatch {
 async function mockSetPrisma(colName: string, id: string, data: any, options?: any) {
   if (colName === "banners") {
     try {
-      // Truncate imageUrl to max 200 chars for Prisma if it's a huge base64 data URL
-      const safeImageUrl = data.imageUrl && data.imageUrl.startsWith("data:") 
-        ? data.imageUrl.substring(0, 180) + "...[base64]" 
-        : data.imageUrl;
-      const safeMobileUrl = data.mobileImageUrl && data.mobileImageUrl.startsWith("data:") 
-        ? data.mobileImageUrl.substring(0, 180) + "...[base64]" 
-        : (data.mobileImageUrl || null);
-      const safeTabletUrl = data.tabletImageUrl && data.tabletImageUrl.startsWith("data:") 
-        ? data.tabletImageUrl.substring(0, 180) + "...[base64]" 
-        : (data.tabletImageUrl || null);
+      const safeImageUrl = data.imageUrl;
+      const safeMobileUrl = data.mobileImageUrl || null;
+      const safeTabletUrl = data.tabletImageUrl || null;
 
       await prisma.promoBanner.upsert({
         where: { id },
