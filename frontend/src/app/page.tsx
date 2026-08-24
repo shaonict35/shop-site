@@ -192,7 +192,7 @@ export default function Home() {
 
           if (homeBanners.length > 0) {
             const validSlides = homeBanners
-              .filter((b: any) => b.imageUrl && b.imageUrl.startsWith("http"))
+              .filter((b: any) => b.imageUrl && (b.imageUrl.startsWith("http") || b.imageUrl.startsWith("/") || b.imageUrl.startsWith("data:")))
               .map((b: any) => ({
                 title: b.title,
                 desc: "Exclusive Collection at GlowGoodly",
