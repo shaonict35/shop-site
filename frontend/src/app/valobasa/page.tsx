@@ -2699,12 +2699,12 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                       return <div style={{ padding: "30px", textAlign: "center", color: "#94a3b8", gridColumn: "1 / -1" }}>No banners found for this filter. Click '+ Add New Banner Slide' to create one.</div>;
                     }
 
-                    return filteredList.map((b: any) => {
+                    return filteredList.map((b: any, idx: number) => {
                       const isHero = b.page === "Hero Slides" || b.title?.includes("Hero");
                       const isWide = b.page === "Homepage Wide Banner";
 
                       return (
-                        <div key={b.id} style={{ border: "1px solid #e2e8f0", borderRadius: "10px", overflow: "hidden", backgroundColor: "#ffffff", boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
+                        <div key={b.id ? `${b.id}-${idx}` : idx} style={{ border: "1px solid #e2e8f0", borderRadius: "10px", overflow: "hidden", backgroundColor: "#ffffff", boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
                           <div style={{ height: "140px", width: "100%", backgroundColor: "#f1f5f9", overflow: "hidden", position: "relative" }}>
                             <img src={b.imageUrl} alt={b.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                             <span style={{ position: "absolute", top: "10px", left: "10px", backgroundColor: "#0f172a", color: "#fff", padding: "3px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: "800" }}>
@@ -4275,12 +4275,12 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "16px" }}>
                   {banners
                     .filter(b => bannerCategoryFilter === "All" || b.page === bannerCategoryFilter || (!b.page && bannerCategoryFilter === "Hero Slides"))
-                    .map((b) => {
+                    .map((b, idx) => {
                       const sizeHint = b.page === "Hero Slides" ? "Desktop: 1200x450px | Mobile: 600x350px"
                         : b.page === "Top Brands & Offers" ? "Desktop: 600x300px | Mobile: 400x200px"
                         : "Desktop & Mobile: 500x500px (1:1)";
                       return (
-                        <div key={b.id} style={{ border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden", backgroundColor: "#fff", display: "flex", flexDirection: "column" }}>
+                        <div key={b.id ? `${b.id}-${idx}` : idx} style={{ border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden", backgroundColor: "#fff", display: "flex", flexDirection: "column" }}>
                           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px", backgroundColor: "#000", height: "130px" }}>
                             <div style={{ position: "relative", height: "100%" }}>
                               <img src={b.imageUrl} alt="Desktop Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
