@@ -161,7 +161,16 @@ class MockCollection {
         updatedAt: n.updatedAt.toISOString(),
       }));
     } else if (this.colName === "users") {
-      const items = await prisma.user.findMany({ include: { addresses: true } });
+      let items: any[] = [];
+      try {
+        items = await prisma.user.findMany({ include: { addresses: true } });
+      } catch (e) {
+        try {
+          items = await prisma.user.findMany();
+        } catch (e2) {
+          items = [];
+        }
+      }
       data = items.map(u => ({
         id: u.id,
         name: u.name,
@@ -171,12 +180,21 @@ class MockCollection {
         role: u.role,
         points: u.points,
         status: u.status,
-        addresses: u.addresses,
-        createdAt: u.createdAt.toISOString(),
-        updatedAt: u.updatedAt.toISOString(),
+        addresses: u.addresses || [],
+        createdAt: u.createdAt ? u.createdAt.toISOString() : new Date().toISOString(),
+        updatedAt: u.updatedAt ? u.updatedAt.toISOString() : new Date().toISOString(),
       }));
     } else if (this.colName === "orders") {
-      const items = await prisma.order.findMany({ include: { orderItems: true } });
+      let items: any[] = [];
+      try {
+        items = await prisma.order.findMany({ include: { orderItems: true } });
+      } catch (e) {
+        try {
+          items = await prisma.order.findMany();
+        } catch (e2) {
+          items = [];
+        }
+      }
       data = items.map(o => ({
         id: o.id,
         orderNumber: o.orderNumber,
@@ -196,9 +214,9 @@ class MockCollection {
         notes: o.notes,
         trackingLink: o.trackingLink,
         salesmanId: o.salesmanId,
-        orderItems: o.orderItems,
-        createdAt: o.createdAt.toISOString(),
-        updatedAt: o.updatedAt.toISOString(),
+        orderItems: o.orderItems || [],
+        createdAt: o.createdAt ? o.createdAt.toISOString() : new Date().toISOString(),
+        updatedAt: o.updatedAt ? o.updatedAt.toISOString() : new Date().toISOString(),
       }));
     } else if (this.colName === "reviews") {
       const items = await prisma.review.findMany();
@@ -211,10 +229,20 @@ class MockCollection {
         isApproved: r.isApproved,
         createdAt: r.createdAt.toISOString(),
       }));
-    } else {
-      const colMap = inMemoryCollections.get(this.colName);
-      if (colMap) {
-        data = Array.from(colMap.values());
+    }
+    
+    // Always merge inMemoryCollections to support dynamic memory items
+    const colMap = inMemoryCollections.get(this.colName);
+    if (colMap && colMap.size > 0) {
+      const memoryItems = Array.from(colMap.values());
+      const existingIds = new Set(data.map(d => d.id));
+      for (const mItem of memoryItems) {
+        if (!existingIds.has(mItem.id)) {
+          data.push(mItem);
+        } else {
+          // Update item in data with latest in-memory edits
+          data = data.map(d => d.id === mItem.id ? { ...d, ...mItem } : d);
+        }
       }
     }
 
@@ -281,28 +309,53 @@ class MockBatch {
 
 async function mockSetPrisma(colName: string, id: string, data: any, options?: any) {
   if (colName === "banners") {
-    await prisma.promoBanner.upsert({
-      where: { id },
-      update: {
-        title: data.title,
-        imageUrl: data.imageUrl,
-        linkUrl: data.linkUrl || null,
-        bgColor: data.bgColor || "#1a1a2e",
-        page: data.page || "Homepage",
-        isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
-        sortOrder: data.sortOrder !== undefined ? Number(data.sortOrder) : 0,
-      },
-      create: {
-        id,
-        title: data.title,
-        imageUrl: data.imageUrl,
-        linkUrl: data.linkUrl || null,
-        bgColor: data.bgColor || "#1a1a2e",
-        page: data.page || "Homepage",
-        isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
-        sortOrder: data.sortOrder !== undefined ? Number(data.sortOrder) : 0,
+    try {
+      // Truncate imageUrl to max 200 chars for Prisma if it's a huge base64 data URL
+      const safeImageUrl = data.imageUrl && data.imageUrl.startsWith("data:") 
+        ? data.imageUrl.substring(0, 180) + "...[base64]" 
+        : data.imageUrl;
+      const safeMobileUrl = data.mobileImageUrl && data.mobileImageUrl.startsWith("data:") 
+        ? data.mobileImageUrl.substring(0, 180) + "...[base64]" 
+        : (data.mobileImageUrl || null);
+      const safeTabletUrl = data.tabletImageUrl && data.tabletImageUrl.startsWith("data:") 
+        ? data.tabletImageUrl.substring(0, 180) + "...[base64]" 
+        : (data.tabletImageUrl || null);
+
+      await prisma.promoBanner.upsert({
+        where: { id },
+        update: {
+          title: data.title,
+          imageUrl: safeImageUrl,
+          mobileImageUrl: safeMobileUrl,
+          tabletImageUrl: safeTabletUrl,
+          linkUrl: data.linkUrl || null,
+          bgColor: data.bgColor || "#1a1a2e",
+          page: data.page || "Homepage",
+          isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
+          sortOrder: data.sortOrder !== undefined ? Number(data.sortOrder) : 0,
+        },
+        create: {
+          id,
+          title: data.title,
+          imageUrl: safeImageUrl,
+          mobileImageUrl: safeMobileUrl,
+          tabletImageUrl: safeTabletUrl,
+          linkUrl: data.linkUrl || null,
+          bgColor: data.bgColor || "#1a1a2e",
+          page: data.page || "Homepage",
+          isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
+          sortOrder: data.sortOrder !== undefined ? Number(data.sortOrder) : 0,
+        }
+      });
+    } catch (e) {
+      console.warn("Prisma banner SQL save note (saving to memory storage):", e);
+    } finally {
+      if (!inMemoryCollections.has(colName)) {
+        inMemoryCollections.set(colName, new Map());
       }
-    });
+      // Store complete full base64 data URL string in memory so client receives 100% full image data
+      inMemoryCollections.get(colName)!.set(id, { id, ...data });
+    }
   } else if (colName === "settings") {
     await prisma.setting.upsert({
       where: { key: data.key || id },
@@ -542,21 +595,32 @@ async function mockUpdatePrisma(colName: string, id: string, data: any) {
 }
 
 async function mockDeletePrisma(colName: string, id: string) {
-  if (colName === "banners") {
-    await prisma.promoBanner.delete({ where: { id } });
-  } else if (colName === "settings") {
-    await prisma.setting.delete({ where: { id } });
-  } else if (colName === "notifications") {
-    await prisma.notification.delete({ where: { id } });
-  } else if (colName === "reviews") {
-    await prisma.review.delete({ where: { id } });
-  } else if (colName === "users") {
-    await prisma.user.delete({ where: { id } });
-  } else if (colName === "orders") {
-    await prisma.order.delete({ where: { id } });
-  } else if (colName === "products") {
-    await prisma.product.delete({ where: { id } });
-  } else {
+  try {
+    if (colName === "banners") {
+      await prisma.promoBanner.deleteMany({ where: { id } });
+    } else if (colName === "settings") {
+      await prisma.setting.deleteMany({ where: { id } });
+    } else if (colName === "notifications") {
+      await prisma.notification.deleteMany({ where: { id } });
+    } else if (colName === "reviews") {
+      await prisma.review.deleteMany({ where: { id } });
+    } else if (colName === "users") {
+      await prisma.user.deleteMany({ where: { id } });
+    } else if (colName === "orders") {
+      await prisma.orderItem.deleteMany({ where: { orderId: id } });
+      await prisma.order.deleteMany({ where: { id } });
+    } else if (colName === "products") {
+      await prisma.variant.deleteMany({ where: { productId: id } });
+      await prisma.productImage.deleteMany({ where: { productId: id } });
+      await prisma.product.deleteMany({ where: { id } });
+    } else if (colName === "categories") {
+      await prisma.category.deleteMany({ where: { id } });
+    } else if (colName === "brands") {
+      await prisma.brand.deleteMany({ where: { id } });
+    }
+  } catch (e) {
+    console.warn(`Prisma delete fallback note for ${colName} (${id}):`, e);
+  } finally {
     const colMap = inMemoryCollections.get(colName);
     if (colMap) {
       colMap.delete(id);

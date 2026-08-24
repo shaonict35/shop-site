@@ -8,7 +8,10 @@ import SplashScreen from "../components/SplashScreen";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://shop.glowgoodly.com"),
-  title: "Home-Glowgoodly",
+  title: {
+    default: "GlowGoodly | 100% Authentic Cosmetics & Skincare in Bangladesh",
+    template: "%s | GlowGoodly"
+  },
   description: "Shop 100% authentic makeup, skincare, and hair care products at GlowGoodly. Fast delivery across Bangladesh. Buy original brands like CeraVe, COSRX, and The Ordinary in BD.",
   keywords: ["cosmetics in bangladesh", "skincare bd", "authentic makeup bangladesh", "buy cosmetics online bd", "GlowGoodly", "best beauty shop dhaka", "korean skincare bd", "buy makeup online dhaka"],
   alternates: {
@@ -38,11 +41,10 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/icon.png", type: "image/png" },
-      { url: "/favicon.ico" },
+      { url: "/user-glow-logo.png", type: "image/png" },
     ],
-    shortcut: ["/favicon.ico"],
-    apple: ["/apple-icon.png"],
+    shortcut: ["/user-glow-logo.png"],
+    apple: ["/user-glow-logo.png"],
   },
   robots: {
     index: true,

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap');
 
 :root {
   /* Curated Color Palette */
@@ -38,14 +38,14 @@
   --radius-full: 9999px;
   
   /* Font Family */
-  --font-outfit: 'Outfit', sans-serif;
+  --font-outfit: 'Montserrat', sans-serif;
 }
 
 * {
   box-sizing: border-box;
   padding: 0;
   margin: 0;
-  font-family: var(--font-outfit);
+  font-family: 'Montserrat', sans-serif;
 }
 
 body {
@@ -2591,14 +2591,14 @@ button, input, select, textarea {
 
 .top-brands-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }
 
 @media (min-width: 768px) {
   .top-brands-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 15px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
   }
 }
 
@@ -2842,11 +2842,11 @@ button, input, select, textarea {
     gap: 10px !important;
   }
 
-  /* Shajgoj Top Brands & Offers Stacked Banners (One after another) */
+  /* Shajgoj Top Brands & Offers Grid */
   .top-brands-grid {
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 14px !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
   }
 
   /* Prevent Bottom Fixed Bar overlap */

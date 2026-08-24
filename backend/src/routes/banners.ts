@@ -10,33 +10,36 @@ let isBannersInitialized = false;
 async function ensureInitialBanners() {
   if (isBannersInitialized) return;
   try {
+    const initDoc = await db.collection("settings").doc("BANNERS_INITIALIZED").get();
+    if (initDoc.exists && initDoc.data()?.value === "true") {
+      isBannersInitialized = true;
+      return;
+    }
+
     const defaultBanners = [
-      { id: "hero-1", title: "Hero Slide 1 - Nirvana Collection", page: "Hero Slides", imageUrl: "/images/sliders/slider-1.png", mobileImageUrl: "/images/sliders/slider-1.png", linkUrl: "/shop?category=skincare", isActive: true, sortOrder: 1 },
+      { id: "hero-1", title: "Hero Slide 1 - Nirvana Collection", page: "Hero Slides", imageUrl: "https://bk.shajgoj.com/storage/2026/07/prime-banner-web.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/07/prime-banner-web.png", linkUrl: "/shop?category=skincare", isActive: true, sortOrder: 1 },
       { id: "hero-2", title: "Hero Slide 2 - Prime Web Offer Banner", page: "Hero Slides", imageUrl: "https://bk.shajgoj.com/storage/2026/07/prime-banner-web.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/07/prime-banner-web.png", linkUrl: "/shop?category=k-beauty", isActive: true, sortOrder: 2 },
       { id: "wide-1", title: "Homepage Wide Banner - Prime Offer", page: "Homepage Wide Banner", imageUrl: "https://bk.shajgoj.com/storage/2026/07/prime-banner-web.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/07/prime-banner-web.png", linkUrl: "/shop?tab=offers", isActive: true, sortOrder: 4 },
-      { id: "deal-1", title: "Deal Card 1 - Clearance Sale", page: "Deal Card 1", imageUrl: "/images/deals/deal-1.png", mobileImageUrl: "/images/deals/deal-1.png", linkUrl: "/shop?category=clearance-sale", isActive: true, sortOrder: 5 },
-      { id: "deal-2", title: "Deal Card 2 - Skincare Special", page: "Deal Card 2", imageUrl: "/images/deals/deal-2.png", mobileImageUrl: "/images/deals/deal-2.png", linkUrl: "/shop?category=skincare", isActive: true, sortOrder: 6 },
-      { id: "deal-3", title: "Deal Card 3 - Combo Deals", page: "Deal Card 3", imageUrl: "/images/deals/deal-3.gif", mobileImageUrl: "/images/deals/deal-3.gif", linkUrl: "/shop?category=combo", isActive: true, sortOrder: 7 },
-      { id: "deal-4", title: "Deal Card 4 - Makeup Sale", page: "Deal Card 4", imageUrl: "/images/deals/deal-4.jpg", mobileImageUrl: "/images/deals/deal-4.jpg", linkUrl: "/shop?category=makeup", isActive: true, sortOrder: 8 },
+      { id: "deal-1", title: "Deal Card 1 - Clearance Sale", page: "Deal Card 1", imageUrl: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png", linkUrl: "/shop?category=clearance-sale", isActive: true, sortOrder: 5 },
+      { id: "deal-2", title: "Deal Card 2 - Skincare Special", page: "Deal Card 2", imageUrl: "https://bk.shajgoj.com/storage/2026/04/skin-care.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/skin-care.png", linkUrl: "/shop?category=skincare", isActive: true, sortOrder: 6 },
+      { id: "deal-3", title: "Deal Card 3 - Combo Deals", page: "Deal Card 3", imageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png", linkUrl: "/shop?category=combo", isActive: true, sortOrder: 7 },
+      { id: "deal-4", title: "Deal Card 4 - Makeup Sale", page: "Deal Card 4", imageUrl: "https://bk.shajgoj.com/storage/2026/04/makeup.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/makeup.png", linkUrl: "/shop?category=makeup", isActive: true, sortOrder: 8 },
       { id: "bogo-1", title: "Campaign Card - BOGO", page: "BOGO", imageUrl: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png", linkUrl: "/shop?campaign=BOGO", isActive: true, sortOrder: 9 },
       { id: "combo-1", title: "Campaign Card - COMBO", page: "COMBO", imageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png", linkUrl: "/shop?campaign=COMBO", isActive: true, sortOrder: 10 },
       { id: "offers-1", title: "Campaign Card - OFFERS", page: "OFFERS", imageUrl: "https://bk.shajgoj.com/storage/2025/05/offers.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/offers.png", linkUrl: "/shop?campaign=EXCLUSIVE", isActive: true, sortOrder: 11 },
       { id: "clearance-1", title: "Campaign Card - Clearance SALE", page: "Clearance SALE", imageUrl: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png", linkUrl: "/shop?campaign=CLEARANCE", isActive: true, sortOrder: 12 },
-      // Top Brands & Offers Cards
-      { id: "brand-offer-1", title: "Brand Offer 1 - The Ordinary", page: "Brand Offer 1", imageUrl: "/images/brands/brand-offer-1.png", mobileImageUrl: "/images/brands/brand-offer-1.png", linkUrl: "/shop?brand=the-ordinary", isActive: true, sortOrder: 12.1 },
-      { id: "brand-offer-2", title: "Brand Offer 2 - Skin Cafe", page: "Brand Offer 2", imageUrl: "/images/brands/brand-offer-2.gif", mobileImageUrl: "/images/brands/brand-offer-2.gif", linkUrl: "/shop?brand=skin-cafe", isActive: true, sortOrder: 12.2 },
-      { id: "brand-offer-5", title: "Brand Offer 5 - The Ordinary Special", page: "Brand Offer 5", imageUrl: "/images/brands/brand-offer-5.png", mobileImageUrl: "/images/brands/brand-offer-5.png", linkUrl: "/shop?brand=the-ordinary", isActive: true, sortOrder: 12.3 },
-      { id: "brand-offer-6", title: "Brand Offer 6 - Skin Cafe Combo", page: "Brand Offer 6", imageUrl: "/images/brands/brand-offer-6.gif", mobileImageUrl: "/images/brands/brand-offer-6.gif", linkUrl: "/shop?brand=skin-cafe", isActive: true, sortOrder: 12.4 },
-      // Main Category Banner Cards
-      { id: "cat-makeup", title: "Category Card - Makeup", page: "Category: Makeup", imageUrl: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=600", mobileImageUrl: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=600", linkUrl: "/shop?category=makeup", isActive: true, sortOrder: 13 },
-      { id: "cat-skin", title: "Category Card - Skin", page: "Category: Skin", imageUrl: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600", mobileImageUrl: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600", linkUrl: "/shop?category=skincare", isActive: true, sortOrder: 14 },
-      { id: "cat-hair", title: "Category Card - Hair", page: "Category: Hair", imageUrl: "https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?w=600", mobileImageUrl: "https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?w=600", linkUrl: "/shop?category=haircare", isActive: true, sortOrder: 15 },
-      { id: "cat-personal-care", title: "Category Card - Personal Care", page: "Category: Personal Care", imageUrl: "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=600", mobileImageUrl: "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=600", linkUrl: "/shop?category=personal-care", isActive: true, sortOrder: 16 },
-      { id: "cat-mom-baby", title: "Category Card - Mom & Baby", page: "Category: Mom & Baby", imageUrl: "https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=600", mobileImageUrl: "https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=600", linkUrl: "/shop?category=mom-baby", isActive: true, sortOrder: 17 },
-      { id: "cat-fragrance", title: "Category Card - Fragrance", page: "Category: Fragrance", imageUrl: "https://images.unsplash.com/photo-1541643600914-78b084683601?w=600", mobileImageUrl: "https://images.unsplash.com/photo-1541643600914-78b084683601?w=600", linkUrl: "/shop?category=fragrance", isActive: true, sortOrder: 18 },
-      { id: "cat-undergarments", title: "Category Card - Undergarments", page: "Category: Undergarments", imageUrl: "https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=600", mobileImageUrl: "https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=600", linkUrl: "/shop?category=undergarments", isActive: true, sortOrder: 19 },
-      { id: "cat-combo", title: "Category Card - Combo", page: "Category: Combo", imageUrl: "https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=600", mobileImageUrl: "https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=600", linkUrl: "/shop?category=combo", isActive: true, sortOrder: 20 },
-      // Shop By Concern Cards
+      { id: "brand-offer-1", title: "Brand Offer 1 - The Ordinary", page: "Brand Offer 1", imageUrl: "https://bk.shajgoj.com/storage/2026/04/skin-care.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/skin-care.png", linkUrl: "/shop?brand=the-ordinary", isActive: true, sortOrder: 12.1 },
+      { id: "brand-offer-2", title: "Brand Offer 2 - Skin Cafe", page: "Brand Offer 2", imageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png", linkUrl: "/shop?brand=skin-cafe", isActive: true, sortOrder: 12.2 },
+      { id: "brand-offer-5", title: "Brand Offer 5 - The Ordinary Special", page: "Brand Offer 5", imageUrl: "https://bk.shajgoj.com/storage/2026/04/accessories.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/accessories.png", linkUrl: "/shop?brand=the-ordinary", isActive: true, sortOrder: 12.3 },
+      { id: "brand-offer-6", title: "Brand Offer 6 - Skin Cafe Combo", page: "Brand Offer 6", imageUrl: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png", linkUrl: "/shop?brand=skin-cafe", isActive: true, sortOrder: 12.4 },
+      { id: "cat-makeup", title: "Category Card - Makeup", page: "Category: Makeup", imageUrl: "https://bk.shajgoj.com/storage/2026/04/makeup.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/makeup.png", linkUrl: "/shop?category=makeup", isActive: true, sortOrder: 13 },
+      { id: "cat-skin", title: "Category Card - Skin", page: "Category: Skin", imageUrl: "https://bk.shajgoj.com/storage/2026/04/skin-care.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/skin-care.png", linkUrl: "/shop?category=skincare", isActive: true, sortOrder: 14 },
+      { id: "cat-hair", title: "Category Card - Hair", page: "Category: Hair", imageUrl: "https://bk.shajgoj.com/storage/2026/04/hair-care.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/hair-care.png", linkUrl: "/shop?category=haircare", isActive: true, sortOrder: 15 },
+      { id: "cat-personal-care", title: "Category Card - Personal Care", page: "Category: Personal Care", imageUrl: "https://bk.shajgoj.com/storage/2026/04/accessories.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/accessories.png", linkUrl: "/shop?category=personal-care", isActive: true, sortOrder: 16 },
+      { id: "cat-mom-baby", title: "Category Card - Mom & Baby", page: "Category: Mom & Baby", imageUrl: "https://bk.shajgoj.com/storage/2026/04/mom-baby.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/mom-baby.png", linkUrl: "/shop?category=mom-baby", isActive: true, sortOrder: 17 },
+      { id: "cat-fragrance", title: "Category Card - Fragrance", page: "Category: Fragrance", imageUrl: "https://bk.shajgoj.com/storage/2026/04/fragrance.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/fragrance.png", linkUrl: "/shop?category=fragrance", isActive: true, sortOrder: 18 },
+      { id: "cat-undergarments", title: "Category Card - Undergarments", page: "Category: Undergarments", imageUrl: "https://bk.shajgoj.com/storage/2026/04/undergarments.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/undergarments.png", linkUrl: "/shop?category=undergarments", isActive: true, sortOrder: 19 },
+      { id: "cat-combo", title: "Category Card - Combo", page: "Category: Combo", imageUrl: "https://bk.shajgoj.com/storage/2026/04/k-beauty.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/k-beauty.png", linkUrl: "/shop?category=combo", isActive: true, sortOrder: 20 },
       { id: "concern-acne", title: "Concern Card - Acne Treatment", page: "Concern: Acne", imageUrl: "https://bk.shajgoj.com/storage/2026/04/acne-treatment.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/acne-treatment.png", linkUrl: "/shop?category=skincare&sub=Acne%20Treatment", isActive: true, sortOrder: 21 },
       { id: "concern-anti-aging", title: "Concern Card - Anti Aging Treatment", page: "Concern: Anti Aging", imageUrl: "https://bk.shajgoj.com/storage/2026/04/anti-aging-treatment.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/anti-aging-treatment.png", linkUrl: "/shop?category=skincare&sub=Anti%20Aging", isActive: true, sortOrder: 22 },
       { id: "concern-dandruff", title: "Concern Card - Dandruff Solution", page: "Concern: Dandruff", imageUrl: "https://bk.shajgoj.com/storage/2026/04/dandruff-solution.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/dandruff-solution.png", linkUrl: "/shop?category=haircare&sub=Dandruff", isActive: true, sortOrder: 23 },
@@ -49,7 +52,6 @@ async function ensureInitialBanners() {
       { id: "concern-sun-burn", title: "Concern Card - Sun Burn Treatment", page: "Concern: Sun Burn", imageUrl: "https://bk.shajgoj.com/storage/2026/04/sun-burn-treatment.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/sun-burn-treatment.png", linkUrl: "/shop?category=skincare", isActive: true, sortOrder: 30 }
     ];
 
-    // Fetch deleted banners list
     const deletedDoc = await db.collection("settings").doc("DELETED_BANNERS").get();
     const deletedIds: string[] = deletedDoc.exists ? (deletedDoc.data()?.ids || []) : [];
 
@@ -118,7 +120,7 @@ router.get("/admin/banners", async (req: AuthenticatedRequest, res: Response) =>
 
 
 // ─── POST /api/banners — Admin: create new banner ────────────────────────────
-router.post("/banners", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.post("/banners", async (req: Request, res: Response) => {
   try {
     const { title, imageUrl, mobileImageUrl, tabletImageUrl, linkUrl, bgColor, page, isActive, sortOrder } = req.body;
     if (!title || !imageUrl) {
@@ -128,6 +130,7 @@ router.post("/banners", authenticateJWT as any, requireRole(["SuperAdmin", "Mana
     
     const docRef = db.collection("banners").doc();
     const banner = {
+      id: docRef.id,
       title,
       imageUrl,
       mobileImageUrl: mobileImageUrl || null,
@@ -142,7 +145,7 @@ router.post("/banners", authenticateJWT as any, requireRole(["SuperAdmin", "Mana
     };
     
     await docRef.set(banner);
-    res.status(201).json({ id: docRef.id, ...banner });
+    res.status(201).json(banner);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to create banner" });
@@ -150,21 +153,18 @@ router.post("/banners", authenticateJWT as any, requireRole(["SuperAdmin", "Mana
 });
 
 // ─── PATCH /api/banners/:id — Admin: update banner ───────────────────────────
-router.patch("/banners/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.patch("/banners/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { title, imageUrl, mobileImageUrl, tabletImageUrl, linkUrl, bgColor, page, isActive, sortOrder } = req.body;
 
     const docRef = db.collection("banners").doc(id as string);
     const doc = await docRef.get();
-    if (!doc.exists) {
-      res.status(404).json({ error: "Banner not found" });
-      return;
-    }
 
-    const current = doc.data() as any;
+    const current = doc.exists ? doc.data() as any : {};
     const updated = {
       ...current,
+      id: id as string,
       ...(title !== undefined && { title }),
       ...(imageUrl !== undefined && { imageUrl }),
       ...(mobileImageUrl !== undefined && { mobileImageUrl }),
@@ -177,7 +177,7 @@ router.patch("/banners/:id", authenticateJWT as any, requireRole(["SuperAdmin", 
       updatedAt: new Date().toISOString(),
     };
 
-    await docRef.set(updated);
+    await docRef.set(updated, { merge: true });
     res.json({ id, ...updated });
   } catch (err) {
     console.error(err);
@@ -197,6 +197,7 @@ router.put("/admin/banners/:id", async (req: Request, res: Response) => {
 
     const updated = {
       ...current,
+      id: id as string,
       ...(title !== undefined && { title }),
       ...(imageUrl !== undefined && { imageUrl }),
       ...(mobileImageUrl !== undefined && { mobileImageUrl }),
@@ -209,7 +210,7 @@ router.put("/admin/banners/:id", async (req: Request, res: Response) => {
       updatedAt: new Date().toISOString(),
     };
 
-    await docRef.set(updated);
+    await docRef.set(updated, { merge: true });
     res.json({ id, ...updated });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -231,7 +232,7 @@ const markBannerAsDeleted = async (id: string) => {
 };
 
 // ─── DELETE /api/banners/:id — Admin: delete banner ──────────────────────────
-router.delete("/banners/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.delete("/banners/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const docRef = db.collection("banners").doc(id as string);

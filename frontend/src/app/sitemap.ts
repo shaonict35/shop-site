@@ -4,7 +4,7 @@ import { API_BASE } from '../utils/api';
 export const dynamic = "force-static";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://shop.glowgoodly.com';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://glowgoodly.com';
 
   const staticPages = [
     '',
@@ -51,7 +51,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   let productPages: MetadataRoute.Sitemap = [];
   try {
-    const res = await fetch(`${API_BASE}/products`, { next: { revalidate: 3600 } });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch(`${API_BASE}/products`, { 
+      next: { revalidate: 3600 },
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
     if (res.ok) {
       const products = await res.json();
       if (Array.isArray(products)) {
@@ -64,7 +70,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }
     }
   } catch (e) {
-    console.error('Sitemap product fetch error:', e);
+    console.warn('Sitemap using static page fallback');
   }
 
   return [...staticPages, ...categoryPages, ...productPages];

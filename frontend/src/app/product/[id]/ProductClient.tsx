@@ -40,7 +40,24 @@ import { useParams } from "next/navigation";
 export default function ProductPage() {
   const { addToCart, wishlist, toggleWishlist } = useApp();
   const routeParams = useParams();
-  const productId = routeParams?.id as string;
+  const rawId = routeParams?.id as string;
+
+  const [clientProductId, setClientProductId] = useState<string>("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const match = window.location.pathname.match(/\/product\/([^\/?#]+)/);
+      if (match && match[1] && match[1] !== "default") {
+        setClientProductId(match[1]);
+        return;
+      }
+    }
+    if (rawId && rawId !== "default") {
+      setClientProductId(rawId);
+    }
+  }, [rawId]);
+
+  const productId = clientProductId || (rawId !== "default" ? rawId : "");
   const [unwrappedParams, setUnwrappedParams] = useState<{ id: string } | null>(null);
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
@@ -91,11 +108,26 @@ export default function ProductPage() {
     const fetchProductDetails = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${API_BASE}/products/${productId}`, { cache: "no-store" });
+        let res = await fetch(`${API_BASE}/products/${productId}`, { cache: "no-store" });
+        let data: any = null;
+
         if (res.ok) {
-          const data = await res.json();
+          data = await res.json();
+        } else {
+          // Fallback search in full product list
+          const listRes = await fetch(`${API_BASE}/products`, { cache: "no-store" });
+          if (listRes.ok) {
+            const list = await listRes.json();
+            const matched = (list || []).find((p: any) => p.id === productId || p.slug === productId);
+            if (matched) {
+              data = { product: matched, relatedProducts: list.slice(0, 6) };
+            }
+          }
+        }
+
+        if (data && data.product) {
           setProduct(data.product);
-          setRelatedProducts(data.relatedProducts);
+          setRelatedProducts(data.relatedProducts || []);
 
           // Always set Product Main Cover Image as the primary display image when page opens
           const mainCoverImg = data.product.images?.find((img: any) => img.isPrimary)?.url 
@@ -104,7 +136,7 @@ export default function ProductPage() {
             || "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&auto=format&fit=crop&q=60";
 
           setActiveImage(mainCoverImg);
-          if (data.product.variants.length > 0) {
+          if (data.product.variants && data.product.variants.length > 0) {
             setSelectedVariant(data.product.variants[0]);
           }
 
@@ -137,7 +169,8 @@ export default function ProductPage() {
         metaDesc.setAttribute('name', 'description');
         document.head.appendChild(metaDesc);
       }
-      metaDesc.setAttribute('content', product.description.substring(0, 160).replace(/\n/g, ' '));
+      const safeDesc = product.description || "Authentic cosmetics product at GlowGoodly";
+      metaDesc.setAttribute('content', safeDesc.substring(0, 160).replace(/\n/g, ' '));
 
       // Update primary og:image tag in-place without deleting nodes
       let ogImage = document.querySelector('meta[property="og:image"]');
@@ -168,7 +201,7 @@ export default function ProductPage() {
         "@type": "Product",
         "name": product.name,
         "image": imagesList,
-        "description": product.description.substring(0, 300),
+        "description": safeDesc.substring(0, 300),
         "brand": {
           "@type": "Brand",
           "name": product.brand?.name || "GlowGoodly"
@@ -220,14 +253,14 @@ export default function ProductPage() {
 
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!unwrappedParams) return;
+    if (!productId) return;
     if (!customerName || !comment) {
       setReviewMessage("Please fill in all review fields.");
       return;
     }
 
     try {
-      const res = await fetch(`${API_BASE}/products/${unwrappedParams.id}/reviews`, {
+      const res = await fetch(`${API_BASE}/products/${productId}/reviews`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ customerName, rating, comment }),
@@ -287,8 +320,8 @@ export default function ProductPage() {
     return (
       <>
         <Header />
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "400px", color: "var(--primary)", fontWeight: "800" }}>
-          Loading product details...
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "350px" }}>
+          <div style={{ display: "inline-block", width: "36px", height: "36px", border: "3px solid #f3f3f3", borderTop: "3px solid var(--primary)", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
         </div>
         <MobileNavbar />
       </>
@@ -328,12 +361,12 @@ export default function ProductPage() {
                 "name": "GlowGoodly"
               }
             },
-            "aggregateRating": product.reviews.length > 0 ? {
+            "aggregateRating": (product.reviews && product.reviews.length > 0) ? {
               "@type": "AggregateRating",
               "ratingValue": (product.reviews.reduce((acc, r) => acc + r.rating, 0) / product.reviews.length).toFixed(1),
               "reviewCount": product.reviews.length
             } : undefined,
-            "review": product.reviews.map((rev) => ({
+            "review": (product.reviews || []).map((rev) => ({
               "@type": "Review",
               "author": {
                 "@type": "Person",
@@ -504,7 +537,7 @@ export default function ProductPage() {
               </h1>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px" }}>
                 <span style={{ color: "var(--secondary)", fontWeight: "700" }}>★★★★★ 4.8</span>
-                <span style={{ color: "var(--gray-500)", fontSize: "13px", fontWeight: "600" }}>| {product.reviews.length} Approved Reviews</span>
+                <span style={{ color: "var(--gray-500)", fontSize: "13px", fontWeight: "600" }}>| {product.reviews?.length || 0} Approved Reviews</span>
               </div>
             </div>
 
@@ -940,14 +973,14 @@ export default function ProductPage() {
           {/* Reviews List */}
           <div style={{ flex: 1.5, minWidth: "300px" }}>
             <h2 style={{ fontSize: "20px", fontWeight: "800", marginBottom: "20px" }}>
-              Customer Reviews ({product.reviews.length})
+              Customer Reviews ({(product.reviews || []).length})
             </h2>
 
-            {product.reviews.length === 0 ? (
+            {(product.reviews || []).length === 0 ? (
               <p style={{ color: "var(--gray-500)", fontWeight: "600" }}>No approved reviews for this product yet.</p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
-                {product.reviews.map((rev) => (
+                {(product.reviews || []).map((rev) => (
                   <div
                     key={rev.id}
                     style={{

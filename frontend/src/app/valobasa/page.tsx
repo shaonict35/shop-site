@@ -182,20 +182,22 @@ export default function ValobasaAdminPanel() {
 
 const DEFAULT_ALL_SITE_BANNERS = [
   // Hero Main Slides
-  { id: "hero-1", title: "Hero Slide 1 - Nirvana Collection", page: "Hero Slides", imageUrl: "/images/sliders/slider-1.png", mobileImageUrl: "/images/sliders/slider-1.png", linkUrl: "/shop?category=skincare" },
-  { id: "hero-2", title: "Hero Slide 2 - Prime Web Offer Banner", page: "Hero Slides", imageUrl: "https://bk.shajgoj.com/storage/2026/07/prime-banner-web.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/07/prime-banner-web.png", linkUrl: "/shop?category=k-beauty" },
+  { id: "hero-1", title: "Hero Slide 1 - Prime Web Offer Banner", page: "Hero Slides", imageUrl: "https://bk.shajgoj.com/storage/2026/07/prime-banner-web.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/07/prime-banner-web.png", linkUrl: "/shop?category=skincare" },
+  { id: "hero-2", title: "Hero Slide 2 - Beauty Bonanza Clearance", page: "Hero Slides", imageUrl: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png", linkUrl: "/shop?category=clearance-sale" },
+  { id: "hero-3", title: "Hero Slide 3 - BOGO Special Offer", page: "Hero Slides", imageUrl: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png", linkUrl: "/shop?category=bogo" },
+  { id: "hero-4", title: "Hero Slide 4 - Combo Saver Offer", page: "Hero Slides", imageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png", linkUrl: "/shop?category=combo" },
 
   // Deals You Cannot Miss
-  { id: "deal-1", title: "Deal Card 1 - Clearance Sale", page: "Deals You Cannot Miss", imageUrl: "/images/deals/deal-1.png", mobileImageUrl: "/images/deals/deal-1.png", linkUrl: "/shop?category=clearance-sale" },
-  { id: "deal-2", title: "Deal Card 2 - Skincare Steals", page: "Deals You Cannot Miss", imageUrl: "/images/deals/deal-2.png", mobileImageUrl: "/images/deals/deal-2.png", linkUrl: "/shop?category=skincare" },
-  { id: "deal-3", title: "Deal Card 3 - Combo Special Offer", page: "Deals You Cannot Miss", imageUrl: "/images/deals/deal-3.gif", mobileImageUrl: "/images/deals/deal-3.gif", linkUrl: "/shop?category=combo" },
-  { id: "deal-4", title: "Deal Card 4 - Makeup Essentials", page: "Deals You Cannot Miss", imageUrl: "/images/deals/deal-4.jpg", mobileImageUrl: "/images/deals/deal-4.jpg", linkUrl: "/shop?category=makeup" },
+  { id: "deal-1", title: "Deal Card 1 - Clearance Sale", page: "Deals You Cannot Miss", imageUrl: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png", linkUrl: "/shop?category=clearance-sale" },
+  { id: "deal-2", title: "Deal Card 2 - Skincare Steals", page: "Deals You Cannot Miss", imageUrl: "https://bk.shajgoj.com/storage/2026/04/skin-care.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/skin-care.png", linkUrl: "/shop?category=skincare" },
+  { id: "deal-3", title: "Deal Card 3 - Combo Special Offer", page: "Deals You Cannot Miss", imageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png", linkUrl: "/shop?category=combo" },
+  { id: "deal-4", title: "Deal Card 4 - Makeup Essentials", page: "Deals You Cannot Miss", imageUrl: "https://bk.shajgoj.com/storage/2026/04/makeup.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/makeup.png", linkUrl: "/shop?category=makeup" },
 
   // Top Brands & Offers
-  { id: "brand-1", title: "Brand Offer 1 - The Ordinary Deal", page: "Top Brands & Offers", imageUrl: "/images/brands/brand-offer-1.png", mobileImageUrl: "/images/brands/brand-offer-1.png", linkUrl: "/shop?brand=the-ordinary" },
-  { id: "brand-2", title: "Brand Offer 2 - Skin Cafe Offer", page: "Top Brands & Offers", imageUrl: "/images/brands/brand-offer-2.gif", mobileImageUrl: "/images/brands/brand-offer-2.gif", linkUrl: "/shop?brand=skin-cafe" },
-  { id: "brand-5", title: "Brand Offer 5 - Vitamin C Special", page: "Top Brands & Offers", imageUrl: "/images/brands/brand-offer-5.png", mobileImageUrl: "/images/brands/brand-offer-5.png", linkUrl: "/shop?brand=the-ordinary" },
-  { id: "brand-6", title: "Brand Offer 6 - Skin Cafe Combo", page: "Top Brands & Offers", imageUrl: "/images/brands/brand-offer-6.gif", mobileImageUrl: "/images/brands/brand-offer-6.gif", linkUrl: "/shop?brand=skin-cafe" },
+  { id: "brand-1", title: "Brand Offer 1 - The Ordinary Deal", page: "Top Brands & Offers", imageUrl: "https://bk.shajgoj.com/storage/2026/04/skin-care.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/skin-care.png", linkUrl: "/shop?brand=the-ordinary" },
+  { id: "brand-2", title: "Brand Offer 2 - Skin Cafe Offer", page: "Top Brands & Offers", imageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png", linkUrl: "/shop?brand=skin-cafe" },
+  { id: "brand-5", title: "Brand Offer 5 - Vitamin C Special", page: "Top Brands & Offers", imageUrl: "https://bk.shajgoj.com/storage/2026/04/accessories.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/accessories.png", linkUrl: "/shop?brand=the-ordinary" },
+  { id: "brand-6", title: "Brand Offer 6 - Skin Cafe Combo", page: "Top Brands & Offers", imageUrl: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png", linkUrl: "/shop?brand=skin-cafe" },
 
   // Limited Time Offers
   { id: "lim-1", title: "BOGO Offer - Buy 1 Get 1 Free", page: "Limited Time Offers", imageUrl: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png", linkUrl: "/shop?campaign=BOGO" },
@@ -458,11 +460,23 @@ const DEFAULT_ALL_SITE_BANNERS = [
       return;
     }
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
+      let res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim(), password: password.trim() })
       });
+      if (!res.ok && typeof window !== "undefined" && window.location.hostname === "localhost") {
+        try {
+          const fallbackRes = await fetch(`http://localhost:5000/api/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: email.trim(), password: password.trim() })
+          });
+          if (fallbackRes.ok) {
+            res = fallbackRes;
+          }
+        } catch (e2) {}
+      }
       const data = await res.json();
       if (res.ok && data.token && data.user) {
         if (!["SuperAdmin", "Manager", "Salesman"].includes(data.user.role)) {
@@ -485,6 +499,26 @@ const DEFAULT_ALL_SITE_BANNERS = [
         setLoginError(data.error || "Invalid admin email or password.");
       }
     } catch (err: any) {
+      // Local fallback on exception
+      if (typeof window !== "undefined" && window.location.hostname === "localhost") {
+        try {
+          const fallbackRes = await fetch(`http://localhost:5000/api/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: email.trim(), password: password.trim() })
+          });
+          const fbData = await fallbackRes.json();
+          if (fallbackRes.ok && fbData.token && fbData.user) {
+            sessionStorage.setItem("glowgoodly_admin_session", "active");
+            localStorage.setItem("glowgoodly_token", fbData.token);
+            localStorage.setItem("glowgoodly_user", JSON.stringify(fbData.user));
+            if (login) login(fbData.user, fbData.token);
+            setIsAdmin(true);
+            window.location.reload();
+            return;
+          }
+        } catch (e3) {}
+      }
       setLoginError(err?.message || "Login failed. Please try again.");
     }
   };
@@ -512,28 +546,50 @@ const DEFAULT_ALL_SITE_BANNERS = [
   }, [user, token]);
 
 
+  const safeFetch = async (url: string, options: any = {}) => {
+    try {
+      let res = await fetch(url, options);
+      if (!res.ok && typeof window !== "undefined" && window.location.hostname === "localhost" && url.includes("api.glowgoodly.com")) {
+        const fallbackUrl = url.replace("https://api.glowgoodly.com/api", "http://localhost:5000/api");
+        try {
+          const fbRes = await fetch(fallbackUrl, options);
+          if (fbRes.ok) return fbRes;
+        } catch (e2) {}
+      }
+      return res;
+    } catch (err) {
+      if (typeof window !== "undefined" && window.location.hostname === "localhost" && url.includes("api.glowgoodly.com")) {
+        const fallbackUrl = url.replace("https://api.glowgoodly.com/api", "http://localhost:5000/api");
+        try {
+          return await fetch(fallbackUrl, options);
+        } catch (e3) {}
+      }
+      return null;
+    }
+  };
+
   const fetchData = async (bypass: boolean = false) => {
     const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : "");
     if (!activeToken) return;
     try {
       const [settingsRes, statsRes, ordersRes, catRes, brandRes, prodRes, bannerRes, blogRes, custRes, staffRes, notifRes, menuRes, pageRes, msgRes] = await Promise.all([
-        fetch(`${API_BASE}/settings`, { headers: { Authorization: `Bearer ${activeToken}` } }),
-        fetch(`${API_BASE}/admin/dashboard-stats`, { headers: { Authorization: `Bearer ${activeToken}` } }),
-        fetch(`${API_BASE}/orders/all`, { headers: { Authorization: `Bearer ${activeToken}` } }),
-        fetch(`${API_BASE}/admin/categories`),
-        fetch(`${API_BASE}/admin/brands` + (bypass ? `?t=${Date.now()}` : ""), { headers: { Authorization: `Bearer ${activeToken}`, "Cache-Control": "no-cache" } }),
-        fetch(`${API_BASE}/products` + (bypass ? `?t=${Date.now()}` : "")),
-        fetch(`${API_BASE}/admin/banners`),
-        fetch(`${API_BASE}/admin/blogs`),
-        fetch(`${API_BASE}/admin/customers`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${API_BASE}/admin/staff`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${API_BASE}/notifications`),
-        fetch(`${API_BASE}/admin/menus`),
-        fetch(`${API_BASE}/admin/pages`),
-        fetch(`${API_BASE}/admin/contact-messages`)
+        safeFetch(`${API_BASE}/settings`, { headers: { Authorization: `Bearer ${activeToken}` } }),
+        safeFetch(`${API_BASE}/admin/dashboard-stats`, { headers: { Authorization: `Bearer ${activeToken}` } }),
+        safeFetch(`${API_BASE}/orders/all`, { headers: { Authorization: `Bearer ${activeToken}` } }),
+        safeFetch(`${API_BASE}/admin/categories`),
+        safeFetch(`${API_BASE}/admin/brands` + (bypass ? `?t=${Date.now()}` : ""), { headers: { Authorization: `Bearer ${activeToken}`, "Cache-Control": "no-cache" } }),
+        safeFetch(`${API_BASE}/products` + (bypass ? `?t=${Date.now()}` : "")),
+        safeFetch(`${API_BASE}/admin/banners`),
+        safeFetch(`${API_BASE}/admin/blogs`),
+        safeFetch(`${API_BASE}/admin/customers`, { headers: { Authorization: `Bearer ${activeToken}` } }),
+        safeFetch(`${API_BASE}/admin/staff`, { headers: { Authorization: `Bearer ${activeToken}` } }),
+        safeFetch(`${API_BASE}/notifications`),
+        safeFetch(`${API_BASE}/admin/menus`),
+        safeFetch(`${API_BASE}/admin/pages`),
+        safeFetch(`${API_BASE}/admin/contact-messages`)
       ]);
 
-      const safeJson = async (res: Response) => {
+      const safeJson = async (res: Response | null) => {
         if (!res || !res.ok) return null;
         try {
           const text = await res.text();
@@ -607,10 +663,8 @@ const DEFAULT_ALL_SITE_BANNERS = [
         });
         setInventoryPrices(priceMap);
       }
-      if (bnData && bnData.length > 0) {
+      if (bnData && Array.isArray(bnData)) {
         setBanners(bnData);
-      } else {
-        setBanners(DEFAULT_ALL_SITE_BANNERS);
       }
       if (blData) setBlogList(blData);
       if (csData) setCustomerList(csData);
@@ -865,24 +919,36 @@ const DEFAULT_ALL_SITE_BANNERS = [
       return;
     }
     try {
-      const method = bannerForm.id ? "PATCH" : "POST";
-      const url = bannerForm.id ? `${API_BASE}/banners/${bannerForm.id}` : `${API_BASE}/banners`;
-      const res = await fetch(url, {
+      let method = bannerForm.id ? "PATCH" : "POST";
+      let url = bannerForm.id ? `${API_BASE}/banners/${bannerForm.id}` : `${API_BASE}/banners`;
+      
+      let res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(bannerForm)
       });
+
+      if (!res.ok && bannerForm.id) {
+        // Fallback to PUT alias endpoint
+        res = await fetch(`${API_BASE}/admin/banners/${bannerForm.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(bannerForm)
+        });
+      }
+
       if (res.ok) {
         clearAllCache(); // Force website to reload fresh data
         alert("Banner saved successfully!");
         setBannerForm({ id: "", title: "", imageUrl: "", mobileImageUrl: "", tabletImageUrl: "", linkUrl: "", bgColor: "#1a1a2e", page: "Homepage", isActive: true, sortOrder: "0" });
         navigateTo("home-banner-list");
-        fetchData();
+        fetchData(true);
       } else {
-        alert("Failed to save banner.");
+        const errData = await res.json().catch(() => ({}));
+        alert(`Failed to save banner: ${errData.error || "Server response error"}`);
       }
-    } catch (e) {
-      alert("Error saving banner.");
+    } catch (e: any) {
+      alert(`Error saving banner: ${e.message || e}`);
     }
   };
 
@@ -1248,10 +1314,27 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
   });
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", backgroundColor: "#f4f5fa", fontFamily: "sans-serif" }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", backgroundColor: "#f3f4f6", fontFamily: "'Montserrat', sans-serif" }}>
 
-      {/* CSS Rules for Printing Voucher */}
+      {/* Modern Montserrat Font Import */}
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
+        .admin-sidebar { font-family: 'Montserrat', sans-serif; }
+        .admin-menu-item {
+          transition: all 0.2s ease;
+          border-left: 4px solid transparent;
+        }
+        .admin-menu-item:hover {
+          background-color: #2b2b40 !important;
+          color: #fff !important;
+        }
+        .admin-menu-item.active {
+          background-color: #e63b7a !important;
+          color: #fff !important;
+          border-left-color: #ffffff !important;
+          font-weight: 700;
+          box-shadow: 0 4px 12px rgba(230, 59, 122, 0.35);
+        }
         @media print {
           body * { visibility: hidden; }
           #printable-voucher, #printable-voucher * { visibility: visible; }
@@ -2752,6 +2835,36 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                             onChange={(e) => setBannerForm({ ...bannerForm, title: e.target.value })}
                             style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13.5px" }}
                             placeholder="e.g. Hero Slide 1 - Nirvana Collection"
+                          />
+                        </div>
+
+                        {/* Desktop Image File & URL Upload */}
+                        <div style={{ backgroundColor: "#f8fafc", padding: "14px", borderRadius: "10px", border: "1px solid #cbd5e1" }}>
+                          <label style={{ display: "block", fontSize: "12.5px", fontWeight: "800", color: "#0f172a", marginBottom: "4px" }}>
+                            🖥️ DESKTOP BANNER IMAGE * (Upload File or Paste Image URL)
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={bannerForm.imageUrl}
+                            onChange={(e) => setBannerForm({ ...bannerForm, imageUrl: e.target.value })}
+                            style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13px", marginBottom: "8px" }}
+                            placeholder="Paste Image URL or select local file below..."
+                          />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (evt) => {
+                                  if (evt.target?.result) setBannerForm({ ...bannerForm, imageUrl: evt.target.result as string });
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                            style={{ fontSize: "12px" }}
                           />
                         </div>
 

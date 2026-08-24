@@ -24,12 +24,40 @@ interface Product {
 
 const initialHeroSlides: any[] = [
   {
-    title: "Exclusive Beauty & Skincare Deals",
-    desc: "Up to 50% Off Top Brands",
+    title: "Self Care Week - Mega Discount",
+    desc: "Up to 50% OFF on Top International Skincare & Makeup Brands",
     bg: "linear-gradient(135deg, #e63b7a 0%, #ff758c 100%)",
     img: "https://bk.shajgoj.com/storage/2026/07/prime-banner-web.png",
     mobileImg: "https://bk.shajgoj.com/storage/2026/07/prime-banner-web.png",
-    link: "/shop"
+    tabletImg: "https://bk.shajgoj.com/storage/2026/07/prime-banner-web.png",
+    link: "/shop?category=skincare"
+  },
+  {
+    title: "Beauty Bonanza Clearance Sale",
+    desc: "Unbeatable Prices on Beauty & Personal Care",
+    bg: "linear-gradient(135deg, #821f9b 0%, #d946ef 100%)",
+    img: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png",
+    mobileImg: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png",
+    tabletImg: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png",
+    link: "/shop?category=clearance-sale"
+  },
+  {
+    title: "BOGO Special Beauty Offer",
+    desc: "Buy 1 Get 1 Free on Selected Top Brands",
+    bg: "linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%)",
+    img: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png",
+    mobileImg: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png",
+    tabletImg: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png",
+    link: "/shop?category=bogo"
+  },
+  {
+    title: "Skincare Steals & Combos",
+    desc: "Exclusive Glow & Care Bundles",
+    bg: "linear-gradient(135deg, #ec4899 0%, #f43f5e 100%)",
+    img: "https://bk.shajgoj.com/storage/2025/05/combo.png",
+    mobileImg: "https://bk.shajgoj.com/storage/2025/05/combo.png",
+    tabletImg: "https://bk.shajgoj.com/storage/2025/05/combo.png",
+    link: "/shop?category=combo"
   }
 ];
 
@@ -47,18 +75,25 @@ const DEFAULT_BEAUTY_CATEGORIES = [
 export default function Home() {
   const { addToCart, wishlist, toggleWishlist } = useApp();
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>(DEFAULT_BEAUTY_CATEGORIES);
   const [brands, setBrands] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [dynamicSlides, setDynamicSlides] = useState<any[]>(initialHeroSlides);
   const [homepageBanners, setHomepageBanners] = useState<any[]>([]);
 
-  const getBannerForPage = (pageName: string, fallbackImg: string, fallbackTitle: string, fallbackLink: string = "#") => {
-    const found = homepageBanners.find((b: any) => b.page === pageName);
+  const getBannerForPage = (identifier: string, fallbackImg: string, fallbackTitle: string, fallbackLink: string = "#") => {
+    const term = (identifier || "").toLowerCase();
+    const found = homepageBanners.find((b: any) => 
+      (b.title && b.title.toLowerCase().includes(term)) ||
+      (b.page && b.page.toLowerCase().includes(term)) ||
+      (b.id && b.id.toLowerCase().includes(term))
+    );
+    const rawImg = found ? found.imageUrl : "";
+    const isValidImg = rawImg && rawImg.startsWith("http");
     return {
-      img: found ? found.imageUrl : fallbackImg,
-      title: found ? found.title : fallbackTitle,
-      link: found ? (found.linkUrl || fallbackLink) : fallbackLink
+      img: isValidImg ? rawImg : fallbackImg,
+      title: (found && found.title) ? found.title : fallbackTitle,
+      link: (found && found.linkUrl) ? found.linkUrl : fallbackLink
     };
   };
 
@@ -143,9 +178,9 @@ export default function Home() {
           fetchWithCache(`${API_BASE}/banners`, bypass),
           fetchWithCache(`${API_BASE}/notifications/active`, bypass)
         ]);
-        setCategories(Array.isArray(catData) ? catData : []);
+        setCategories(Array.isArray(catData) && catData.length > 0 ? catData : DEFAULT_BEAUTY_CATEGORIES);
         setBrands(Array.isArray(brandData) ? brandData : []);
-        if (bannerData && bannerData.length > 0) {
+        if (bannerData && Array.isArray(bannerData) && bannerData.length > 0) {
           setHomepageBanners(bannerData);
           const homeBanners = bannerData.filter((b: any) => 
             b.isActive !== false &&
@@ -156,17 +191,20 @@ export default function Home() {
           );
 
           if (homeBanners.length > 0) {
-            setDynamicSlides(homeBanners.map((b: any) => ({
-              title: b.title,
-              desc: "Exclusive Collection at GlowGoodly",
-              bg: b.bgColor || "linear-gradient(135deg, #e63b7a 0%, #ff758c 100%)",
-              img: b.imageUrl,
-              mobileImg: b.mobileImageUrl || b.imageUrl,
-              tabletImg: b.tabletImageUrl || b.imageUrl,
-              link: b.linkUrl || "/shop"
-            })));
-          } else {
-            setDynamicSlides(initialHeroSlides);
+            const validSlides = homeBanners
+              .filter((b: any) => b.imageUrl && b.imageUrl.startsWith("http"))
+              .map((b: any) => ({
+                title: b.title,
+                desc: "Exclusive Collection at GlowGoodly",
+                bg: b.bgColor || "linear-gradient(135deg, #e63b7a 0%, #ff758c 100%)",
+                img: b.imageUrl,
+                mobileImg: b.mobileImageUrl || b.imageUrl,
+                tabletImg: b.tabletImageUrl || b.imageUrl,
+                link: b.linkUrl || "/shop"
+              }));
+            if (validSlides.length > 0) {
+              setDynamicSlides(validSlides);
+            }
           }
         }
 
@@ -196,7 +234,6 @@ export default function Home() {
   // Fetch filtered products
   useEffect(() => {
     const fetchProducts = async (bypass: boolean = false) => {
-      setLoading(true);
       try {
         let url = `${API_BASE}/products?`;
         if (activeCategory) url += `category=${activeCategory}&`;
@@ -259,7 +296,11 @@ export default function Home() {
       <PromoBanner />
 
       {/* Full-width Dynamic Promotional Banner Slider - Responsive with Shajgoj-like sizing */}
-      {activeSlidesList.length > 0 && activeSlidesList[activeSlide]?.img ? (
+      {(() => {
+        const safeSlideIdx = activeSlide % (activeSlidesList.length || 1);
+        const currentSlide = activeSlidesList[safeSlideIdx] || activeSlidesList[0];
+        if (!currentSlide || !currentSlide.img) return null;
+        return (
         <section
           style={{
             width: "100%",
@@ -269,26 +310,27 @@ export default function Home() {
           }}
         >
         <div style={{ position: "relative", width: "100%", display: "block" }}>
-          {activeSlidesList[activeSlide]?.link?.startsWith("http") ? (
+          {currentSlide?.link?.startsWith("http") ? (
             <a
-              href={activeSlidesList[activeSlide]?.link}
+              href={currentSlide?.link}
               target="_blank"
               rel="noopener noreferrer"
               style={{ display: "block", width: "100%", cursor: "pointer" }}
             >
               <picture style={{ display: "block", width: "100%" }}>
-                {activeSlidesList[activeSlide]?.mobileImg && (
-                  <source media="(max-width: 640px)" srcSet={activeSlidesList[activeSlide]?.mobileImg} />
+                {currentSlide?.mobileImg && (
+                  <source media="(max-width: 640px)" srcSet={currentSlide?.mobileImg} />
                 )}
-                {activeSlidesList[activeSlide]?.tabletImg && (
-                  <source media="(max-width: 1024px)" srcSet={activeSlidesList[activeSlide]?.tabletImg} />
+                {currentSlide?.tabletImg && (
+                  <source media="(max-width: 1024px)" srcSet={currentSlide?.tabletImg} />
                 )}
                 <img
-                  src={activeSlidesList[activeSlide]?.img}
-                  alt={activeSlidesList[activeSlide]?.title || "Hero Slider"}
+                  src={currentSlide?.img}
+                  alt={currentSlide?.title || "Hero Slider"}
                   style={{
                     width: "100%",
-                    height: "auto",
+                    maxHeight: "450px",
+                    objectFit: "cover",
                     display: "block",
                   }}
                 />
@@ -296,22 +338,23 @@ export default function Home() {
             </a>
           ) : (
             <Link
-              href={activeSlidesList[activeSlide]?.link || "/shop"}
+              href={currentSlide?.link || "/shop"}
               style={{ display: "block", width: "100%", cursor: "pointer" }}
             >
               <picture style={{ display: "block", width: "100%" }}>
-                {activeSlidesList[activeSlide]?.mobileImg && (
-                  <source media="(max-width: 640px)" srcSet={activeSlidesList[activeSlide]?.mobileImg} />
+                {currentSlide?.mobileImg && (
+                  <source media="(max-width: 640px)" srcSet={currentSlide?.mobileImg} />
                 )}
-                {activeSlidesList[activeSlide]?.tabletImg && (
-                  <source media="(max-width: 1024px)" srcSet={activeSlidesList[activeSlide]?.tabletImg} />
+                {currentSlide?.tabletImg && (
+                  <source media="(max-width: 1024px)" srcSet={currentSlide?.tabletImg} />
                 )}
                 <img
-                  src={activeSlidesList[activeSlide]?.img}
-                  alt={activeSlidesList[activeSlide]?.title || "Hero Slider"}
+                  src={currentSlide?.img}
+                  alt={currentSlide?.title || "Hero Slider"}
                   style={{
                     width: "100%",
-                    height: "auto",
+                    maxHeight: "450px",
+                    objectFit: "cover",
                     display: "block",
                   }}
                 />
@@ -339,7 +382,7 @@ export default function Home() {
                   width: "10px",
                   height: "10px",
                   borderRadius: "50%",
-                  backgroundColor: activeSlide === idx ? "#e63b7a" : "rgba(255, 255, 255, 0.6)",
+                  backgroundColor: safeSlideIdx === idx ? "#e63b7a" : "rgba(255, 255, 255, 0.6)",
                   boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
                   cursor: "pointer",
                   transition: "all 0.2s",
@@ -349,7 +392,8 @@ export default function Home() {
           </div>
         </div>
       </section>
-      ) : null}
+        );
+      })()}
 
       <main className="container" style={{ paddingBottom: "40px", paddingTop: "20px" }}>
 
@@ -366,33 +410,8 @@ export default function Home() {
           />
         </Link>
 
-        {/* DEALS YOU CANNOT MISS Section */}
-        <section style={{ margin: "30px 0 40px 0" }}>
-          <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "20px", color: "#000" }}>
-            DEALS YOU CANNOT MISS
-          </h2>
-          <div className="dycm-grid">
-            {/* Card 1 */}
-            <Link href={getBannerForPage("Deal Card 1", "", "", "/shop?category=clearance-sale").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("Deal Card 1", "/images/deals/deal-1.png", "").img} alt="Deal Card 1" style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
-            </Link>
-            {/* Card 2 */}
-            <Link href={getBannerForPage("Deal Card 2", "", "", "/shop?category=skincare").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("Deal Card 2", "/images/deals/deal-2.png", "").img} alt="Deal Card 2" style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
-            </Link>
-            {/* Card 3 */}
-            <Link href={getBannerForPage("Deal Card 3", "", "", "/shop?category=combo").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("Deal Card 3", "/images/deals/deal-3.gif", "").img} alt="Deal Card 3" style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
-            </Link>
-            {/* Card 4 */}
-            <Link href={getBannerForPage("Deal Card 4", "", "", "/shop?category=makeup").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("Deal Card 4", "/images/deals/deal-4.jpg", "").img} alt="Deal Card 4" style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
-            </Link>
-          </div>
-        </section>
-
         {/* MAKEUP Section */}
-        <section style={{ margin: "40px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
+        <section style={{ margin: "30px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
           <div style={{ position: "relative", marginBottom: "20px" }}>
             <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", color: "#000", margin: 0 }}>
               MAKEUP
@@ -466,31 +485,129 @@ export default function Home() {
           </div>
         </section>
 
-        {/* TOP BRANDS & OFFERS Section */}
-        <section style={{ margin: "40px 0" }}>
+        {/* DEALS YOU CANNOT MISS Section */}
+        <section style={{ margin: "30px 0 40px 0" }}>
           <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "20px", color: "#000" }}>
+            DEALS YOU CANNOT MISS
+          </h2>
+          <div className="dycm-grid">
+            {/* Card 1 */}
+            <Link href={getBannerForPage("Deal Card 1", "", "", "/shop?category=clearance-sale").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
+              <img src={getBannerForPage("Deal Card 1", "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png", "").img} alt="Deal Card 1" style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
+            </Link>
+            {/* Card 2 */}
+            <Link href={getBannerForPage("Deal Card 2", "", "", "/shop?category=skincare").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
+              <img src={getBannerForPage("Deal Card 2", "https://bk.shajgoj.com/storage/2026/04/skin-care.png", "").img} alt="Deal Card 2" style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
+            </Link>
+            {/* Card 3 */}
+            <Link href={getBannerForPage("Deal Card 3", "", "", "/shop?category=combo").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
+              <img src={getBannerForPage("Deal Card 3", "https://bk.shajgoj.com/storage/2025/05/combo.png", "").img} alt="Deal Card 3" style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
+            </Link>
+            {/* Card 4 */}
+            <Link href={getBannerForPage("Deal Card 4", "", "", "/shop?category=makeup").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
+              <img src={getBannerForPage("Deal Card 4", "https://bk.shajgoj.com/storage/2026/04/makeup.png", "").img} alt="Deal Card 4" style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
+            </Link>
+          </div>
+        </section>
+
+        {/* SKIN CARE Section */}
+        <section style={{ margin: "40px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
+          <div style={{ position: "relative", marginBottom: "20px" }}>
+            <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", color: "#000", margin: 0 }}>
+              SKIN CARE
+            </h2>
+            <Link href="/shop?category=Skincare" style={{ position: "absolute", right: "0", top: "50%", transform: "translateY(-50%)", backgroundColor: "#e2136e", color: "#ffffff", padding: "6px 14px", borderRadius: "20px", fontSize: "11.5px", fontWeight: "800", textDecoration: "none", boxShadow: "0 2px 8px rgba(226,19,110,0.25)" }}>
+              SEE ALL ›
+            </Link>
+          </div>
+
+          <div className="homepage-product-grid mobile-limit-2">
+            {(products
+              .filter(p => p.category?.name?.toLowerCase().includes("skin") || p.name?.toLowerCase().includes("serum") || p.name?.toLowerCase().includes("cream") || p.name?.toLowerCase().includes("sunscreen") || p.name?.toLowerCase().includes("moisturizer") || p.name?.toLowerCase().includes("toner") || p.name?.toLowerCase().includes("face wash"))
+              .slice(0, 4)
+              .concat(
+                products.slice(1, Math.max(1, 1 + 4 - products.filter(p => p.category?.name?.toLowerCase().includes("skin") || p.name?.toLowerCase().includes("serum") || p.name?.toLowerCase().includes("cream") || p.name?.toLowerCase().includes("sunscreen") || p.name?.toLowerCase().includes("moisturizer") || p.name?.toLowerCase().includes("toner") || p.name?.toLowerCase().includes("face wash")).length))
+              )
+              .slice(0, 4)
+            ).map((p) => {
+              const primaryImage = p.images?.find((img) => img.isPrimary)?.url || p.images?.[0]?.url || "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=500&auto=format&fit=crop&q=60";
+              const primaryVariant = p.variants?.[0];
+              const oldPrice = primaryVariant?.price || 1500;
+              const currentPrice = primaryVariant?.discountPrice || primaryVariant?.price || 1199;
+              const hasDiscount = primaryVariant?.discountPrice && primaryVariant.discountPrice < primaryVariant.price;
+              const discountPercent = hasDiscount ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100) : 20;
+              const sizeLabel = (primaryVariant as any)?.size || primaryVariant?.name || "50ml";
+
+              return (
+                <div key={p.id} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
+                  <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
+                    {discountPercent}% OFF
+                  </div>
+
+                  <div className={`wishlist-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)}>
+                    <svg fill={wishlist.includes(p.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                    </svg>
+                  </div>
+                  <Link href={`/product/${p.id}`} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
+                  </Link>
+                  <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
+                    <Link href={`/product/${p.id}`} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                      {p.name}
+                    </Link>
+                    <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
+                      SKIN CARE
+                    </span>
+                    <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                      {hasDiscount && (
+                        <span className="old-price" style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "line-through", fontWeight: "600" }}>
+                          ৳{oldPrice.toFixed(2)}
+                        </span>
+                      )}
+                      <span className="price" style={{ fontSize: "16px", fontWeight: "800", color: "#e2136e" }}>
+                        ৳{currentPrice.toFixed(2)}
+                      </span>
+                    </div>
+                    <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
+                      ★ ★ ★ ★ ★
+                    </div>
+                    <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
+                      {sizeLabel}
+                    </div>
+                  </div>
+                  <button className="add-to-cart-btn" onClick={() => handleAddToCart(p)} style={{ backgroundColor: "#581c87", color: "#ffffff", border: "none", padding: "12px", fontWeight: "800", fontSize: "13px", letterSpacing: "0.5px", cursor: "pointer", width: "100%", borderRadius: "0 0 12px 12px" }}>
+                    ADD TO CART
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* TOP BRANDS & OFFERS Section */}
+        <section style={{ margin: "30px 0" }}>
+          <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "16px", color: "#000" }}>
             TOP BRANDS & OFFERS
           </h2>
           <div className="top-brands-grid">
             {/* Banner 1 */}
-            <Link href={getBannerForPage("Brand Offer 1", "", "", "/shop?brand=the-ordinary").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("Brand Offer 1", "/images/brands/brand-offer-1.png", "").img} alt="Brand Offer 1" style={{ width: "100%", height: "auto", display: "block" }} />
+            <Link href={getBannerForPage("Brand Offer 1", "", "", "/shop?brand=the-ordinary").link} style={{ display: "block", overflow: "hidden", borderRadius: "10px", transition: "transform 0.2s ease" }} className="promo-card-hover">
+              <img src={getBannerForPage("Brand Offer 1", "https://bk.shajgoj.com/storage/2026/04/skin-care.png", "").img} alt="Brand Offer 1" style={{ width: "100%", height: "auto", display: "block", borderRadius: "10px" }} />
             </Link>
             {/* Banner 2 */}
-            <Link href={getBannerForPage("Brand Offer 2", "", "", "/shop?brand=skin-cafe").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("Brand Offer 2", "/images/brands/brand-offer-2.gif", "").img} alt="Brand Offer 2" style={{ width: "100%", height: "auto", display: "block" }} />
+            <Link href={getBannerForPage("Brand Offer 2", "", "", "/shop?brand=skin-cafe").link} style={{ display: "block", overflow: "hidden", borderRadius: "10px", transition: "transform 0.2s ease" }} className="promo-card-hover">
+              <img src={getBannerForPage("Brand Offer 2", "https://bk.shajgoj.com/storage/2025/05/combo.png", "").img} alt="Brand Offer 2" style={{ width: "100%", height: "auto", display: "block", borderRadius: "10px" }} />
             </Link>
             {/* Banner 5 */}
-            <Link href={getBannerForPage("Brand Offer 5", "", "", "/shop?brand=the-ordinary").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("Brand Offer 5", "/images/brands/brand-offer-5.png", "").img} alt="Brand Offer 5" style={{ width: "100%", height: "auto", display: "block" }} />
+            <Link href={getBannerForPage("Brand Offer 5", "", "", "/shop?brand=the-ordinary").link} style={{ display: "block", overflow: "hidden", borderRadius: "10px", transition: "transform 0.2s ease" }} className="promo-card-hover">
+              <img src={getBannerForPage("Brand Offer 5", "https://bk.shajgoj.com/storage/2026/04/accessories.png", "").img} alt="Brand Offer 5" style={{ width: "100%", height: "auto", display: "block", borderRadius: "10px" }} />
             </Link>
             {/* Banner 6 */}
-            <Link href={getBannerForPage("Brand Offer 6", "", "", "/shop?brand=skin-cafe").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("Brand Offer 6", "/images/brands/brand-offer-6.gif", "").img} alt="Brand Offer 6" style={{ width: "100%", height: "auto", display: "block" }} />
+            <Link href={getBannerForPage("Brand Offer 6", "", "", "/shop?brand=skin-cafe").link} style={{ display: "block", overflow: "hidden", borderRadius: "10px", transition: "transform 0.2s ease" }} className="promo-card-hover">
+              <img src={getBannerForPage("Brand Offer 6", "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png", "").img} alt="Brand Offer 6" style={{ width: "100%", height: "auto", display: "block", borderRadius: "10px" }} />
             </Link>
           </div>
-
-
         </section>
 
         {/* BOGO Section */}
@@ -680,14 +797,20 @@ export default function Home() {
             SHOP BEAUTY PRODUCTS BY CATEGORY
           </h2>
           <div className="categories-grid">
-            {((Array.isArray(categories) && categories.filter(c => c && !c.parentId).length >= 4) 
-              ? categories.filter(c => c && !c.parentId).slice(0, 8) 
-              : DEFAULT_BEAUTY_CATEGORIES
-            ).map((cat: any) => {
-              const bannerInfo = getBannerForPage(`Category: ${cat.name}`, cat.image || getCategoryImage(cat.name), cat.name, `/shop?category=${getCategorySlug(cat.slug || cat.name)}`);
+            {[
+              { name: "Makeup", defaultImg: "https://bk.shajgoj.com/storage/2026/04/makeup.png", link: "/shop?category=makeup" },
+              { name: "Skin", defaultImg: "https://bk.shajgoj.com/storage/2026/04/skin-care.png", link: "/shop?category=skincare" },
+              { name: "Hair", defaultImg: "https://bk.shajgoj.com/storage/2026/04/hair-care.png", link: "/shop?category=haircare" },
+              { name: "Personal Care", defaultImg: "https://bk.shajgoj.com/storage/2026/04/accessories.png", link: "/shop?category=personal-care" },
+              { name: "Mom & Baby", defaultImg: "https://bk.shajgoj.com/storage/2026/04/mom-baby.png", link: "/shop?category=mom-baby" },
+              { name: "Fragrance", defaultImg: "https://bk.shajgoj.com/storage/2026/04/fragrance.png", link: "/shop?category=fragrance" },
+              { name: "Undergarments", defaultImg: "https://bk.shajgoj.com/storage/2026/04/undergarments.png", link: "/shop?category=undergarments" },
+              { name: "Combo", defaultImg: "https://bk.shajgoj.com/storage/2026/04/k-beauty.png", link: "/shop?category=combo" }
+            ].map((cat: any) => {
+              const bannerInfo = getBannerForPage(`Category: ${cat.name}`, cat.defaultImg, cat.name, cat.link);
               return (
                 <Link 
-                  key={cat.id || cat.name} 
+                  key={cat.name} 
                   href={bannerInfo.link} 
                   style={{ display: "block", borderRadius: "8px", overflow: "hidden", cursor: "pointer", textDecoration: "none" }} 
                   className="promo-card-hover"

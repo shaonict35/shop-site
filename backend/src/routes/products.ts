@@ -92,10 +92,13 @@ router.get("/products", async (req: Request, res: Response) => {
 
     const { category, categoryName, brand, campaign, search, minPrice, maxPrice, sort, ids } = req.query;
 
-    const snapshot = await db.collection("products").where("status", "==", "Active").get();
+    const snapshot = await db.collection("products").get();
     let productsList: any[] = [];
     snapshot.forEach(doc => {
-      productsList.push({ id: doc.id, ...doc.data() });
+      const data = doc.data();
+      if (!data.status || data.status === "Active" || data.status === "active" || data.status === "ACTIVE") {
+        productsList.push({ id: doc.id, ...data });
+      }
     });
 
     // Support fast query by ID list (e.g. for Wishlist)
@@ -185,25 +188,43 @@ router.get("/products", async (req: Request, res: Response) => {
 router.get("/products/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const doc = await db.collection("products").doc(id as string).get();
-    if (!doc.exists) {
+    if (!id || id === "default" || id === "undefined") {
+      return res.status(400).json({ error: "Invalid product id" });
+    }
+
+    let doc = await db.collection("products").doc(id as string).get();
+    let productData: any = null;
+
+    if (doc.exists) {
+      productData = { id: doc.id, ...doc.data() };
+    } else {
+      // Fallback search across products if doc ID format differs
+      const snap = await db.collection("products").get();
+      snap.forEach(d => {
+        if (d.id === id || (d.data() && (d.data().id === id || d.data().slug === id))) {
+          productData = { id: d.id, ...d.data() };
+        }
+      });
+    }
+
+    if (!productData) {
       return res.status(404).json({ error: "Product not found" });
     }
 
-    const productData = { id: doc.id, ...doc.data() } as any;
-
-    // Fetch approved reviews safely
+    // Fetch approved reviews safely without requiring Firestore composite index
     let reviews: any[] = [];
     try {
       const reviewsSnapshot = await db.collection("reviews")
         .where("productId", "==", id)
-        .where("isApproved", "==", true)
         .get();
         
       reviewsSnapshot.forEach(rDoc => {
-        reviews.push({ id: rDoc.id, ...rDoc.data() });
+        const rData = rDoc.data();
+        if (rData && (rData.isApproved === true || rData.isApproved === "true" || rData.isApproved === undefined)) {
+          reviews.push({ id: rDoc.id, ...rData });
+        }
       });
-      reviews.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      reviews.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     } catch (e) {
       console.warn("Could not fetch reviews for product", id, e);
     }
@@ -212,24 +233,25 @@ router.get("/products/:id", async (req: Request, res: Response) => {
     // Get related products safely
     let relatedProducts: any[] = [];
     try {
-      const relatedSnapshot = await db.collection("products")
-        .where("categoryId", "==", productData.categoryId)
-        .where("status", "==", "Active")
-        .limit(9)
-        .get();
-
-      relatedSnapshot.forEach(rDoc => {
-        if (rDoc.id !== id && relatedProducts.length < 8) {
-          relatedProducts.push({ id: rDoc.id, ...rDoc.data() });
-        }
-      });
+      if (productData.categoryId) {
+        const allProductsSnap = await db.collection("products").limit(50).get();
+        allProductsSnap.forEach(rDoc => {
+          if (rDoc.id !== id && relatedProducts.length < 8) {
+            const pData = rDoc.data();
+            if (pData.categoryId === productData.categoryId) {
+              relatedProducts.push({ id: rDoc.id, ...pData });
+            }
+          }
+        });
+      }
     } catch (e) {
       console.warn("Could not fetch related products for category", productData.categoryId, e);
     }
 
     res.json({ product: productData, relatedProducts });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error("Error in GET /products/:id", error);
+    res.status(500).json({ error: error.message || "Failed to fetch product" });
   }
 });
 

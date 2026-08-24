@@ -80,6 +80,28 @@ app.use("/api/settings", settingsRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/bkash", bkashRouter);
 
+// ─── SHAJGOJ BK.SHAJGOJ.COM WP-JSON & WOOCOMMERCE BACKEND MIRROR ENDPOINTS ───
+app.use("/wp-json/wp/v2/posts", (req, res) => res.redirect("/api/blogs"));
+app.use("/wp-json/wp/v2/categories", (req, res) => res.redirect("/api/categories"));
+app.use("/wp-json/wc/v3/products", (req, res) => res.redirect("/api/products"));
+app.use("/wp-json/wc/v3/orders", (req, res) => res.redirect("/api/orders"));
+app.get("/wp-json", (req, res) => {
+  res.json({
+    name: "Shajgoj & GlowGoodly E-Commerce Backend Engine",
+    description: "Production API for Products, Banners, Categories, Brands & Orders",
+    url: "http://bk.shajgoj.com",
+    namespaces: ["wp/v2", "wc/v3", "shajgoj/v1", "glowgoodly/v1"],
+    routes: {
+      "/wp-json/wc/v3/products": { methods: ["GET", "POST"] },
+      "/wp-json/wc/v3/categories": { methods: ["GET"] },
+      "/wp-json/wc/v3/orders": { methods: ["GET", "POST"] },
+      "/api/products": { methods: ["GET", "POST"] },
+      "/api/categories": { methods: ["GET"] },
+      "/api/banners": { methods: ["GET"] }
+    }
+  });
+});
+
 // Socket.io Real-Time Promotional Broadcasting System (100% Free WebSockets)
 let activeSocketsCount = 0;
 let lastPromoBroadcast: any = null;
@@ -256,43 +278,179 @@ app.use("/api", enterpriseRouter);
 app.use("/api", menuRouter);
 app.use("/api", pagesRouter);
 
-// Welcome & API Status Page
+// Backend Root Landing Page Endpoint (Shajgoj Landing UI with GlowGoodly Branding)
 app.get("/", (req, res) => {
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>GlowGoodly API Engine & Socket.io Server</title>
-        <style>
-          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #fcf8fa; color: #1a1a2e; padding: 50px; text-align: center; }
-          .card { background: white; padding: 40px; border-radius: 16px; display: inline-block; box-shadow: 0 10px 25px rgba(230, 59, 122, 0.08); max-width: 550px; text-align: left; border-top: 5px solid #e63b7a; }
-          h1 { color: #e63b7a; margin-top: 0; display: flex; align-items: center; gap: 8px; }
-          code { background: #f1f3f5; padding: 3px 6px; border-radius: 4px; font-family: monospace; font-size: 14px; }
-          a { color: #e63b7a; text-decoration: none; font-weight: bold; }
-          a:hover { text-decoration: underline; }
-          .status { display: inline-block; padding: 4px 12px; background: #e8f5e9; color: #2e7d32; border-radius: 20px; font-size: 13px; font-weight: 700; margin-bottom: 15px; }
-          ul { padding-left: 20px; line-height: 1.6; }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <h1>🌸 GlowGoodly API Engine</h1>
-          <div class="status">● ONLINE & REALTIME SOCKET.IO READY</div>
-          <p>The Express backend, bKash Merchant API (01609013011), and Socket.io promotional broadcaster are listening on port 5000.</p>
-          <p>Available Service Endpoints:</p>
-          <ul>
-            <li>API Health Status: <a href="/health">/health</a></li>
-            <li>bKash Merchant Info: <a href="/api/bkash/config">/api/bkash/config</a></li>
-            <li>Store Products: <a href="/api/products">/api/products</a></li>
-            <li>Categories List: <a href="/api/categories">/api/categories</a></li>
-          </ul>
-          <p style="margin-top: 25px; border-top: 1px solid #eee; padding-top: 15px; font-size: 14px; color: #666;">
-            Access the main customer storefront UI here: <a href="http://localhost:3000" target="_blank">http://localhost:3000</a>
-          </p>
-        </div>
-      </body>
-    </html>
-  `);
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>WELCOME TO GLOWGOODLY</title>
+	<link rel="icon" href="http://localhost:3000/user-glow-logo.png" type="image/png">
+	<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+	<style>
+		* {
+			box-sizing: border-box;
+			margin: 0;
+			padding: 0;
+		}
+		body {
+			font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+			background-color: #ffffff;
+			color: #1a1a1a;
+			min-height: 100vh;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			padding: 20px;
+		}
+		.landing-container {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			max-width: 1100px;
+			width: 100%;
+			gap: 40px;
+		}
+		.left-content {
+			flex: 1;
+			max-width: 500px;
+		}
+		.left-content h1 {
+			font-size: 32px;
+			font-weight: 800;
+			letter-spacing: 2px;
+			color: #1c1917;
+			text-transform: uppercase;
+			margin-bottom: 12px;
+		}
+		.left-content p {
+			font-size: 15px;
+			color: #44403c;
+			line-height: 1.5;
+			margin-bottom: 28px;
+			font-weight: 500;
+		}
+		.btn-group {
+			display: flex;
+			flex-direction: column;
+			gap: 12px;
+			width: 220px;
+		}
+		.btn {
+			display: block;
+			text-align: center;
+			padding: 12px 24px;
+			border-radius: 25px;
+			font-size: 14px;
+			font-weight: 700;
+			text-decoration: none;
+			color: #ffffff;
+			transition: all 0.2s ease;
+			box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+		}
+		.btn-ecommerce {
+			background-color: #d81b60;
+		}
+		.btn-ecommerce:hover {
+			background-color: #c2185b;
+			transform: translateY(-1px);
+		}
+		.btn-blog {
+			background-color: #5e35b1;
+		}
+		.btn-blog:hover {
+			background-color: #512da8;
+			transform: translateY(-1px);
+		}
+		.right-content {
+			flex: 1;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			position: relative;
+		}
+		.illustration-wrapper {
+			position: relative;
+			width: 100%;
+			max-width: 460px;
+		}
+		.illustration-wrapper img {
+			width: 100%;
+			height: auto;
+			display: block;
+		}
+		@media (max-width: 768px) {
+			.landing-container {
+				flex-direction: column-reverse;
+				text-align: center;
+				gap: 30px;
+			}
+			.btn-group {
+				margin: 0 auto;
+			}
+			.left-content h1 {
+				font-size: 24px;
+			}
+		}
+	</style>
+</head>
+<body>
+	<div class="landing-container">
+		<div class="left-content">
+			<h1>WELCOME TO GLOWGOODLY</h1>
+			<p>Buy Authentic Cosmetic and Beauty Products Online in Bangladesh.</p>
+			<div class="btn-group">
+				<a href="http://localhost:3000" class="btn btn-ecommerce">E-commerce</a>
+				<a href="http://localhost:3000/blog" class="btn btn-blog">Blog</a>
+			</div>
+		</div>
+		<div class="right-content">
+			<div class="illustration-wrapper">
+				<svg viewBox="0 0 500 500" width="100%" height="100%">
+					<!-- Circular Orbit Lines -->
+					<ellipse cx="250" cy="250" rx="190" ry="170" fill="none" stroke="#d6d3d1" stroke-width="1.5" transform="rotate(-15 250 250)"/>
+					<ellipse cx="250" cy="250" rx="205" ry="185" fill="none" stroke="#e7e5e4" stroke-width="1" transform="rotate(-8 250 250)"/>
+					<ellipse cx="250" cy="250" rx="175" ry="155" fill="none" stroke="#f5f5f4" stroke-width="1" transform="rotate(-25 250 250)"/>
+					
+					<!-- GlowGoodly Exact User Image Logo Center -->
+					<g transform="translate(175, 120)">
+						<image href="http://localhost:3000/user-glow-logo.png" x="0" y="0" width="150" height="180" />
+						<text x="75" y="220" text-anchor="middle" font-family="'Montserrat', sans-serif" font-weight="800" font-size="18" letter-spacing="3" fill="#1c1917">GLOWGOODLY</text>
+					</g>
+
+					<!-- Cosmetic Items Around Orbit -->
+					<!-- Compact Compact Powder Top Left -->
+					<g transform="translate(100, 100) rotate(-20)">
+						<rect x="0" y="0" width="60" height="70" rx="10" fill="#292524" />
+						<circle cx="30" cy="35" r="22" fill="#e7c4b1" />
+					</g>
+					<!-- Makeup Brushes -->
+					<g transform="translate(280, 110) rotate(45)">
+						<rect x="0" y="0" width="8" height="120" rx="4" fill="#1c1917" />
+						<path d="M -2,0 L 10,0 L 8,-25 C 6,-35 2,-35 0,-25 Z" fill="#78716c" />
+						<path d="M 0,-22 C 3,-30 5,-30 8,-22 Z" fill="#d81b60" />
+					</g>
+					<!-- Lipstick Bottom Right -->
+					<g transform="translate(380, 280) rotate(-30)">
+						<rect x="0" y="40" width="30" height="50" rx="4" fill="#292524" />
+						<rect x="3" y="20" width="24" height="20" fill="#d6d3d1" />
+						<path d="M 5,20 L 25,20 L 22,-10 C 15,-20 8,-10 5,20 Z" fill="#d81b60" />
+					</g>
+					<!-- Palette Box Bottom Right -->
+					<g transform="translate(340, 360) rotate(15)">
+						<rect x="0" y="0" width="80" height="60" rx="6" fill="#1c1917" />
+						<circle cx="20" cy="20" r="10" fill="#f43f5e" />
+						<circle cx="45" cy="20" r="10" fill="#fb7185" />
+						<circle cx="20" cy="42" r="10" fill="#fda4af" />
+						<circle cx="45" cy="42" r="10" fill="#e879f9" />
+					</g>
+				</svg>
+			</div>
+		</div>
+	</div>
+</body>
+</html>`);
 });
 
 // Health Check

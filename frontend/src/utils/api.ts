@@ -8,6 +8,9 @@ const CACHE_DURATION = 5000;
 const getBaseApiUrl = () => {
   if (typeof window !== "undefined") {
     const host = window.location.hostname;
+    if (host === "localhost" || host === "127.0.0.1" || host.includes("192.168.")) {
+      return "http://localhost:5000/api";
+    }
     if (host.includes("glowgoodly.com")) {
       return "https://api.glowgoodly.com/api";
     }
@@ -16,7 +19,7 @@ const getBaseApiUrl = () => {
     const raw = process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, "");
     return raw.endsWith("/api") ? raw : `${raw}/api`;
   }
-  return "https://api.glowgoodly.com/api";
+  return "http://localhost:5000/api";
 };
 
 export const API_BASE = getBaseApiUrl();
@@ -40,7 +43,7 @@ export async function fetchWithCache(url: string, bypassCache: boolean = false) 
       if (res.status === 404) {
         return null;
       }
-      if (cached) return cached.data; // Return stale cache if response not OK
+      if (cached) return cached.data;
       return null;
     }
 
@@ -52,6 +55,17 @@ export async function fetchWithCache(url: string, bypassCache: boolean = false) 
 
     return data;
   } catch (error) {
+    if (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") && url.includes("api.glowgoodly.com")) {
+      const fallbackUrl = url.replace("https://api.glowgoodly.com/api", "http://localhost:5000/api");
+      try {
+        const fbRes = await fetch(fallbackUrl, { cache: "no-store" });
+        if (fbRes.ok) {
+          const fbData = await fbRes.json();
+          cache[url] = { data: fbData, expiry: now + CACHE_DURATION };
+          return fbData;
+        }
+      } catch (e) {}
+    }
     if (cached) {
       return cached.data;
     }

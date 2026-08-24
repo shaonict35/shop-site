@@ -68,52 +68,18 @@ try {
 }
 fs.rmSync(backendStageDir, { recursive: true, force: true });
 
-// 5. Package Frontend Node.js App
-console.log('\n📦 [4/4] Creating Frontend Node.js Deployment Package (glowgoodly-frontend-cpanel.zip)...');
-const frontendStageDir = path.join(deployDir, 'frontend_staging');
-if (fs.existsSync(frontendStageDir)) fs.rmSync(frontendStageDir, { recursive: true, force: true });
-fs.mkdirSync(frontendStageDir, { recursive: true });
-
-function copyFrontendDir(src, dest) {
-  fs.mkdirSync(dest, { recursive: true });
-  const entries = fs.readdirSync(src, { withFileTypes: true });
-  for (let entry of entries) {
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
-    if (entry.isDirectory()) {
-      if (entry.name !== 'node_modules' && entry.name !== '.git' && entry.name !== 'cache' && entry.name !== 'dev') {
-        copyFrontendDir(srcPath, destPath);
-      }
-    } else {
-      fs.copyFileSync(srcPath, destPath);
-    }
-  }
-}
-
-// Copy .next build files (excluding cache)
-copyFrontendDir(path.join(rootDir, 'frontend', '.next'), path.join(frontendStageDir, '.next'));
-if (fs.existsSync(path.join(rootDir, 'frontend', 'public'))) {
-  copyFrontendDir(path.join(rootDir, 'frontend', 'public'), path.join(frontendStageDir, 'public'));
-}
-fs.copyFileSync(path.join(rootDir, 'frontend', 'server.js'), path.join(frontendStageDir, 'server.js'));
-fs.copyFileSync(path.join(rootDir, 'frontend', 'package.json'), path.join(frontendStageDir, 'package.json'));
-fs.copyFileSync(path.join(rootDir, 'frontend', 'package-lock.json'), path.join(frontendStageDir, 'package-lock.json'));
-if (fs.existsSync(path.join(rootDir, 'frontend', '.env.production.example'))) {
-  fs.copyFileSync(path.join(rootDir, 'frontend', '.env.production.example'), path.join(frontendStageDir, '.env.production.example'));
-}
-if (fs.existsSync(path.join(rootDir, 'frontend', '.env'))) {
-  fs.copyFileSync(path.join(rootDir, 'frontend', '.env'), path.join(frontendStageDir, '.env'));
-}
-
+// 5. Package Frontend Static Export
+console.log('\n📦 [4/4] Creating Frontend Deployment Package (glowgoodly-frontend-cpanel.zip)...');
+const outDir = path.join(rootDir, 'frontend', 'out');
 const frontendZipPath = path.join(deployDir, 'glowgoodly-frontend-cpanel.zip');
-if (fs.existsSync(frontendZipPath)) fs.unlinkSync(frontendZipPath);
 
-try {
-  execSync(`powershell -Command "$items = (Get-ChildItem -LiteralPath '${frontendStageDir}' -Force).FullName; Compress-Archive -LiteralPath $items -DestinationPath '${frontendZipPath}' -Force"`, { stdio: 'inherit' });
-} catch (e) {
-  console.log('Using fallback zip command', e.message);
+if (fs.existsSync(frontendZipPath)) {
+  try { fs.unlinkSync(frontendZipPath); } catch (e) {}
 }
-fs.rmSync(frontendStageDir, { recursive: true, force: true });
+
+if (fs.existsSync(outDir)) {
+  execSync(`powershell -Command "$items = (Get-ChildItem -LiteralPath '${outDir}' -Force).FullName; Compress-Archive -LiteralPath $items -DestinationPath '${frontendZipPath}' -Force"`, { stdio: 'inherit' });
+}
 
 console.log('\n🎉 PACKAGING COMPLETE! Ready for cPanel deployment:');
 if (fs.existsSync(backendZipPath)) {

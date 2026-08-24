@@ -689,7 +689,7 @@ export default function Header() {
         {/* Shajgoj Sub-header Navigation (Category navbar row) */}
         <div className="category-navbar-shajgoj">
           <div className="container">
-            <nav className="category-links-shajgoj" style={{ display: "flex", gap: "clamp(6px, 1.1vw, 18px)", alignItems: "center", justifyContent: "space-between", whiteSpace: "nowrap", flexWrap: "nowrap", width: "100%", overflowX: "auto" }}>
+            <nav className="category-links-shajgoj" style={{ display: "flex", gap: "4px", alignItems: "center", justifyContent: "space-between", whiteSpace: "nowrap", flexWrap: "wrap", width: "100%", overflowX: "visible" }}>
 
 
               {/* 1. Makeup */}

@@ -14,19 +14,24 @@ DirectoryIndex index.html index.php
 
   # 3. Clean Route Rewrites to HTML Files (Shop, Brands, Cart, etc.)
   RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{DOCUMENT_ROOT}/$1.html -f
-  RewriteRule ^([^/]+)/?$ /$1.html [L]
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule ^product/([^/]+)/?$ product/default.html [L]
+  RewriteCond %{DOCUMENT_ROOT}/product/$1.html -f
+  RewriteRule ^product/([^/]+)/?$ /product/$1.html [L]
 
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule ^category/([^/]+)/?$ category/skincare.html [L]
+  RewriteRule ^product/([^/]+)/?$ /product/default.html [L]
+
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{DOCUMENT_ROOT}/category/$1.html -f
+  RewriteRule ^category/([^/]+)/?$ /category/$1.html [L]
 
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule ^landing/([^/]+)/?$ landing/seasonal-offer.html [L]
+  RewriteRule ^category/([^/]+)/?$ /category/skincare.html [L]
+
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^landing/([^/]+)/?$ /landing/seasonal-offer.html [L]
 
   # 4. Clean URLs: Map page names to .html files first (e.g. /shop -> shop.html, /valobasa -> valobasa.html)
   RewriteCond %{DOCUMENT_ROOT}/$1.html -f

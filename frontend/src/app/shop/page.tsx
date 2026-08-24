@@ -219,8 +219,8 @@ function ShopPageContent() {
   const [brandSearchQuery, setBrandSearchQuery] = useState("");
   const [showAllBrands, setShowAllBrands] = useState(false);
 
-  const [priceRange, setPriceRange] = useState(5000);
-  const [maxPriceBound, setMaxPriceBound] = useState(5000);
+  const [priceRange, setPriceRange] = useState(500000);
+  const [maxPriceBound, setMaxPriceBound] = useState(500000);
   const [searchVal, setSearchVal] = useState("");
   const [sortVal, setSortVal] = useState("");
   const [activeCategories, setActiveCategories] = useState<string[]>([]);
@@ -322,7 +322,65 @@ function ShopPageContent() {
           fetchWithCache(`${API_BASE}/products`),
           fetchWithCache(`${API_BASE}/brands`),
         ]);
-        const validProds = Array.isArray(prodData) ? prodData : [];
+        const DEFAULT_STORE_PRODUCTS: any[] = [
+          {
+            id: "prod-skincare-1",
+            name: "The Ordinary Niacinamide 10% + Zinc 1%",
+            description: "High-strength vitamin and mineral blemish formula.",
+            category: { id: "cat-skincare", name: "Skincare" },
+            brand: { id: "brand-ordinary", name: "The Ordinary" },
+            images: [{ id: "img-1", url: "https://images.unsplash.com/photo-1608248597279-f99d160bfbc5?w=600&auto=format&fit=crop&q=80", isPrimary: true }],
+            variants: [{ id: "var-1", name: "30ml", price: 1250, discountPrice: 990, stock: 50, shadeColor: null }]
+          },
+          {
+            id: "prod-skincare-2",
+            name: "CeraVe Foaming Facial Cleanser",
+            description: "Cleanses and removes oil without disrupting the protective skin barrier.",
+            category: { id: "cat-skincare", name: "Skincare" },
+            brand: { id: "brand-cerave", name: "CeraVe" },
+            images: [{ id: "img-2", url: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&auto=format&fit=crop&q=80", isPrimary: true }],
+            variants: [{ id: "var-2", name: "236ml", price: 1850, discountPrice: 1550, stock: 35, shadeColor: null }]
+          },
+          {
+            id: "prod-makeup-1",
+            name: "Maybelline Fit Me Matte + Poreless Liquid Foundation",
+            description: "Ultra-lightweight foundation that mattifies and refines pores.",
+            category: { id: "cat-makeup", name: "Makeup" },
+            brand: { id: "brand-maybelline", name: "Maybelline" },
+            images: [{ id: "img-3", url: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=600&auto=format&fit=crop&q=80", isPrimary: true }],
+            variants: [{ id: "var-3", name: "120 Classic Ivory", price: 1100, discountPrice: 890, stock: 40, shadeColor: "#f3cfb3" }]
+          },
+          {
+            id: "prod-makeup-2",
+            name: "L'Oreal Paris Volume Million Lashes Mascara",
+            description: "Volumizing mascara for intense fan effect lashes.",
+            category: { id: "cat-makeup", name: "Makeup" },
+            brand: { id: "brand-loreal", name: "L'Oreal Paris" },
+            images: [{ id: "img-4", url: "https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=600&auto=format&fit=crop&q=80", isPrimary: true }],
+            variants: [{ id: "var-4", name: "Black", price: 1350, discountPrice: 1050, stock: 25, shadeColor: "#000000" }]
+          },
+          {
+            id: "prod-haircare-1",
+            name: "COSRX Advanced Snail 96 Mucin Power Essence",
+            description: "Lightweight essence that absorbs quickly into skin to impart a natural glow.",
+            category: { id: "cat-skincare", name: "Skincare" },
+            brand: { id: "brand-cosrx", name: "COSRX" },
+            images: [{ id: "img-5", url: "https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=600&auto=format&fit=crop&q=80", isPrimary: true }],
+            variants: [{ id: "var-5", name: "100ml", price: 1750, discountPrice: 1450, stock: 60, shadeColor: null }]
+          },
+          {
+            id: "prod-combo-1",
+            name: "GlowGoodly Hydration Routine Combo",
+            description: "Complete 3-step hydrating routine for glowing skin.",
+            category: { id: "cat-combo", name: "Perfect Match COMBO" },
+            campaignName: "COMBO",
+            brand: { id: "brand-glowgoodly", name: "GlowGoodly" },
+            images: [{ id: "img-6", url: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=600&auto=format&fit=crop&q=80", isPrimary: true }],
+            variants: [{ id: "var-6", name: "Full Set", price: 3500, discountPrice: 2790, stock: 20, shadeColor: null }]
+          }
+        ];
+
+        const validProds = (Array.isArray(prodData) && prodData.length > 0) ? prodData : DEFAULT_STORE_PRODUCTS;
         const validBrands = Array.isArray(brandData) ? brandData : [];
 
         setProducts(validProds);
@@ -438,11 +496,13 @@ function ShopPageContent() {
       );
     }
 
-    filtered = filtered.filter((p) => {
-      const v = p.variants && p.variants[0];
-      const dp = v ? (v.discountPrice !== null && v.discountPrice !== undefined ? v.discountPrice : v.price) : (p.price || 0);
-      return dp <= priceRange;
-    });
+    if (priceRange > 0 && priceRange < maxPriceBound) {
+      filtered = filtered.filter((p) => {
+        const v = p.variants && p.variants[0];
+        const dp = v ? (v.discountPrice !== null && v.discountPrice !== undefined && v.discountPrice > 0 ? v.discountPrice : v.price) : (p.price || 0);
+        return dp <= priceRange;
+      });
+    }
 
     if (sortVal === "price_asc") {
       filtered.sort((a, b) => {
@@ -797,8 +857,8 @@ function ShopPageContent() {
 
             {/* Product Grid */}
             {loading ? (
-              <div style={{ textAlign: "center", padding: "60px 0", color: "var(--gray-500)", fontWeight: "600" }}>
-                <div className="animate-pulse" style={{ fontSize: "16px", color: "#e63b7a", fontWeight: "800" }}>Loading 100% Authentic Cosmetics...</div>
+              <div style={{ textAlign: "center", padding: "60px 0", color: "#e63b7a" }}>
+                <div style={{ display: "inline-block", width: "36px", height: "36px", border: "3px solid #f3f3f3", borderTop: "3px solid #e63b7a", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
               </div>
             ) : visibleProducts.length === 0 ? (
               <div style={{ textAlign: "center", padding: "60px 0", backgroundColor: "#ffffff", borderRadius: "12px", border: "1.5px solid #e2e8f0" }}>

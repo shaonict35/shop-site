@@ -6,7 +6,7 @@ dotenv.config();
 
 const dbUrl = process.env.DATABASE_URL || "file:./dev.db";
 const adapter = new PrismaLibSql({ url: dbUrl });
-const prisma = new PrismaClient({ adapter });
+const prisma = new (PrismaClient as any)({ adapter });
 
 async function main() {
   const banners = await prisma.promoBanner.findMany();

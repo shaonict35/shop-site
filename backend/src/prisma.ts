@@ -68,24 +68,7 @@ function parseDbUrl(urlStr: string) {
   }
 }
 
-let adapter: any;
-if (dbUrl.startsWith("file:") || dbUrl.endsWith(".db")) {
-  try {
-    const { PrismaLibSql } = require("@prisma/adapter-libsql");
-    adapter = new PrismaLibSql({ url: dbUrl });
-  } catch (err) {
-    console.warn("⚠️ PrismaLibSql not available:", err);
-  }
-} else {
-  try {
-    const { PrismaMariaDb } = require("@prisma/adapter-mariadb");
-    adapter = new PrismaMariaDb(parseDbUrl(dbUrl));
-  } catch (err) {
-    console.warn("⚠️ PrismaMariaDb not available, using default PrismaClient:", err);
-  }
-}
-
-const prisma = adapter ? new PrismaClient({ adapter }) : new PrismaClient();
+const prisma = new PrismaClient();
 
 export default prisma;
 

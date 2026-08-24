@@ -143,7 +143,21 @@ const ALL_CATEGORIES = [
 
 function CategoryPageContent() {
   const params = useParams();
-  const slug = (params.slug as string) || "";
+  const rawSlug = (params?.slug as string) || "";
+  const [clientSlug, setClientSlug] = useState<string>("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const match = window.location.pathname.match(/\/category\/([^\/?#]+)/);
+      if (match && match[1]) {
+        setClientSlug(match[1]);
+        return;
+      }
+    }
+    if (rawSlug) setClientSlug(rawSlug);
+  }, [rawSlug]);
+
+  const slug = clientSlug || rawSlug || "skincare";
   const { addToCart, wishlist, toggleWishlist } = useApp();
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -415,7 +429,9 @@ function CategoryPageContent() {
             </div>
 
             {loading ? (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "400px", fontSize: "16px", fontWeight: "700", color: "#e52860" }}>Loading category cosmetics...</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "300px" }}>
+                <div style={{ display: "inline-block", width: "36px", height: "36px", border: "3px solid #f3f3f3", borderTop: "3px solid #e52860", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+              </div>
             ) : visibleProducts.length === 0 ? (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "400px", fontSize: "15px", fontWeight: "700", color: "#718096" }}>No products found matching your filters.</div>
             ) : (

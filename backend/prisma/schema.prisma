@@ -6,7 +6,8 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -191,9 +192,9 @@ model Review {
 model PromoBanner {
   id             String   @id @default(uuid())
   title          String   // Used as alt text and aria-label (SEO friendly)
-  imageUrl       String   @db.Text // Full-width desktop banner image URL
-  mobileImageUrl String?  @db.Text // Mobile version banner image URL
-  tabletImageUrl String?  @db.Text // Tablet version banner image URL
+  imageUrl       String   @db.LongText // Full-width desktop banner image URL (supports base64 images)
+  mobileImageUrl String?  @db.LongText // Mobile version banner image URL
+  tabletImageUrl String?  @db.LongText // Tablet version banner image URL
   linkUrl        String?  @db.Text // Optional click-through link
   bgColor        String   @default("#1a1a2e") // Fallback background color
   page           String   @default("Homepage") // Homepage, Hair Care 101, Skin Care 101, Makeup 101
