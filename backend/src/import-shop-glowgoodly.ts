@@ -5,8 +5,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const dbUrl = process.env.DATABASE_URL || "file:./dev.db";
-const adapter = new PrismaLibSql({ url: dbUrl });
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 function decodeHtmlEntities(text: string): string {
   if (!text) return "";

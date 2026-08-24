@@ -5,8 +5,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const dbUrl = process.env.DATABASE_URL || "file:./dev.db";
-const adapter = new PrismaLibSql({ url: dbUrl });
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 async function run() {
   console.log("Fetching brands taxonomy list from Shajgoj...");

@@ -7,8 +7,7 @@ dotenv.config();
 
 // Initialize Prisma with LibSQL adapter matching src/prisma.ts
 const dbUrl = process.env.DATABASE_URL || "file:./dev.db";
-const adapter = new PrismaLibSql({ url: dbUrl });
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 // Helper to strip HTML tags if any remain
 function stripHtml(html: string | null): string {

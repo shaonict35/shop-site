@@ -5,8 +5,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const dbUrl = process.env.DATABASE_URL || "file:./dev.db";
-const adapter = new PrismaLibSql({ url: dbUrl });
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 // Standard brand logos mapping (case-insensitive checks will be done)
 const BRAND_LOGOS: Record<string, string> = {

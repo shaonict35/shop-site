@@ -5,8 +5,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const dbUrl = process.env.DATABASE_URL || "file:./dev.db";
-const adapter = new PrismaLibSql({ url: dbUrl });
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 const DEFAULT_COSMETIC_IMAGES = [
   "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&auto=format&fit=crop&q=80",

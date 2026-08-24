@@ -5,8 +5,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const dbUrl = process.env.DATABASE_URL || "file:./dev.db";
-const adapter = new PrismaLibSql({ url: dbUrl });
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 // Common cosmetic shade color mapping for known shade names/numbers
 const SHADE_COLOR_MAP: Record<string, string> = {
