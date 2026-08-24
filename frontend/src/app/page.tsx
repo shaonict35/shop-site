@@ -843,7 +843,7 @@ export default function Home() {
                 products.slice(2, Math.max(2, 2 + 4 - products.filter(p => p.category?.name?.toLowerCase().includes("clearance") || p.name?.toLowerCase().includes("clearance") || p.campaignName === "CLEARANCE").length))
               )
               .slice(0, 4)
-            ).map((p) => {
+            ).map((p, idx) => {
               const primaryImage = p.images?.find((img) => img.isPrimary)?.url || p.images?.[0]?.url || "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&auto=format&fit=crop&q=60";
               const primaryVariant = p.variants?.[0];
               const oldPrice = primaryVariant?.price || 1200;
@@ -853,7 +853,7 @@ export default function Home() {
               const sizeLabel = primaryVariant?.size || primaryVariant?.name || "22ml";
 
               return (
-                <div key={p.id} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
+                <div key={p.id ? `${p.id}-${idx}` : idx} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
                   <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
                     {discountPercent}% OFF
                   </div>
