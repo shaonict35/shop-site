@@ -616,7 +616,10 @@ const DEFAULT_ALL_SITE_BANNERS = [
         safeJson(msgRes)
       ]);
 
-      if (bnData && Array.isArray(bnData)) setBanners(bnData);
+      if (bnData && Array.isArray(bnData)) {
+        const uniqueBanners = Array.from(new Map(bnData.map((item: any) => [item.id || Math.random().toString(), item])).values());
+        setBanners(uniqueBanners);
+      }
       if (stfData && Array.isArray(stfData)) setStaffList(stfData);
       if (csData && Array.isArray(csData)) setCustomerList(csData);
 
@@ -662,9 +665,6 @@ const DEFAULT_ALL_SITE_BANNERS = [
           };
         });
         setInventoryPrices(priceMap);
-      }
-      if (bnData && Array.isArray(bnData)) {
-        setBanners(bnData);
       }
       if (blData) setBlogList(blData);
       if (csData) setCustomerList(csData);
