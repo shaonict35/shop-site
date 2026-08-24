@@ -27,36 +27,36 @@ const initialHeroSlides: any[] = [
     title: "Self Care Week - Mega Discount",
     desc: "Up to 50% OFF on Top International Skincare & Makeup Brands",
     bg: "linear-gradient(135deg, #e63b7a 0%, #ff758c 100%)",
-    img: "https://bk.shajgoj.com/storage/2026/07/prime-banner-web.png",
-    mobileImg: "https://bk.shajgoj.com/storage/2026/07/prime-banner-web.png",
-    tabletImg: "https://bk.shajgoj.com/storage/2026/07/prime-banner-web.png",
+    img: "/hero-slide-1.png",
+    mobileImg: "/hero-slide-1.png",
+    tabletImg: "/hero-slide-1.png",
     link: "/shop?category=skincare"
   },
   {
     title: "Beauty Bonanza Clearance Sale",
     desc: "Unbeatable Prices on Beauty & Personal Care",
     bg: "linear-gradient(135deg, #821f9b 0%, #d946ef 100%)",
-    img: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png",
-    mobileImg: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png",
-    tabletImg: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png",
+    img: "/hero-slide-2.png",
+    mobileImg: "/hero-slide-2.png",
+    tabletImg: "/hero-slide-2.png",
     link: "/shop?category=clearance-sale"
   },
   {
     title: "BOGO Special Beauty Offer",
     desc: "Buy 1 Get 1 Free on Selected Top Brands",
     bg: "linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%)",
-    img: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png",
-    mobileImg: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png",
-    tabletImg: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png",
+    img: "/hero-slide-3.png",
+    mobileImg: "/hero-slide-3.png",
+    tabletImg: "/hero-slide-3.png",
     link: "/shop?category=bogo"
   },
   {
     title: "Skincare Steals & Combos",
     desc: "Exclusive Glow & Care Bundles",
     bg: "linear-gradient(135deg, #ec4899 0%, #f43f5e 100%)",
-    img: "https://bk.shajgoj.com/storage/2025/05/combo.png",
-    mobileImg: "https://bk.shajgoj.com/storage/2025/05/combo.png",
-    tabletImg: "https://bk.shajgoj.com/storage/2025/05/combo.png",
+    img: "/hero-slide-4.png",
+    mobileImg: "/hero-slide-4.png",
+    tabletImg: "/hero-slide-4.png",
     link: "/shop?category=combo"
   }
 ];

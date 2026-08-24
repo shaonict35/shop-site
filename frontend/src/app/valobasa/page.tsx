@@ -182,10 +182,10 @@ export default function ValobasaAdminPanel() {
 
 const DEFAULT_ALL_SITE_BANNERS = [
   // Hero Main Slides
-  { id: "hero-1", title: "Hero Slide 1 - Prime Web Offer Banner", page: "Hero Slides", imageUrl: "https://bk.shajgoj.com/storage/2026/07/prime-banner-web.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/07/prime-banner-web.png", linkUrl: "/shop?category=skincare" },
-  { id: "hero-2", title: "Hero Slide 2 - Beauty Bonanza Clearance", page: "Hero Slides", imageUrl: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png", linkUrl: "/shop?category=clearance-sale" },
-  { id: "hero-3", title: "Hero Slide 3 - BOGO Special Offer", page: "Hero Slides", imageUrl: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png", linkUrl: "/shop?category=bogo" },
-  { id: "hero-4", title: "Hero Slide 4 - Combo Saver Offer", page: "Hero Slides", imageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png", linkUrl: "/shop?category=combo" },
+  { id: "hero-1", title: "Hero Slide 1 - Prime Web Offer Banner", page: "Hero Slides", imageUrl: "/hero-slide-1.png", mobileImageUrl: "/hero-slide-1.png", linkUrl: "/shop?category=skincare" },
+  { id: "hero-2", title: "Hero Slide 2 - Beauty Bonanza Clearance", page: "Hero Slides", imageUrl: "/hero-slide-2.png", mobileImageUrl: "/hero-slide-2.png", linkUrl: "/shop?category=clearance-sale" },
+  { id: "hero-3", title: "Hero Slide 3 - BOGO Special Offer", page: "Hero Slides", imageUrl: "/hero-slide-3.png", mobileImageUrl: "/hero-slide-3.png", linkUrl: "/shop?category=bogo" },
+  { id: "hero-4", title: "Hero Slide 4 - Combo Saver Offer", page: "Hero Slides", imageUrl: "/hero-slide-4.png", mobileImageUrl: "/hero-slide-4.png", linkUrl: "/shop?category=combo" },
 
   // Deals You Cannot Miss
   { id: "deal-1", title: "Deal Card 1 - Clearance Sale", page: "Deals You Cannot Miss", imageUrl: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png", linkUrl: "/shop?category=clearance-sale" },
