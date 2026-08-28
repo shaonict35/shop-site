@@ -4,7 +4,6 @@ import "./globals.css";
 import { AppProvider } from "../context/AppContext";
 import TrackingScripts from "../components/TrackingScripts";
 import ChatWidget from "../components/ChatWidget";
-import SplashScreen from "../components/SplashScreen";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://shop.glowgoodly.com"),
@@ -189,7 +188,6 @@ export default function RootLayout({
           />
         </noscript>
         <AppProvider>
-          <SplashScreen />
           <TrackingScripts />
           {children}
           <ChatWidget />

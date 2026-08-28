@@ -89,7 +89,10 @@ export default function AdminPage() {
     const fetchAdminData = async () => {
       try {
         const settingsRes = await fetch("http://localhost:5000/api/settings", { headers: { Authorization: \`Bearer \${token}\` } });
-        if (settingsRes.ok) setSettings((prev) => ({ ...prev, ...await settingsRes.json() }));
+        if (settingsRes.ok) {
+          const settingsData = await settingsRes.json();
+          setSettings((prev) => ({ ...prev, ...settingsData }));
+        }
 
         const ordersRes = await fetch("http://localhost:5000/api/orders/all", { headers: { Authorization: \`Bearer \${token}\` } });
         if (ordersRes.ok) setOrders(await ordersRes.json());
