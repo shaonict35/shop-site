@@ -26,6 +26,9 @@ export default function CheckoutPage() {
   const [email, setEmail] = useState(user?.email || "");
   const [paymentMethod, setPaymentMethod] = useState("COD");
 
+  // Delivery Zone Selection State ("auto", "inside", "sub", "outside")
+  const [manualZone, setManualZone] = useState<"auto" | "inside" | "sub" | "outside">("auto");
+
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponMessage, setCouponMessage] = useState("");
@@ -35,26 +38,18 @@ export default function CheckoutPage() {
 
   const cartSubtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
 
-  const detectDeliveryZone = (address: string) => {
-    const text = (address || "").toLowerCase().trim();
-    if (!text) return { zone: "Inside Dhaka City", charge: 70, isSub: false, isOutside: false };
+  const getDeliveryDetails = () => {
+    if (manualZone === "inside") return { zone: "Inside Dhaka City", charge: 70 };
+    if (manualZone === "sub") return { zone: "Sub Area (Keraniganj, Savar, Gazipur, Narayanganj)", charge: 100 };
+    if (manualZone === "outside") return { zone: "Outside Dhaka / All Districts", charge: 130 };
+
+    // Auto detect from address text
+    const text = (checkoutAddress || "").toLowerCase().trim();
+    if (!text) return { zone: "Inside Dhaka City", charge: 70 };
 
     const subKeywords = ["savar", "keraniganj", "gazipur", "narayanganj", "সাভার", "কেরানীগঞ্জ", "গাজীপুর", "নারায়ণগঞ্জ"];
     if (subKeywords.some(k => text.includes(k))) {
-      return { zone: "Sub Area (Keraniganj, Savar, Gazipur, Narayanganj)", charge: 100, isSub: true, isOutside: false };
-    }
-
-    const dhakaKeywords = [
-      "dhaka", "ঢাকা", "mirpur", "uttara", "dhanmondi", "gulshan", "banani", "mohammadpur", "badda",
-      "motijheel", "jatrabari", "mohakhali", "khilgaon", "rampura", "tejgaon", "farmgate", "bashundhara",
-      "lalbagh", "old dhaka", "puran dhaka", "malibagh", "moghbazar", "kakrail", "palton", "shahbagh",
-      "azimpur", "cantonment", "nikunja", "agargaon", "shewrapara", "kazipara", "kallyanpur", "shyamoli",
-      "gabtoli", "hazaribagh", "chawkbazar", "gandaria", "sutrapur", "wari", "demra", "kadamtali",
-      "khilkhet", "bhatara", "baridhara", "tejturi", "niketon", "mircpur", "dhanmondy"
-    ];
-
-    if (dhakaKeywords.some(k => text.includes(k))) {
-      return { zone: "Inside Dhaka City", charge: 70, isSub: false, isOutside: false };
+      return { zone: "Sub Area (Keraniganj, Savar, Gazipur, Narayanganj)", charge: 100 };
     }
 
     const outsideKeywords = [
@@ -70,14 +65,13 @@ export default function CheckoutPage() {
     ];
 
     if (outsideKeywords.some(k => text.includes(k))) {
-      return { zone: "Outside Dhaka / All Districts", charge: 130, isSub: false, isOutside: true };
+      return { zone: "Outside Dhaka / All Districts", charge: 130 };
     }
 
-    // Default to Inside Dhaka City (৳70) if not explicitly outside
-    return { zone: "Inside Dhaka City", charge: 70, isSub: false, isOutside: false };
+    return { zone: "Inside Dhaka City", charge: 70 };
   };
 
-  const detectedInfo = detectDeliveryZone(checkoutAddress);
+  const detectedInfo = getDeliveryDetails();
   const deliveryCharge = detectedInfo.charge;
   const zone = detectedInfo.zone;
 
@@ -260,8 +254,68 @@ export default function CheckoutPage() {
                       onChange={(e) => setCheckoutAddress(e.target.value)}
                       style={{ width: "100%", padding: "11px", borderRadius: "8px", border: "1.5px solid #cbd5e1", fontSize: "14px", fontWeight: "600", resize: "vertical" }}
                     />
-                    <div style={{ marginTop: "8px", padding: "10px 14px", backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px", fontSize: "13px", fontWeight: "700", color: "#166534", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <span>🚚 Calculated Delivery Charge:</span>
+                    {/* Delivery Zone Selector Buttons */}
+                    <div style={{ marginTop: "12px" }}>
+                      <label style={{ fontSize: "12px", fontWeight: "800", color: "#475569", display: "block", marginBottom: "6px" }}>
+                        SELECT YOUR DELIVERY LOCATION:
+                      </label>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+                        <button
+                          type="button"
+                          onClick={() => setManualZone("inside")}
+                          style={{
+                            padding: "8px 6px",
+                            borderRadius: "8px",
+                            border: manualZone === "inside" ? "2px solid #e63b7a" : "1px solid #cbd5e1",
+                            backgroundColor: manualZone === "inside" ? "#fff0f5" : "#ffffff",
+                            color: manualZone === "inside" ? "#e63b7a" : "#334155",
+                            fontWeight: "800",
+                            fontSize: "12px",
+                            cursor: "pointer",
+                            textAlign: "center"
+                          }}
+                        >
+                          Inside Dhaka (৳70)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setManualZone("sub")}
+                          style={{
+                            padding: "8px 6px",
+                            borderRadius: "8px",
+                            border: manualZone === "sub" ? "2px solid #e63b7a" : "1px solid #cbd5e1",
+                            backgroundColor: manualZone === "sub" ? "#fff0f5" : "#ffffff",
+                            color: manualZone === "sub" ? "#e63b7a" : "#334155",
+                            fontWeight: "800",
+                            fontSize: "12px",
+                            cursor: "pointer",
+                            textAlign: "center"
+                          }}
+                        >
+                          Sub Area (৳100)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setManualZone("outside")}
+                          style={{
+                            padding: "8px 6px",
+                            borderRadius: "8px",
+                            border: manualZone === "outside" ? "2px solid #e63b7a" : "1px solid #cbd5e1",
+                            backgroundColor: manualZone === "outside" ? "#fff0f5" : "#ffffff",
+                            color: manualZone === "outside" ? "#e63b7a" : "#334155",
+                            fontWeight: "800",
+                            fontSize: "12px",
+                            cursor: "pointer",
+                            textAlign: "center"
+                          }}
+                        >
+                          All Districts (৳130)
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: "10px", padding: "10px 14px", backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px", fontSize: "13px", fontWeight: "700", color: "#166534", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span>🚚 Selected Shipping Charge:</span>
                       <span style={{ fontSize: "14px", fontWeight: "900", color: "#e63b7a" }}>৳{deliveryCharge} ({zone})</span>
                     </div>
                   </div>
