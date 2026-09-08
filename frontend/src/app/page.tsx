@@ -22,45 +22,6 @@ interface Product {
   variants: { id: string; name: string; price: number; discountPrice: number | null; stock: number; shadeColor: string | null; size?: string | null }[];
 }
 
-const initialHeroSlides: any[] = [
-  {
-    title: "Self Care Week - Mega Discount",
-    desc: "Up to 50% OFF on Top International Skincare & Makeup Brands",
-    bg: "linear-gradient(135deg, #e63b7a 0%, #ff758c 100%)",
-    img: "/hero-slide-1.png",
-    mobileImg: "/hero-slide-1.png",
-    tabletImg: "/hero-slide-1.png",
-    link: "/shop?category=skincare"
-  },
-  {
-    title: "Beauty Bonanza Clearance Sale",
-    desc: "Unbeatable Prices on Beauty & Personal Care",
-    bg: "linear-gradient(135deg, #821f9b 0%, #d946ef 100%)",
-    img: "/hero-slide-2.png",
-    mobileImg: "/hero-slide-2.png",
-    tabletImg: "/hero-slide-2.png",
-    link: "/shop?category=clearance-sale"
-  },
-  {
-    title: "BOGO Special Beauty Offer",
-    desc: "Buy 1 Get 1 Free on Selected Top Brands",
-    bg: "linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%)",
-    img: "/hero-slide-3.png",
-    mobileImg: "/hero-slide-3.png",
-    tabletImg: "/hero-slide-3.png",
-    link: "/shop?category=bogo"
-  },
-  {
-    title: "Skincare Steals & Combos",
-    desc: "Exclusive Glow & Care Bundles",
-    bg: "linear-gradient(135deg, #ec4899 0%, #f43f5e 100%)",
-    img: "/hero-slide-4.png",
-    mobileImg: "/hero-slide-4.png",
-    tabletImg: "/hero-slide-4.png",
-    link: "/shop?category=combo"
-  }
-];
-
 const DEFAULT_BEAUTY_CATEGORIES = [
   { id: "cat-makeup", name: "Makeup", slug: "makeup", image: "https://bk.shajgoj.com/storage/2026/04/makeup.png" },
   { id: "cat-skincare", name: "Skin Care", slug: "skincare", image: "https://bk.shajgoj.com/storage/2026/04/skin-care.png" },
@@ -78,7 +39,7 @@ export default function Home() {
   const [categories, setCategories] = useState<any[]>(DEFAULT_BEAUTY_CATEGORIES);
   const [brands, setBrands] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [dynamicSlides, setDynamicSlides] = useState<any[]>(initialHeroSlides);
+  const [dynamicSlides, setDynamicSlides] = useState<any[]>([]);
   const [homepageBanners, setHomepageBanners] = useState<any[]>([]);
 
   const getBannerForPage = (identifier: string, fallbackImg: string, fallbackTitle: string, fallbackLink: string = "#") => {
@@ -134,7 +95,7 @@ export default function Home() {
   const [activeSlide, setActiveSlide] = useState(0);
   const [bannersLoaded, setBannersLoaded] = useState(false);
 
-  const activeSlidesList = dynamicSlides.length > 0 ? dynamicSlides : initialHeroSlides;
+  const activeSlidesList = dynamicSlides;
 
   // Auto rotate slides
   useEffect(() => {
@@ -182,20 +143,22 @@ export default function Home() {
         setBrands(Array.isArray(brandData) ? brandData : []);
         if (bannerData && Array.isArray(bannerData) && bannerData.length > 0) {
           setHomepageBanners(bannerData);
-          const homeBanners = bannerData.filter((b: any) => 
-            b.isActive !== false &&
-            (b.page === "Hero Slides" || 
-             b.page === "Hero Slides Carousel" || 
-             (b.page && b.page.toLowerCase().includes("hero")) || 
-             (b.title && b.title.toLowerCase().includes("hero")))
+          const activeBanners = bannerData.filter((b: any) => b.isActive !== false);
+          const heroBanners = activeBanners.filter((b: any) => 
+            b.page === "Hero Slides" || 
+            b.page === "Hero Slides Carousel" || 
+            (b.page && b.page.toLowerCase().includes("hero")) || 
+            (b.title && b.title.toLowerCase().includes("hero"))
           );
 
-          if (homeBanners.length > 0) {
-            const validSlides = homeBanners
+          const targetBanners = heroBanners.length > 0 ? heroBanners : activeBanners;
+
+          if (targetBanners.length > 0) {
+            const validSlides = targetBanners
               .filter((b: any) => b.imageUrl && (b.imageUrl.startsWith("http") || b.imageUrl.startsWith("/") || b.imageUrl.startsWith("data:")))
               .map((b: any) => ({
                 title: b.title,
-                desc: "Exclusive Collection at GlowGoodly",
+                desc: b.description || "Exclusive Collection at GlowGoodly",
                 bg: b.bgColor || "linear-gradient(135deg, #e63b7a 0%, #ff758c 100%)",
                 img: b.imageUrl,
                 mobileImg: b.mobileImageUrl || b.imageUrl,
