@@ -3182,14 +3182,119 @@ html, body {
   color: #e52860 !important;
 }
 
-.footer-glowgoodly-text span {
-  transition: color 0.2s ease !important;
-  display: inline-block !important;
-}
-
 .footer-glowgoodly-text:hover span {
   color: #e52860 !important;
 }
+
+/* ==========================================================================
+   MOBILE OPTIMIZATION & ACCESSIBILITY ENHANCEMENTS
+   ========================================================================== */
+
+/* Prevent accidental horizontal scrolling on small viewports */
+html, body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Standard minimum touch target sizes & touch feedback */
+button, a, input, select {
+  touch-action: manipulation;
+}
+
+/* Mobile Bottom Navigation Bar */
+.mobile-bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 999;
+  background-color: #ffffff;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@media (max-width: 768px) {
+  .mobile-bottom-nav {
+    display: block;
+  }
+
+  body {
+    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+.mobile-nav-items {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  height: 56px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.mobile-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  height: 100%;
+  color: #495057;
+  text-decoration: none;
+  gap: 2px;
+  padding: 4px 0;
+  transition: color 0.15s ease, transform 0.15s ease;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.mobile-nav-item:active {
+  transform: scale(0.94);
+  color: #e63b7a;
+}
+
+.mobile-nav-item:hover {
+  color: #e63b7a;
+}
+
+/* Mobile Search Bar Sizing & Overflow Protection */
+@media (max-width: 768px) {
+  .search-container-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 6px 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .search-bar-shajgoj {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 36px !important;
+    padding: 0 10px !important;
+    box-sizing: border-box !important;
+    border-radius: 20px !important;
+  }
+
+  .search-bar-shajgoj input {
+    font-size: 12px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .header-main-shajgoj {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    padding: 8px 10px !important;
+    box-sizing: border-box !important;
+  }
+}
+
+
 
 
 

@@ -585,7 +585,7 @@ export default function Header() {
             </div>
 
             {/* Shajgoj Desktop Search Bar - Stretches widely from Brands to Wishlist */}
-            <div ref={searchRef} style={{ position: "relative", flex: "4", margin: "0 8px", minWidth: "350px", maxWidth: "950px" }}>
+            <div ref={searchRef} className="search-container-wrapper" style={{ position: "relative", flex: "1 1 auto", margin: "0 8px", minWidth: "0", maxWidth: "950px" }}>
               <form onSubmit={handleSearch} className="search-bar-shajgoj" style={{ height: "38px", width: "100%", display: "flex", alignItems: "center" }}>
                 <button type="submit">
                   <svg

@@ -1,9 +1,17 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import "./globals.css";
 import { AppProvider } from "../context/AppContext";
 import TrackingScripts from "../components/TrackingScripts";
 import ChatWidget from "../components/ChatWidget";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+  themeColor: "#e63b7a",
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://shop.glowgoodly.com"),
@@ -13,6 +21,15 @@ export const metadata: Metadata = {
   },
   description: "Shop 100% authentic makeup, skincare, and hair care products at GlowGoodly. Fast delivery across Bangladesh. Buy original brands like CeraVe, COSRX, and The Ordinary in BD.",
   keywords: ["cosmetics in bangladesh", "skincare bd", "authentic makeup bangladesh", "buy cosmetics online bd", "GlowGoodly", "best beauty shop dhaka", "korean skincare bd", "buy makeup online dhaka"],
+  authors: [{ name: "GlowGoodly Team", url: "https://shop.glowgoodly.com" }],
+  creator: "GlowGoodly",
+  publisher: "GlowGoodly",
+  category: "ecommerce",
+  formatDetection: {
+    telephone: true,
+    address: true,
+    email: true,
+  },
   alternates: {
     canonical: "https://shop.glowgoodly.com",
   },

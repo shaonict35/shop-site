@@ -80,7 +80,11 @@ export default function CheckoutPage() {
   const detectedInfo = detectDeliveryZone(checkoutAddress);
   const deliveryCharge = detectedInfo.charge;
   const zone = detectedInfo.zone;
-  const total = cartSubtotal + deliveryCharge - couponDiscount;
+
+  // Tiered Auto Discount: ৳50 off for every ৳500 spent
+  const autoDiscount = Math.floor(cartSubtotal / 500) * 50;
+  const effectiveDiscount = Math.max(autoDiscount, couponDiscount);
+  const total = Math.max(0, cartSubtotal + deliveryCharge - effectiveDiscount);
 
   // COD is enabled for all orders
   const isCodDisabled = false;
@@ -155,7 +159,7 @@ export default function CheckoutPage() {
         paymentPhone: checkoutPhone,
         paymentStatus: "Pending COD",
         items: cart.map((i) => ({ variantId: i.id, quantity: i.quantity })),
-        couponCode: couponDiscount > 0 ? couponCode : null,
+        couponCode: effectiveDiscount > 0 ? (couponCode || `AUTO_${autoDiscount}OFF`) : null,
       };
 
       const res = await fetch(`${API_BASE}/orders`, {
@@ -375,10 +379,12 @@ export default function CheckoutPage() {
                     <span>BDT {deliveryCharge}</span>
                   </div>
 
-                  {couponDiscount > 0 && (
+                  {effectiveDiscount > 0 && (
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px", fontWeight: "700", color: "#16a34a" }}>
-                      <span>Coupon Discount ({couponCode})</span>
-                      <span>- BDT {couponDiscount}</span>
+                      <span>
+                        {couponDiscount > autoDiscount ? `Coupon Discount (${couponCode})` : `Volume Discount (৳50 off per ৳500)`}
+                      </span>
+                      <span>- BDT {effectiveDiscount}</span>
                     </div>
                   )}
 
@@ -391,15 +397,30 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Coupon Code Card */}
+              {/* Automatic Tiered Discount Info & Optional Promo Box */}
               <div style={{ backgroundColor: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
-                <h3 style={{ fontSize: "14px", fontWeight: "800", color: "#0f172a", marginBottom: "10px" }}>
-                  Have a Promo Coupon or Loyalty Points Code?
+                {/* Automatic Volume Offer Banner */}
+                <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", padding: "12px", borderRadius: "8px", marginBottom: "14px" }}>
+                  <div style={{ fontSize: "12px", fontWeight: "800", color: "#15803d", marginBottom: "4px" }}>
+                    🎉 Automatic Tiered Discount Active!
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#166534", fontWeight: "600", lineHeight: "1.4" }}>
+                    Every ৳500 spent gets ৳50 instant discount (৳500 = ৳50 OFF, ৳1000 = ৳100 OFF, ৳1500 = ৳150 OFF, etc.)
+                  </div>
+                  {autoDiscount > 0 && (
+                    <div style={{ fontSize: "12px", fontWeight: "900", color: "#e63b7a", marginTop: "6px" }}>
+                      Current Tier Savings: ৳{autoDiscount} OFF
+                    </div>
+                  )}
+                </div>
+
+                <h3 style={{ fontSize: "13px", fontWeight: "800", color: "#0f172a", marginBottom: "8px" }}>
+                  Have an Extra Special Promo Code?
                 </h3>
-                <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
+                <div style={{ display: "flex", gap: "10px" }}>
                   <input
                     type="text"
-                    placeholder="e.g. POINTS50, POINTS100, GLOW15"
+                    placeholder="Enter promo code (e.g. GLOW15)"
                     value={couponCode}
                     onChange={(e) => setCouponCode(e.target.value)}
                     style={{ flex: 1, padding: "9px 12px", border: "1.5px solid #cbd5e1", borderRadius: "8px", fontSize: "13px", fontWeight: "600" }}
@@ -411,47 +432,6 @@ export default function CheckoutPage() {
                   >
                     APPLY
                   </button>
-                </div>
-
-                {/* Quick Points Reward Coupon Shortcuts */}
-                <div style={{ backgroundColor: "#fff0f5", padding: "10px 12px", borderRadius: "8px", border: "1px dashed #fecdd3" }}>
-                  <div style={{ fontSize: "11px", fontWeight: "800", color: "#be185d", marginBottom: "6px" }}>
-                    🎁 Redeem Loyalty Points Coupon Shortcuts:
-                  </div>
-                  <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                    {[
-                      { code: "POINTS50", text: "৳50 OFF" },
-                      { code: "POINTS100", text: "৳100 OFF" },
-                      { code: "POINTS250", text: "৳250 OFF" },
-                      { code: "POINTS500", text: "৳500 OFF" }
-                    ].map(btn => (
-                      <button
-                        key={btn.code}
-                        type="button"
-                        onClick={() => {
-                          setCouponCode(btn.code);
-                          let amt = 50;
-                          if (btn.code === "POINTS100") amt = 100;
-                          if (btn.code === "POINTS250") amt = 250;
-                          if (btn.code === "POINTS500") amt = 500;
-                          setCouponDiscount(amt);
-                          setCouponMessage(`🎉 Loyalty Points Reward Coupon ${btn.code} applied: ৳${amt} OFF your order!`);
-                        }}
-                        style={{
-                          backgroundColor: "#ffffff",
-                          border: "1px solid #f472b6",
-                          color: "#be185d",
-                          padding: "3px 8px",
-                          borderRadius: "4px",
-                          fontSize: "11px",
-                          fontWeight: "800",
-                          cursor: "pointer"
-                        }}
-                      >
-                        {btn.code} ({btn.text})
-                      </button>
-                    ))}
-                  </div>
                 </div>
 
                 {couponMessage && (
