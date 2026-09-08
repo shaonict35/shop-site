@@ -88,7 +88,7 @@ function CategoryMenuItem({ title, href, className, columns, arches }: CategoryM
 }
 
 export default function Header() {
-  const { cart, wishlist, cartOpen, setCartOpen, updateCartQuantity, removeFromCart, user, logout } = useApp();
+  const { cart, wishlist, cartOpen, setCartOpen, updateCartQuantity, removeFromCart, user, logout, trackingSettings } = useApp();
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPlaceholder, setCurrentPlaceholder] = useState("");
   const [dbProducts, setDbProducts] = useState<any[]>([]);
@@ -236,7 +236,11 @@ export default function Header() {
         {/* Center: Brand Logo (flex-1 trick to center) */}
         <div style={{ flex: 1, display: "flex", justifyContent: "center" }}>
           <Link href="/" className="mobile-logo-text" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <span>GLOWGOODLY</span>
+            {trackingSettings?.SITE_LOGO ? (
+              <img src={trackingSettings.SITE_LOGO} alt="Brand Logo" style={{ maxHeight: "28px", objectFit: "contain" }} />
+            ) : (
+              <span>GLOWGOODLY</span>
+            )}
           </Link>
         </div>
 
@@ -378,7 +382,11 @@ export default function Header() {
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }
               }} style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
-                <span>GLOWGOODLY</span>
+                {trackingSettings?.SITE_LOGO ? (
+                  <img src={trackingSettings.SITE_LOGO} alt="Brand Logo" style={{ maxHeight: "36px", objectFit: "contain" }} />
+                ) : (
+                  <span>GLOWGOODLY</span>
+                )}
               </Link>
               <div className="nav-item-with-menu" style={{ position: "relative", paddingBottom: "25px", marginBottom: "-25px" }}>
                 <Link href="/brands" className="brands-link">

@@ -62,8 +62,9 @@ export default function AdminPage() {
   // Reviews State
   const [pendingReviews, setPendingReviews] = useState<any[]>([]);
 
-  // Integration Settings Form States
+  // Integration & Branding Settings Form States
   const [settings, setSettings] = useState({
+    SITE_TITLE: "", SITE_DESCRIPTION: "", SITE_FAVICON: "", SITE_LOGO: "",
     META_PIXEL_ID: "", META_CAPI_TOKEN: "", GA4_MEASUREMENT_ID: "", GTM_CONTAINER_ID: "", SMS_PROVIDER_URL: "",
     SMS_API_KEY: "", SMS_SENDER_ID: "", SMS_TEMPLATE_ORDER_PLACED: "", SMS_TEMPLATE_ORDER_SHIPPED: "",
     COURIER_PROVIDER: "Steadfast", COURIER_API_SECRET: "", COURIER_CLIENT_ID: "", COURIER_STORE_ID: "",
@@ -613,17 +614,47 @@ export default function AdminPage() {
             )}
 
             {activeTab === "settings" && (
-              <div className="admin-panel-card" style={{ maxWidth: "800px", margin: "0 auto" }}>
-                <h2 style={{ fontSize: "16px", fontWeight: "700", marginBottom: "20px", textTransform: 'uppercase' }}>Integrations Settings</h2>
+              <div className="admin-panel-card" style={{ maxWidth: "850px", margin: "0 auto" }}>
+                <h2 style={{ fontSize: "16px", fontWeight: "700", marginBottom: "20px", textTransform: 'uppercase' }}>Site Branding & SEO Settings</h2>
                 <form onSubmit={handleUpdateSettings} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px" }}>
-                    <input type="text" placeholder="Meta Pixel ID" value={settings.META_PIXEL_ID} onChange={(e) => setSettings({ ...settings, META_PIXEL_ID: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #e2e8f0", borderRadius: "4px", fontSize: "13px" }} />
-                    <input type="text" placeholder="GA4 ID" value={settings.GA4_MEASUREMENT_ID} onChange={(e) => setSettings({ ...settings, GA4_MEASUREMENT_ID: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #e2e8f0", borderRadius: "4px", fontSize: "13px" }} />
-                    <input type="text" placeholder="SMS Provider URL" value={settings.SMS_PROVIDER_URL} onChange={(e) => setSettings({ ...settings, SMS_PROVIDER_URL: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #e2e8f0", borderRadius: "4px", fontSize: "13px" }} />
-                    <input type="password" placeholder="SMS API Key" value={settings.SMS_API_KEY} onChange={(e) => setSettings({ ...settings, SMS_API_KEY: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #e2e8f0", borderRadius: "4px", fontSize: "13px" }} />
+                  {/* Branding & SEO */}
+                  <div style={{ backgroundColor: "#f8fafc", padding: "16px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                    <h3 style={{ fontSize: "14px", fontWeight: "700", color: "#1e293b", marginBottom: "12px" }}>🌐 Site Branding & Dynamic SEO</h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "700", color: "#475569", display: "block", marginBottom: "4px" }}>Site Title (SEO Title)</label>
+                        <input type="text" placeholder="e.g. GlowGoodly™ | 100% Authentic Cosmetics & Skincare BD" value={settings.SITE_TITLE} onChange={(e) => setSettings({ ...settings, SITE_TITLE: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px" }} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "700", color: "#475569", display: "block", marginBottom: "4px" }}>Meta Description</label>
+                        <textarea rows={2} placeholder="Description for search engines..." value={settings.SITE_DESCRIPTION} onChange={(e) => setSettings({ ...settings, SITE_DESCRIPTION: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px" }} />
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                        <div>
+                          <label style={{ fontSize: "12px", fontWeight: "700", color: "#475569", display: "block", marginBottom: "4px" }}>Favicon URL (.ico / .png)</label>
+                          <input type="text" placeholder="/icon.png or https://..." value={settings.SITE_FAVICON} onChange={(e) => setSettings({ ...settings, SITE_FAVICON: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px" }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "12px", fontWeight: "700", color: "#475569", display: "block", marginBottom: "4px" }}>Brand Logo Image URL</label>
+                          <input type="text" placeholder="https://..." value={settings.SITE_LOGO} onChange={(e) => setSettings({ ...settings, SITE_LOGO: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px" }} />
+                        </div>
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Integrations & Analytics */}
+                  <div style={{ backgroundColor: "#f8fafc", padding: "16px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                    <h3 style={{ fontSize: "14px", fontWeight: "700", color: "#1e293b", marginBottom: "12px" }}>📊 Analytics & Integrations</h3>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                      <input type="text" placeholder="Meta Pixel ID" value={settings.META_PIXEL_ID} onChange={(e) => setSettings({ ...settings, META_PIXEL_ID: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px" }} />
+                      <input type="text" placeholder="GA4 Measurement ID" value={settings.GA4_MEASUREMENT_ID} onChange={(e) => setSettings({ ...settings, GA4_MEASUREMENT_ID: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px" }} />
+                      <input type="text" placeholder="SMS Provider URL" value={settings.SMS_PROVIDER_URL} onChange={(e) => setSettings({ ...settings, SMS_PROVIDER_URL: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px" }} />
+                      <input type="password" placeholder="SMS API Key" value={settings.SMS_API_KEY} onChange={(e) => setSettings({ ...settings, SMS_API_KEY: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px" }} />
+                    </div>
+                  </div>
+
                   {settingsMessage && <p style={{ color: "#00c6ff", fontSize: "13px", fontWeight: "700" }}>{settingsMessage}</p>}
-                  <button type="submit" style={{ backgroundColor: "#00c6ff", color: "#fff", fontWeight: "700", padding: "14px", borderRadius: "4px", cursor: "pointer", border: 'none' }}>SAVE SETTINGS</button>
+                  <button type="submit" style={{ backgroundColor: "#e63b7a", color: "#fff", fontWeight: "800", padding: "14px", borderRadius: "8px", cursor: "pointer", border: 'none', fontSize: "15px", boxShadow: "0 4px 12px rgba(230,59,122,0.3)" }}>SAVE ALL SETTINGS</button>
                 </form>
               </div>
             )}

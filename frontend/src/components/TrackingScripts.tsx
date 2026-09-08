@@ -71,7 +71,38 @@ export default function TrackingScripts() {
     }
   }, [trackingSettings, pixelId]);
 
-  // 2. Track PageView automatically on every single page navigation across the website
+  // 2. Dynamic SEO Title, Description & Favicon injection from Admin Settings
+  useEffect(() => {
+    if (!trackingSettings || typeof document === "undefined") return;
+
+    const { SITE_TITLE, SITE_DESCRIPTION, SITE_FAVICON } = trackingSettings as any;
+
+    if (SITE_TITLE) {
+      document.title = SITE_TITLE;
+    }
+
+    if (SITE_DESCRIPTION) {
+      let metaDesc = document.querySelector('meta[name="description"]');
+      if (!metaDesc) {
+        metaDesc = document.createElement("meta");
+        metaDesc.setAttribute("name", "description");
+        document.head.appendChild(metaDesc);
+      }
+      metaDesc.setAttribute("content", SITE_DESCRIPTION);
+    }
+
+    if (SITE_FAVICON) {
+      let iconLink = document.querySelector('link[rel="icon"]') as HTMLLinkElement;
+      if (!iconLink) {
+        iconLink = document.createElement("link");
+        iconLink.setAttribute("rel", "icon");
+        document.head.appendChild(iconLink);
+      }
+      iconLink.href = SITE_FAVICON;
+    }
+  }, [trackingSettings]);
+
+  // 3. Track PageView automatically on every single page navigation across the website
   useEffect(() => {
     if (typeof window !== "undefined" && (window as any).fbq) {
       (window as any).fbq("track", "PageView");

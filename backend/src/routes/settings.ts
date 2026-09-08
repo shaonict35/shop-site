@@ -8,6 +8,10 @@ const router = Router();
 router.get("/public", async (req, res) => {
   try {
     const keys = [
+      "SITE_TITLE",
+      "SITE_DESCRIPTION",
+      "SITE_FAVICON",
+      "SITE_LOGO",
       "META_PIXEL_ID",
       "GA4_MEASUREMENT_ID",
       "GTM_CONTAINER_ID",

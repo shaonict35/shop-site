@@ -38,6 +38,10 @@ interface AppContextType {
   checkoutName: string;
   setCheckoutName: (name: string) => void;
   trackingSettings: {
+    SITE_TITLE?: string;
+    SITE_DESCRIPTION?: string;
+    SITE_FAVICON?: string;
+    SITE_LOGO?: string;
     META_PIXEL_ID?: string;
     META_CAPI_TOKEN?: string;
     GA4_MEASUREMENT_ID?: string;
