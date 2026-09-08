@@ -286,7 +286,7 @@ app.get("/", (req, res) => {
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>WELCOME TO GLOWGOODLY</title>
-	<link rel="icon" href="http://localhost:3000/user-glow-logo.png" type="image/png">
+	<link rel="icon" href="https://shop.glowgoodly.com/user-glow-logo.png" type="image/png">
 	<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
 	<style>
 		* {
@@ -401,8 +401,8 @@ app.get("/", (req, res) => {
 			<h1>WELCOME TO GLOWGOODLY</h1>
 			<p>Buy Authentic Cosmetic and Beauty Products Online in Bangladesh.</p>
 			<div class="btn-group">
-				<a href="http://localhost:3000" class="btn btn-ecommerce">E-commerce</a>
-				<a href="http://localhost:3000/blog" class="btn btn-blog">Blog</a>
+				<a href="https://shop.glowgoodly.com" class="btn btn-ecommerce" target="_blank">E-commerce</a>
+				<a href="https://glowgoodly.com" class="btn btn-blog" target="_blank">Blog</a>
 			</div>
 		</div>
 		<div class="right-content">
@@ -415,7 +415,7 @@ app.get("/", (req, res) => {
 					
 					<!-- GlowGoodly Exact User Image Logo Center -->
 					<g transform="translate(175, 120)">
-						<image href="http://localhost:3000/user-glow-logo.png" x="0" y="0" width="150" height="180" />
+						<image href="https://shop.glowgoodly.com/user-glow-logo.png" x="0" y="0" width="150" height="180" />
 						<text x="75" y="220" text-anchor="middle" font-family="'Montserrat', sans-serif" font-weight="800" font-size="18" letter-spacing="3" fill="#1c1917">GLOWGOODLY</text>
 					</g>
 

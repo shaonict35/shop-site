@@ -74,7 +74,7 @@ router.post("/create-payment", async (req: Request, res: Response) => {
           body: JSON.stringify({
             mode: "0011",
             payerReference: customerPhone || "Customer",
-            callbackURL: `http://localhost:3000/checkout?bkash_callback=true`,
+            callbackURL: `${process.env.FRONTEND_URL || "https://shop.glowgoodly.com"}/checkout?bkash_callback=true`,
             amount: String(amount),
             currency: "BDT",
             intent: "sale",
@@ -97,7 +97,7 @@ router.post("/create-payment", async (req: Request, res: Response) => {
     }
 
     // Interactive bKash Portal Session Fallback (Matches developer.bka.sh user experience)
-    const bkashURL = `http://localhost:3000/bkash-portal?paymentID=${paymentID}&amount=${amount}&orderId=${orderId || ""}&phone=${encodeURIComponent(customerPhone || "")}&name=${encodeURIComponent(customerName || "")}`;
+    const bkashURL = `${process.env.FRONTEND_URL || "https://shop.glowgoodly.com"}/bkash-portal?paymentID=${paymentID}&amount=${amount}&orderId=${orderId || ""}&phone=${encodeURIComponent(customerPhone || "")}&name=${encodeURIComponent(customerName || "")}`;
 
     res.json({
       success: true,
