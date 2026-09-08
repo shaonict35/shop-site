@@ -77,28 +77,28 @@ export default function TrackingScripts() {
 
     const { SITE_TITLE, SITE_DESCRIPTION, SITE_FAVICON } = trackingSettings as any;
 
-    if (SITE_TITLE) {
-      document.title = SITE_TITLE;
+    if (typeof SITE_TITLE === "string" && SITE_TITLE.trim().length > 0) {
+      document.title = SITE_TITLE.trim();
     }
 
-    if (SITE_DESCRIPTION) {
+    if (typeof SITE_DESCRIPTION === "string" && SITE_DESCRIPTION.trim().length > 0) {
       let metaDesc = document.querySelector('meta[name="description"]');
       if (!metaDesc) {
         metaDesc = document.createElement("meta");
         metaDesc.setAttribute("name", "description");
         document.head.appendChild(metaDesc);
       }
-      metaDesc.setAttribute("content", SITE_DESCRIPTION);
+      metaDesc.setAttribute("content", SITE_DESCRIPTION.trim());
     }
 
-    if (SITE_FAVICON) {
+    if (typeof SITE_FAVICON === "string" && SITE_FAVICON.trim().length > 0) {
       let iconLink = document.querySelector('link[rel="icon"]') as HTMLLinkElement;
       if (!iconLink) {
         iconLink = document.createElement("link");
         iconLink.setAttribute("rel", "icon");
         document.head.appendChild(iconLink);
       }
-      iconLink.href = SITE_FAVICON;
+      iconLink.href = SITE_FAVICON.trim();
     }
   }, [trackingSettings]);
 

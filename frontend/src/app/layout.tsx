@@ -56,11 +56,9 @@ export const metadata: Metadata = {
     images: ["https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=1200&h=630&fit=crop"],
   },
   icons: {
-    icon: [
-      { url: "/user-glow-logo.png", type: "image/png" },
-    ],
-    shortcut: ["/user-glow-logo.png"],
-    apple: ["/user-glow-logo.png"],
+    icon: "/user-glow-logo.png",
+    shortcut: "/user-glow-logo.png",
+    apple: "/user-glow-logo.png",
   },
   robots: {
     index: true,
@@ -125,10 +123,6 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Favicon & Browser Tab Icons */}
-        <link rel="icon" href="/icon.png" type="image/png" />
-        <link rel="shortcut icon" href="/favicon.ico" />
-        <link rel="apple-touch-icon" href="/apple-icon.png" />
         {/* Resource Preconnect & Performance Hints */}
         <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://bk.shajgoj.com" crossOrigin="anonymous" />
