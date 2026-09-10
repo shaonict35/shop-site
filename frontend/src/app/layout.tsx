@@ -16,10 +16,10 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL("https://shop.glowgoodly.com"),
   title: {
-    default: "GlowGoodly™ | 100% Authentic Skincare & Premium Cosmetics Bangladesh",
-    template: "%s | GlowGoodly™ BD"
+    default: "GlowGoodly | 100% Authentic Skincare & Premium Cosmetics Bangladesh",
+    template: "%s | GlowGoodly BD"
   },
-  description: "Shop 100% authentic cosmetics, Korean skincare, and hair care products at GlowGoodly™. Fast cash on delivery across Bangladesh. Buy original CeraVe, COSRX, and The Ordinary in BD.",
+  description: "Shop 100% authentic cosmetics, Korean skincare, and hair care products at GlowGoodly. Fast cash on delivery across Bangladesh. Buy original CeraVe, COSRX, and The Ordinary in BD.",
   keywords: ["cosmetics in bangladesh", "skincare bd", "authentic makeup bangladesh", "buy cosmetics online bd", "GlowGoodly", "best beauty shop dhaka", "korean skincare bd", "buy makeup online dhaka"],
   authors: [{ name: "GlowGoodly Team", url: "https://shop.glowgoodly.com" }],
   creator: "GlowGoodly",

@@ -65,7 +65,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       canonical: `https://shop.glowgoodly.com/product/${id}`,
     },
     openGraph: {
-      title: `${product.name} | GlowGoodly™ Bangladesh`,
+      title: `${product.name} | GlowGoodly Bangladesh`,
       description,
       url: `https://shop.glowgoodly.com/product/${id}`,
       siteName: "GlowGoodly",
@@ -81,7 +81,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     twitter: {
       card: "summary_large_image",
-      title: `${product.name} | GlowGoodly™ BD`,
+      title: `${product.name} | GlowGoodly BD`,
       description,
       images: [primaryImage],
     },

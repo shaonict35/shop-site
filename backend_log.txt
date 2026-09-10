@@ -30,3 +30,4 @@ c:\Users\skhan\Desktop\Shop_Site\shop-site\backend\src\routes\banners.ts:305:0: 
 }
 
 Node.js v24.18.0
+^C^C

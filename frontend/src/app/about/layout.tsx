@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     canonical: "https://shop.glowgoodly.com/about",
   },
   openGraph: {
-    title: "About GlowGoodly™ Bangladesh",
+    title: "About GlowGoodly Bangladesh",
     description: "Learn about our commitment to 100% authentic cosmetics and premium skincare across Bangladesh.",
     url: "https://shop.glowgoodly.com/about",
   },

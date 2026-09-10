@@ -384,7 +384,7 @@ export default function Home() {
           border: 0,
         }}
       >
-        GlowGoodly™ — 100% Authentic Cosmetics, Korean Skincare & Beauty Shop Bangladesh
+        GlowGoodly — 100% Authentic Cosmetics, Korean Skincare & Beauty Shop Bangladesh
       </h1>
 
       {/* Full-width Dynamic Promotional Banner Slider - Responsive with Shajgoj-like sizing */}
