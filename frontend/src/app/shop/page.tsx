@@ -324,8 +324,8 @@ function ShopPageContent() {
       setLoading(true);
       try {
         const [prodData, brandData] = await Promise.all([
-          fetchWithCache(`${API_BASE}/products?includeAll=true&t=${Date.now()}`, true),
-          fetchWithCache(`${API_BASE}/brands?t=${Date.now()}`, true),
+          fetchWithCache(`${API_BASE}/products?includeAll=true`),
+          fetchWithCache(`${API_BASE}/brands`),
         ]);
 
         const validProds = Array.isArray(prodData) ? prodData : [];

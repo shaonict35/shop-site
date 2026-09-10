@@ -234,8 +234,8 @@ export default function Home() {
       try {
         const [catData, brandData, bannerData, notifRes] = await Promise.all([
           fetchWithCache(`${API_BASE}/categories`, bypass),
-          fetchWithCache(`${API_BASE}/brands?t=${Date.now()}`, true),
-          fetchWithCache(`${API_BASE}/banners?t=${Date.now()}`, true),
+          fetchWithCache(`${API_BASE}/brands`, bypass),
+          fetchWithCache(`${API_BASE}/banners`, bypass),
           fetchWithCache(`${API_BASE}/notifications/active`, bypass)
         ]);
         setCategories(Array.isArray(catData) && catData.length > 0 ? catData : DEFAULT_BEAUTY_CATEGORIES);
