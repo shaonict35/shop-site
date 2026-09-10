@@ -222,15 +222,25 @@ const getProductsHandler = async (req: Request, res: Response) => {
       });
     }
 
-    // 2. Filter by brand
+    // 2. Filter by brand (support ID, slug, and name)
     if (brand) {
-      let brandIds: string[] = [];
+      let brandKeys: string[] = [];
       if (typeof brand === "string") {
-        brandIds = brand.includes(",") ? brand.split(",") : [brand];
+        brandKeys = brand.includes(",") ? brand.split(",").map(b => b.trim().toLowerCase()) : [brand.trim().toLowerCase()];
       } else if (Array.isArray(brand)) {
-        brandIds = brand as string[];
+        brandKeys = (brand as string[]).map(b => b.trim().toLowerCase());
       }
-      productsList = productsList.filter(p => p.brandId && brandIds.includes(p.brandId));
+      productsList = productsList.filter(p => {
+        const bId = (p.brandId || "").toLowerCase();
+        const bSlug = (p.brand?.slug || generateSlug(p.brand?.name || "")).toLowerCase();
+        const bName = (p.brand?.name || "").toLowerCase();
+        return brandKeys.some(k => 
+          bId === k || 
+          bSlug === k || 
+          bName === k || 
+          generateSlug(k) === bSlug
+        );
+      });
     }
 
     // 3. Filter by campaign

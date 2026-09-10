@@ -494,3 +494,4 @@ httpServer.listen(PORT, async () => {
   console.log(`🚀 GlowGoodly Custom Backend & Socket.io Server running at http://localhost:${PORT}`);
   await autoSeedDatabase();
 });
+// GlowGoodly Server active

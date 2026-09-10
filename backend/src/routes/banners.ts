@@ -5,11 +5,7 @@ import { authenticateJWT, requireRole, AuthenticatedRequest } from "../middlewar
 
 const router = Router();
 
-let isBannersInitialized = false;
-
 async function ensureInitialBanners() {
-  if (isBannersInitialized) return;
-  isBannersInitialized = true;
   try {
     const snapshot = await db.collection("banners").get();
     for (const doc of snapshot.docs) {
@@ -30,21 +26,71 @@ async function ensureInitialBanners() {
       }
       // Auto-heal Deal cards
       if (data.page === "Deal Card 1" && (data.imageUrl?.includes("shajgoj") || !data.imageUrl)) {
-        await doc.ref.update({ imageUrl: "/images/deals/deal-1.png", mobileImageUrl: "/images/deals/deal-1.png" });
+        await doc.ref.update({ imageUrl: "/images/deals/deal-1.png", mobileImageUrl: "/images/deals/deal-1.png", tabletImageUrl: "/images/deals/deal-1.png" });
       }
       if (data.page === "Deal Card 2" && (data.imageUrl?.includes("shajgoj") || !data.imageUrl)) {
-        await doc.ref.update({ imageUrl: "/images/deals/deal-2.png", mobileImageUrl: "/images/deals/deal-2.png" });
+        await doc.ref.update({ imageUrl: "/images/deals/deal-2.png", mobileImageUrl: "/images/deals/deal-2.png", tabletImageUrl: "/images/deals/deal-2.png" });
       }
       if (data.page === "Deal Card 3" && (data.imageUrl?.includes("shajgoj") || !data.imageUrl)) {
-        await doc.ref.update({ imageUrl: "/images/deals/deal-3.gif", mobileImageUrl: "/images/deals/deal-3.gif" });
+        await doc.ref.update({ imageUrl: "/images/deals/deal-3.gif", mobileImageUrl: "/images/deals/deal-3.gif", tabletImageUrl: "/images/deals/deal-3.gif" });
       }
       if (data.page === "Deal Card 4" && (data.imageUrl?.includes("shajgoj") || !data.imageUrl)) {
-        await doc.ref.update({ imageUrl: "/images/deals/deal-4.jpg", mobileImageUrl: "/images/deals/deal-4.jpg" });
+        await doc.ref.update({ imageUrl: "/images/deals/deal-4.jpg", mobileImageUrl: "/images/deals/deal-4.jpg", tabletImageUrl: "/images/deals/deal-4.jpg" });
+      }
+
+      // Auto-heal Campaign cards
+      if (data.page === "BOGO" && (data.imageUrl?.includes("shajgoj") || !data.imageUrl)) {
+        await doc.ref.update({ imageUrl: "/images/deals/deal-1.png", mobileImageUrl: "/images/deals/deal-1.png", tabletImageUrl: "/images/deals/deal-1.png" });
+      }
+      if (data.page === "COMBO" && (data.imageUrl?.includes("shajgoj") || !data.imageUrl)) {
+        await doc.ref.update({ imageUrl: "/images/deals/deal-2.png", mobileImageUrl: "/images/deals/deal-2.png", tabletImageUrl: "/images/deals/deal-2.png" });
+      }
+      if (data.page === "OFFERS" && (data.imageUrl?.includes("shajgoj") || !data.imageUrl)) {
+        await doc.ref.update({ imageUrl: "/images/deals/deal-3.gif", mobileImageUrl: "/images/deals/deal-3.gif", tabletImageUrl: "/images/deals/deal-3.gif" });
+      }
+      if (data.page === "Clearance SALE" && (data.imageUrl?.includes("shajgoj") || !data.imageUrl)) {
+        await doc.ref.update({ imageUrl: "/images/deals/deal-4.jpg", mobileImageUrl: "/images/deals/deal-4.jpg", tabletImageUrl: "/images/deals/deal-4.jpg" });
+      }
+
+      // Universal sanitize for any lingering external broken banner image
+      if (data.imageUrl && data.imageUrl.includes("shajgoj")) {
+        await doc.ref.update({
+          imageUrl: "/images/sliders/slider-1.png",
+          mobileImageUrl: "/images/sliders/slider-1.png",
+          tabletImageUrl: "/images/sliders/slider-1.png"
+        });
       }
     }
   } catch (err) {
     console.error("ensureInitialBanners error:", err);
   }
+}
+
+function cleanBannerData(data: any): any {
+  if (!data) return data;
+  const cleaned = { ...data };
+  if (cleaned.imageUrl && (cleaned.imageUrl.includes("shajgoj") || !cleaned.imageUrl)) {
+    if (cleaned.page === "BOGO") cleaned.imageUrl = "/images/deals/deal-1.png";
+    else if (cleaned.page === "COMBO") cleaned.imageUrl = "/images/deals/deal-2.png";
+    else if (cleaned.page === "OFFERS") cleaned.imageUrl = "/images/deals/deal-3.gif";
+    else if (cleaned.page === "Clearance SALE") cleaned.imageUrl = "/images/deals/deal-4.jpg";
+    else if (cleaned.page === "Brand Offer 1") cleaned.imageUrl = "/images/brands/brand-offer-1.png";
+    else if (cleaned.page === "Brand Offer 2") cleaned.imageUrl = "/images/brands/brand-offer-2.gif";
+    else if (cleaned.page === "Brand Offer 5") cleaned.imageUrl = "/images/brands/brand-offer-5.png";
+    else if (cleaned.page === "Brand Offer 6") cleaned.imageUrl = "/images/brands/brand-offer-6.gif";
+    else if (cleaned.page === "Deal Card 1") cleaned.imageUrl = "/images/deals/deal-1.png";
+    else if (cleaned.page === "Deal Card 2") cleaned.imageUrl = "/images/deals/deal-2.png";
+    else if (cleaned.page === "Deal Card 3") cleaned.imageUrl = "/images/deals/deal-3.gif";
+    else if (cleaned.page === "Deal Card 4") cleaned.imageUrl = "/images/deals/deal-4.jpg";
+    else cleaned.imageUrl = "/images/sliders/slider-1.png";
+  }
+  if (!cleaned.mobileImageUrl || cleaned.mobileImageUrl.includes("shajgoj")) {
+    cleaned.mobileImageUrl = cleaned.imageUrl;
+  }
+  if (!cleaned.tabletImageUrl || cleaned.tabletImageUrl.includes("shajgoj")) {
+    cleaned.tabletImageUrl = cleaned.imageUrl;
+  }
+  return cleaned;
 }
 
 // ─── GET /api/banners — Public: get all ACTIVE banners ───────────────────────
@@ -58,7 +104,7 @@ router.get("/banners", async (req: AuthenticatedRequest, res: Response) => {
     const banners: any[] = [];
     snapshot.forEach(doc => {
       if (deletedIds.includes(doc.id)) return;
-      const data = doc.data();
+      const data = cleanBannerData(doc.data());
       const active = data.isActive === undefined || data.isActive === true || data.isActive === "true" || String(data.isActive) !== "false";
       if (data && active) {
         banners.push({ id: doc.id, ...data });
@@ -84,7 +130,8 @@ const getAllBannersHandler = async (req: Request, res: Response) => {
     const banners: any[] = [];
     snapshot.forEach(doc => {
       if (deletedIds.includes(doc.id)) return;
-      banners.push({ id: doc.id, ...doc.data() });
+      const data = cleanBannerData(doc.data());
+      banners.push({ id: doc.id, ...data });
     });
 
     banners.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, Suspense } from "react";
-import { fetchWithCache, API_BASE, getProductUrl } from "../../utils/api";
+import { fetchWithCache, API_BASE, getProductUrl, generateSlug } from "../../utils/api";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Header from "../../components/Header";
@@ -309,7 +309,15 @@ function ShopPageContent() {
     }
 
     if (brandQuery && brands.length > 0) {
-      const matchedBrand = brands.find(b => b && (b.id === brandQuery || (b.name && b.name.toLowerCase() === brandQuery.toLowerCase())));
+      const qClean = brandQuery.toLowerCase().trim();
+      const matchedBrand = brands.find(b => 
+        b && (
+          b.id === brandQuery || 
+          (b.name && b.name.toLowerCase() === qClean) ||
+          (b.name && generateSlug(b.name) === generateSlug(brandQuery)) ||
+          ((b as any).slug && (b as any).slug.toLowerCase() === qClean)
+        )
+      );
       if (matchedBrand) {
         setSelectedBrands([matchedBrand.name]);
       } else {
@@ -425,9 +433,16 @@ function ShopPageContent() {
 
     if (selectedBrands.length > 0) {
       const lowerSelected = selectedBrands.map(b => (b || "").toLowerCase().trim());
+      const slugSelected = selectedBrands.map(b => generateSlug(b || ""));
       filtered = filtered.filter((p) => {
         const brandName = (p.brand?.name || "").toLowerCase().trim();
-        return brandName && lowerSelected.includes(brandName);
+        const brandSlug = generateSlug(p.brand?.name || "");
+        const brandId = (p.brand?.id || (p as any).brandId || "").toLowerCase();
+        return (
+          (brandName && lowerSelected.includes(brandName)) ||
+          (brandSlug && slugSelected.includes(brandSlug)) ||
+          (brandId && lowerSelected.includes(brandId))
+        );
       });
     }
 

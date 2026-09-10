@@ -70,7 +70,7 @@ export default function ReCaptcha({
 
     // Check if script already on page
     if (typeof window !== "undefined") {
-      if (window.grecaptcha && window.grecaptcha.render) {
+      if (typeof window.grecaptcha?.render === "function") {
         initWidget();
       } else {
         const existingScript = document.getElementById("google-recaptcha-script");
@@ -90,7 +90,7 @@ export default function ReCaptcha({
         } else {
           // Poll until ready
           const interval = setInterval(() => {
-            if (window.grecaptcha && window.grecaptcha.render) {
+            if (typeof window.grecaptcha?.render === "function") {
               clearInterval(interval);
               initWidget();
             }

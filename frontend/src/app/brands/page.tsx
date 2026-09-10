@@ -6,12 +6,13 @@ import Header from "../../components/Header";
 import PromoBanner from "../../components/PromoBanner";
 import Footer from "../../components/Footer";
 import MobileNavbar from "../../components/MobileNavbar";
-import { fetchWithCache, API_BASE } from "../../utils/api";
+import { fetchWithCache, API_BASE, generateSlug } from "../../utils/api";
 
 interface Brand {
   id: string;
   name: string;
   logoUrl?: string | null;
+  slug?: string;
 }
 
 export default function BrandsPage() {
@@ -26,7 +27,24 @@ export default function BrandsPage() {
     "Maybelline": "/images/brands/maybelline.svg",
     "Revlon": "/images/brands/revlon.svg",
     "Wet n Wild": "/images/brands/wet-n-wild.svg",
-    "e.l.f.": "/images/brands/elf.svg"
+    "e.l.f.": "/images/brands/elf.svg",
+    "CeraVe": "/images/brands/cerave.svg",
+    "The Ordinary": "/images/brands/the-ordinary.svg",
+    "L'Oreal Paris": "/images/brands/loreal.svg",
+    "L'Oreal": "/images/brands/loreal.svg",
+    "COSRX": "/images/brands/cosrx.svg",
+    "Innisfree": "/images/brands/innisfree.svg",
+    "Cetaphil": "/images/brands/cetaphil.svg",
+    "Nivea": "/images/brands/nivea.svg",
+    "Olay": "/images/brands/olay.svg",
+    "Calvin Klein": "/images/brands/calvin-klein.svg",
+    "Gillette": "/images/brands/gillette.svg",
+    "Huggies": "/images/brands/huggies.svg",
+    "Farlin": "/images/brands/farlin.svg",
+    "Secret": "/images/brands/secret.svg",
+    "Skin Cafe": "/images/brands/skin-cafe.svg",
+    "Beauty Glazed": "/images/brands/beauty-glazed.svg",
+    "Pudaier": "/images/brands/pudaier.svg",
   };
 
   useEffect(() => {
@@ -153,10 +171,11 @@ export default function BrandsPage() {
                 {/* Brands Logo Grid */}
                 <div className="brand-logo-grid">
                   {groupedBrands[letter].map((b) => {
-                    const logo = b.logoUrl || brandLogosMap[b.name] || "";
+                    const logo = brandLogosMap[b.name] || b.logoUrl || `/images/brands/${generateSlug(b.name)}.svg`;
+                    const brandTarget = b.slug || generateSlug(b.name) || b.id;
                     return (
                       <Link
-                        href={`/shop?brand=${b.id}`}
+                        href={`/shop?brand=${brandTarget}`}
                         key={b.id}
                         className="brand-card"
                         style={{
