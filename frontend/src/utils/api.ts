@@ -48,7 +48,19 @@ export async function fetchWithCache(url: string, bypassCache: boolean = false) 
       return null;
     }
 
-    const data = await res.json();
+    const text = await res.text();
+    if (!text || !text.trim()) {
+      return null;
+    }
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (parseError) {
+      console.warn("Invalid JSON response from URL:", url);
+      return cached ? cached.data : null;
+    }
+
     cache[url] = {
       data,
       expiry: now + CACHE_DURATION,

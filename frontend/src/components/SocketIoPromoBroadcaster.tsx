@@ -44,8 +44,12 @@ export default function SocketIoPromoBroadcaster({ token }: { token: string | nu
     }
 
     const saved = localStorage.getItem("gg_promo_history");
-    if (saved) {
-      setPromoHistory(JSON.parse(saved));
+    if (saved && saved.trim()) {
+      try {
+        setPromoHistory(JSON.parse(saved));
+      } catch (e) {
+        localStorage.removeItem("gg_promo_history");
+      }
     }
   };
 

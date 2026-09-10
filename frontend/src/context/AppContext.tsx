@@ -74,8 +74,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await fetch(`${API_BASE}/settings/public`);
       if (res.ok) {
-        const data = await res.json();
-        setTrackingSettings(data);
+        const text = await res.text();
+        if (text && text.trim()) {
+          try {
+            const data = JSON.parse(text);
+            setTrackingSettings(data);
+          } catch (err) {
+            console.warn("Invalid JSON in /settings/public response");
+          }
+        }
       }
     } catch (e) {
       console.log("Could not load dynamic analytics integrations, using defaults.", e);
@@ -84,20 +91,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Load state from local storage on mount
   useEffect(() => {
-    const savedToken = localStorage.getItem("gg_token");
-    const savedUser = localStorage.getItem("gg_user");
-    const savedCart = localStorage.getItem("gg_cart");
-    const savedWishlist = localStorage.getItem("gg_wishlist");
+    try {
+      const savedToken = localStorage.getItem("gg_token");
+      const savedUser = localStorage.getItem("gg_user");
+      const savedCart = localStorage.getItem("gg_cart");
+      const savedWishlist = localStorage.getItem("gg_wishlist");
 
-    if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
-    }
-    if (savedCart) {
-      setCart(JSON.parse(savedCart));
-    }
-    if (savedWishlist) {
-      setWishlist(JSON.parse(savedWishlist));
+      if (savedToken) {
+        setToken(savedToken);
+      }
+      if (savedUser && savedUser.trim() && savedUser !== "undefined" && savedUser !== "null") {
+        try {
+          setUser(JSON.parse(savedUser));
+        } catch (e) {
+          localStorage.removeItem("gg_user");
+        }
+      }
+      if (savedCart && savedCart.trim() && savedCart !== "undefined" && savedCart !== "null") {
+        try {
+          const parsed = JSON.parse(savedCart);
+          if (Array.isArray(parsed)) setCart(parsed);
+        } catch (e) {
+          localStorage.removeItem("gg_cart");
+        }
+      }
+      if (savedWishlist && savedWishlist.trim() && savedWishlist !== "undefined" && savedWishlist !== "null") {
+        try {
+          const parsed = JSON.parse(savedWishlist);
+          if (Array.isArray(parsed)) setWishlist(parsed);
+        } catch (e) {
+          localStorage.removeItem("gg_wishlist");
+        }
+      }
+    } catch (err) {
+      console.warn("Error accessing localStorage in AppContext:", err);
     }
 
     refreshTracking();
