@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { fetchWithCache, API_BASE } from "../utils/api";
+import { fetchWithCache, API_BASE, getProductUrl } from "../utils/api";
 import { registerFcmToken } from "../utils/fcm";
 
 import Header from "../components/Header";
@@ -10,10 +10,12 @@ import MobileNavbar from "../components/MobileNavbar";
 import Footer from "../components/Footer";
 import { useApp } from "../context/AppContext";
 import Link from "next/link";
+import GlowLoader from "../components/GlowLoader";
 
 interface Product {
   id: string;
   name: string;
+  slug?: string;
   description: string;
   brand: { name: string };
   category: { name: string };
@@ -23,14 +25,14 @@ interface Product {
 }
 
 const DEFAULT_BEAUTY_CATEGORIES = [
-  { id: "cat-makeup", name: "Makeup", slug: "makeup", image: "https://bk.shajgoj.com/storage/2026/04/makeup.png" },
-  { id: "cat-skincare", name: "Skin Care", slug: "skincare", image: "https://bk.shajgoj.com/storage/2026/04/skin-care.png" },
-  { id: "cat-haircare", name: "Hair Care", slug: "haircare", image: "https://bk.shajgoj.com/storage/2026/04/hair-care.png" },
-  { id: "cat-personal-care", name: "Personal Care", slug: "personal-care", image: "https://bk.shajgoj.com/storage/2026/04/accessories.png" },
-  { id: "cat-mom-baby", name: "Mom & Baby", slug: "mom-baby", image: "https://bk.shajgoj.com/storage/2026/04/mom-baby.png" },
-  { id: "cat-fragrance", name: "Fragrance", slug: "fragrance", image: "https://bk.shajgoj.com/storage/2026/04/fragrance.png" },
-  { id: "cat-undergarments", name: "Undergarments", slug: "undergarments", image: "https://bk.shajgoj.com/storage/2026/04/undergarments.png" },
-  { id: "cat-kbeauty", name: "K-Beauty", slug: "k-beauty", image: "https://bk.shajgoj.com/storage/2026/04/k-beauty.png" }
+  { id: "cat-makeup", name: "Makeup", slug: "makeup", image: "/cosmetics_circle_illustration.png" },
+  { id: "cat-skincare", name: "Skin Care", slug: "skincare", image: "/cosmetics_circle_illustration.png" },
+  { id: "cat-haircare", name: "Hair Care", slug: "haircare", image: "/cosmetics_circle_illustration.png" },
+  { id: "cat-personal-care", name: "Personal Care", slug: "personal-care", image: "/cosmetics_circle_illustration.png" },
+  { id: "cat-mom-baby", name: "Mom & Baby", slug: "mom-baby", image: "/cosmetics_circle_illustration.png" },
+  { id: "cat-fragrance", name: "Fragrance", slug: "fragrance", image: "/cosmetics_circle_illustration.png" },
+  { id: "cat-undergarments", name: "Undergarments", slug: "undergarments", image: "/cosmetics_circle_illustration.png" },
+  { id: "cat-kbeauty", name: "K-Beauty", slug: "k-beauty", image: "/cosmetics_circle_illustration.png" }
 ];
 
 const DEFAULT_HERO_SLIDES = [
@@ -170,15 +172,7 @@ export default function Home() {
   };
 
   const getCategoryImage = (catName: string) => {
-    const name = (catName || "").toLowerCase().trim();
-    if (name.includes("makeup")) return "https://bk.shajgoj.com/storage/2026/04/makeup.png";
-    if (name.includes("skin")) return "https://bk.shajgoj.com/storage/2026/04/skin-care.png";
-    if (name.includes("hair")) return "https://bk.shajgoj.com/storage/2026/04/hair-care.png";
-    if (name.includes("personal") || name.includes("care")) return "https://bk.shajgoj.com/storage/2026/04/accessories.png";
-    if (name.includes("mom") || name.includes("baby")) return "https://bk.shajgoj.com/storage/2026/04/mom-baby.png";
-    if (name.includes("fragrance") || name.includes("perfume")) return "https://bk.shajgoj.com/storage/2026/04/fragrance.png";
-    if (name.includes("undergarment") || name.includes("innerwear")) return "https://bk.shajgoj.com/storage/2026/04/undergarments.png";
-    return "https://bk.shajgoj.com/storage/2026/04/k-beauty.png";
+    return "/cosmetics_circle_illustration.png";
   };
 
   // Filter States
@@ -490,7 +484,7 @@ export default function Home() {
         {/* Wide horizontal promo banner ad */}
         <Link href={getBannerForPage("Homepage Wide Banner", "", "").link} style={{ margin: "10px 0 35px 0", borderRadius: "8px", overflow: "hidden", cursor: "pointer", display: "block" }} className="promo-card-hover">
           <img
-            src={getBannerForPage("Homepage Wide Banner", "https://bk.shajgoj.com/storage/2026/07/prime-banner-web.png", "").img}
+            src={getBannerForPage("Homepage Wide Banner", "/beauty_banner.png", "").img}
             alt={getBannerForPage("Homepage Wide Banner", "", "Beauty Must Haves Exclusive Savings").title}
             style={{
               width: "100%",
@@ -499,6 +493,13 @@ export default function Home() {
             }}
           />
         </Link>
+
+        {/* Loading Products Indicator */}
+        {loading && products.length === 0 && (
+          <div style={{ margin: "40px 0" }}>
+            <GlowLoader text="Loading Products..." subtext="Authentic Skincare & Cosmetics" />
+          </div>
+        )}
 
         {/* MAKEUP Section */}
         {(() => {
@@ -542,11 +543,11 @@ export default function Home() {
                           <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
                         </svg>
                       </div>
-                      <Link href={`/product/${p.id}`} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
                       </Link>
                       <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
-                        <Link href={`/product/${p.id}`} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                        <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                           {p.name}
                         </Link>
                         <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
@@ -669,11 +670,11 @@ export default function Home() {
                           <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
                         </svg>
                       </div>
-                      <Link href={`/product/${p.id}`} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
                       </Link>
                       <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
-                        <Link href={`/product/${p.id}`} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                        <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                           {p.name}
                         </Link>
                         <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
@@ -796,11 +797,11 @@ export default function Home() {
                           <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
                         </svg>
                       </div>
-                      <Link href={`/product/${p.id}`} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
                       </Link>
                       <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
-                        <Link href={`/product/${p.id}`} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                        <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                           {p.name}
                         </Link>
                         <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
@@ -844,19 +845,19 @@ export default function Home() {
           <div className="limited-offers-grid">
             {/* Card 1: BOGO */}
             <Link href={getBannerForPage("BOGO", "", "", "/shop?campaign=BOGO").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("BOGO", "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png", "").img} alt="BOGO Offer" style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
+              <img src={getBannerForPage("BOGO", "/images/deals/deal-1.png", "").img} alt="BOGO Offer" style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
             </Link>
             {/* Card 2: COMBO */}
             <Link href={getBannerForPage("COMBO", "", "", "/shop?campaign=COMBO").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("COMBO", "https://bk.shajgoj.com/storage/2025/05/combo.png", "").img} alt="COMBO Offer" style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
+              <img src={getBannerForPage("COMBO", "/images/deals/deal-2.png", "").img} alt="COMBO Offer" style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
             </Link>
             {/* Card 3: OFFERS */}
-            <Link href={getBannerForPage("OFFERS", "", "", "/shop?campaign=EXCLUSIVE").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("OFFERS", "https://bk.shajgoj.com/storage/2025/05/offers.png", "").img} alt="OFFERS" style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
+            <Link href={getBannerForPage("OFFERS", "", "", "/shop?campaign=OFFERS").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
+              <img src={getBannerForPage("OFFERS", "/images/deals/deal-3.gif", "").img} alt="OFFERS" style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
             </Link>
             {/* Card 4: Clearance SALE */}
-            <Link href={getBannerForPage("Clearance SALE", "", "", "/shop?campaign=CLEARANCE").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("Clearance SALE", "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png", "").img} alt="Clearance SALE Offer" style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
+            <Link href={getBannerForPage("Clearance SALE", "", "", "/shop?campaign=Clearance%20SALE").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
+              <img src={getBannerForPage("Clearance SALE", "/images/deals/deal-4.jpg", "").img} alt="Clearance SALE Offer" style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
             </Link>
           </div>
         </section>
@@ -908,11 +909,11 @@ export default function Home() {
                           <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
                         </svg>
                       </div>
-                      <Link href={`/product/${p.id}`} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
                       </Link>
                       <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
-                        <Link href={`/product/${p.id}`} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                        <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                           {p.name}
                         </Link>
                         <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
@@ -955,14 +956,14 @@ export default function Home() {
           </h2>
           <div className="categories-grid">
             {[
-              { name: "Makeup", defaultImg: "https://bk.shajgoj.com/storage/2026/04/makeup.png", link: "/shop?category=makeup" },
-              { name: "Skin", defaultImg: "https://bk.shajgoj.com/storage/2026/04/skin-care.png", link: "/shop?category=skincare" },
-              { name: "Hair", defaultImg: "https://bk.shajgoj.com/storage/2026/04/hair-care.png", link: "/shop?category=haircare" },
-              { name: "Personal Care", defaultImg: "https://bk.shajgoj.com/storage/2026/04/accessories.png", link: "/shop?category=personal-care" },
-              { name: "Mom & Baby", defaultImg: "https://bk.shajgoj.com/storage/2026/04/mom-baby.png", link: "/shop?category=mom-baby" },
-              { name: "Fragrance", defaultImg: "https://bk.shajgoj.com/storage/2026/04/fragrance.png", link: "/shop?category=fragrance" },
-              { name: "Undergarments", defaultImg: "https://bk.shajgoj.com/storage/2026/04/undergarments.png", link: "/shop?category=undergarments" },
-              { name: "Combo", defaultImg: "https://bk.shajgoj.com/storage/2026/04/k-beauty.png", link: "/shop?category=combo" }
+              { name: "Makeup", defaultImg: "/cosmetics_circle_illustration.png", link: "/shop?category=makeup" },
+              { name: "Skin", defaultImg: "/cosmetics_circle_illustration.png", link: "/shop?category=skincare" },
+              { name: "Hair", defaultImg: "/cosmetics_circle_illustration.png", link: "/shop?category=haircare" },
+              { name: "Personal Care", defaultImg: "/cosmetics_circle_illustration.png", link: "/shop?category=personal-care" },
+              { name: "Mom & Baby", defaultImg: "/cosmetics_circle_illustration.png", link: "/shop?category=mom-baby" },
+              { name: "Fragrance", defaultImg: "/cosmetics_circle_illustration.png", link: "/shop?category=fragrance" },
+              { name: "Undergarments", defaultImg: "/cosmetics_circle_illustration.png", link: "/shop?category=undergarments" },
+              { name: "Combo", defaultImg: "/cosmetics_circle_illustration.png", link: "/shop?category=combo" }
             ].map((cat: any) => {
               const bannerInfo = getBannerForPage(`Category: ${cat.name}`, cat.defaultImg, cat.name, cat.link);
               return (
@@ -1025,11 +1026,11 @@ export default function Home() {
                           <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
                         </svg>
                       </div>
-                      <Link href={`/product/${p.id}`} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
                       </Link>
                       <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
-                        <Link href={`/product/${p.id}`} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                        <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                           {p.name}
                         </Link>
                         <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
@@ -1073,43 +1074,43 @@ export default function Home() {
           <div className="concerns-grid">
             {/* Concern Card 1: ACNE */}
             <Link href={getBannerForPage("Concern: Acne", "", "", "/shop?category=skincare&sub=Acne%20Treatment").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("Concern: Acne", "https://bk.shajgoj.com/storage/2026/04/acne-treatment.png", "").img} alt="Acne Treatment" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
+              <img src={getBannerForPage("Concern: Acne", "/cosmetics_circle_illustration.png", "").img} alt="Acne Treatment" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
             </Link>
             {/* Concern Card 2: ANTI AGING */}
             <Link href={getBannerForPage("Concern: Anti Aging", "", "", "/shop?category=skincare&sub=Anti%20Aging").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("Concern: Anti Aging", "https://bk.shajgoj.com/storage/2026/04/anti-aging-treatment.png", "").img} alt="Anti Aging Treatment" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
+              <img src={getBannerForPage("Concern: Anti Aging", "/cosmetics_circle_illustration.png", "").img} alt="Anti Aging Treatment" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
             </Link>
             {/* Concern Card 3: DANDRUFF */}
             <Link href={getBannerForPage("Concern: Dandruff", "", "", "/shop?category=haircare&sub=Dandruff").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("Concern: Dandruff", "https://bk.shajgoj.com/storage/2026/04/dandruff-solution.png", "").img} alt="Dandruff Solution" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
+              <img src={getBannerForPage("Concern: Dandruff", "/cosmetics_circle_illustration.png", "").img} alt="Dandruff Solution" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
             </Link>
             {/* Concern Card 4: DRY SKIN */}
             <Link href={getBannerForPage("Concern: Dry Skin", "", "", "/shop?category=skincare&sub=Dry%20Skin").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("Concern: Dry Skin", "https://bk.shajgoj.com/storage/2026/04/dry-skin-treatment.png", "").img} alt="Dry Skin Treatment" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
+              <img src={getBannerForPage("Concern: Dry Skin", "/cosmetics_circle_illustration.png", "").img} alt="Dry Skin Treatment" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
             </Link>
             {/* Concern Card 5: HAIR FALL */}
             <Link href={getBannerForPage("Concern: Hair Fall", "", "", "/shop?category=haircare&sub=Hair%20Fall").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover concern-card-extra">
-              <img src={getBannerForPage("Concern: Hair Fall", "https://bk.shajgoj.com/storage/2026/04/hair-fall-treatment.png", "").img} alt="Hair Fall Treatment" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
+              <img src={getBannerForPage("Concern: Hair Fall", "/cosmetics_circle_illustration.png", "").img} alt="Hair Fall Treatment" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
             </Link>
             {/* Concern Card 6: OIL CONTROL */}
             <Link href={getBannerForPage("Concern: Oil Control", "", "", "/shop?category=skincare").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover concern-card-extra">
-              <img src={getBannerForPage("Concern: Oil Control", "https://bk.shajgoj.com/storage/2026/04/oil-control-treatment.png", "").img} alt="Oil Control Treatment" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
+              <img src={getBannerForPage("Concern: Oil Control", "/cosmetics_circle_illustration.png", "").img} alt="Oil Control Treatment" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
             </Link>
             {/* Concern Card 7: PORE CARE */}
             <Link href={getBannerForPage("Concern: Pore Care", "", "", "/shop?category=skincare&sub=Pore%20Care").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover concern-card-extra">
-              <img src={getBannerForPage("Concern: Pore Care", "https://bk.shajgoj.com/storage/2026/04/pore-care.png", "").img} alt="Pore Care" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
+              <img src={getBannerForPage("Concern: Pore Care", "/cosmetics_circle_illustration.png", "").img} alt="Pore Care" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
             </Link>
             {/* Concern Card 8: SPOT TREATMENT */}
             <Link href={getBannerForPage("Concern: Spot Treatment", "", "", "/shop?category=skincare").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover concern-card-extra">
-              <img src={getBannerForPage("Concern: Spot Treatment", "https://bk.shajgoj.com/storage/2026/04/spot-treatment.png", "").img} alt="Spot Treatment" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
+              <img src={getBannerForPage("Concern: Spot Treatment", "/cosmetics_circle_illustration.png", "").img} alt="Spot Treatment" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
             </Link>
             {/* Concern Card 9: HAIR THINNING */}
             <Link href={getBannerForPage("Concern: Hair Thinning", "", "", "/shop?category=haircare").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover concern-card-extra">
-              <img src={getBannerForPage("Concern: Hair Thinning", "https://bk.shajgoj.com/storage/2026/04/hair-thinning-solution.png", "").img} alt="Hair Thinning Solution" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
+              <img src={getBannerForPage("Concern: Hair Thinning", "/cosmetics_circle_illustration.png", "").img} alt="Hair Thinning Solution" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
             </Link>
             {/* Concern Card 10: SUN BURN */}
             <Link href={getBannerForPage("Concern: Sun Burn", "", "", "/shop?category=skincare").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover concern-card-extra">
-              <img src={getBannerForPage("Concern: Sun Burn", "https://bk.shajgoj.com/storage/2026/04/sun-burn-treatment.png", "").img} alt="Sun Burn Treatment" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
+              <img src={getBannerForPage("Concern: Sun Burn", "/cosmetics_circle_illustration.png", "").img} alt="Sun Burn Treatment" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
             </Link>
           </div>
         </section>

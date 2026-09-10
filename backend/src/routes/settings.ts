@@ -60,7 +60,7 @@ router.get("/seasonal-offer", async (req, res) => {
     const defaultOffer = {
       title: "বিশেষ অফারে অরিজিনাল বিউটি কম্বো প্যাকেজ!",
       subtitle: "সীমিত সময়ের জন্য ছাড়! ১০০% অরিজিনাল প্রোডাক্ট দ্রুত ক্যাশ অন ডেলিভারিতে পান।",
-      videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4",
+      videoUrl: "",
       productTitle: "প্রিমিয়াম বিউটি ও স্কিনকেয়ার গ্লো সেট",
       productPrice: "1250",
       originalPrice: "1850",

@@ -14,6 +14,7 @@ import {
   Activity, Layout, Layers, Box, Calendar, User, FileText, CheckSquare, MessageSquare, Menu, 
   LogOut, ExternalLink, ChevronDown, Mail, Plus, Edit, Trash2, ArrowLeft, RefreshCw, Upload, Eye, Check, X, ShieldCheck
 } from 'lucide-react';
+import SocketIoPromoBroadcaster from "../../components/SocketIoPromoBroadcaster";
 
 export const DEFAULT_FRONTEND_BANNERS = [
   // Hero Sliders (Frontend Defaults)
@@ -167,9 +168,9 @@ export const DEFAULT_FRONTEND_BANNERS = [
     id: "default-camp-bogo",
     title: "BOGO Offer",
     page: "BOGO",
-    imageUrl: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png",
-    mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png",
-    tabletImageUrl: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png",
+    imageUrl: "/images/deals/deal-1.png",
+    mobileImageUrl: "/images/deals/deal-1.png",
+    tabletImageUrl: "/images/deals/deal-1.png",
     linkUrl: "/shop?campaign=bogo",
     bgColor: "#ffffff",
     isActive: true,
@@ -180,9 +181,9 @@ export const DEFAULT_FRONTEND_BANNERS = [
     id: "default-camp-combo",
     title: "COMBO Offer",
     page: "COMBO",
-    imageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png",
-    mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png",
-    tabletImageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png",
+    imageUrl: "/images/deals/deal-2.png",
+    mobileImageUrl: "/images/deals/deal-2.png",
+    tabletImageUrl: "/images/deals/deal-2.png",
     linkUrl: "/shop?campaign=combo",
     bgColor: "#ffffff",
     isActive: true,
@@ -193,9 +194,9 @@ export const DEFAULT_FRONTEND_BANNERS = [
     id: "default-camp-offers",
     title: "OFFERS",
     page: "OFFERS",
-    imageUrl: "https://bk.shajgoj.com/storage/2025/05/offers.png",
-    mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/offers.png",
-    tabletImageUrl: "https://bk.shajgoj.com/storage/2025/05/offers.png",
+    imageUrl: "/images/deals/deal-3.gif",
+    mobileImageUrl: "/images/deals/deal-3.gif",
+    tabletImageUrl: "/images/deals/deal-3.gif",
     linkUrl: "/shop?campaign=offers",
     bgColor: "#ffffff",
     isActive: true,
@@ -206,9 +207,9 @@ export const DEFAULT_FRONTEND_BANNERS = [
     id: "default-camp-clearance",
     title: "Clearance SALE Offer",
     page: "Clearance SALE",
-    imageUrl: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png",
-    mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png",
-    tabletImageUrl: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png",
+    imageUrl: "/images/deals/deal-4.jpg",
+    mobileImageUrl: "/images/deals/deal-4.jpg",
+    tabletImageUrl: "/images/deals/deal-4.jpg",
     linkUrl: "/shop?campaign=clearance",
     bgColor: "#ffffff",
     isActive: true,
@@ -222,7 +223,56 @@ export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   // Active Navigation Tab
-  const [activeTab, setActiveTab] = useState<"dashboard" | "settings" | "orders" | "reviews" | "products" | "banners" | "categories" | "users">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "settings" | "orders" | "reviews" | "products" | "banners" | "categories" | "users" | "pages" | "marketing">("dashboard");
+
+  // ─── CMS & POLICY PAGES MANAGEMENT STATES ─────────────────────────────────
+  const [cmsPages, setCmsPages] = useState<any[]>([]);
+  const [selectedCmsSlug, setSelectedCmsSlug] = useState<string>("contact");
+  const [cmsPageForm, setCmsPageForm] = useState({ slug: "contact", title: "Contact Us & Customer Support", contentHtml: "", metaTitle: "", metaDescription: "" });
+  const [cmsStatus, setCmsStatus] = useState<string>("");
+
+  const fetchCmsPages = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/admin/pages`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setCmsPages(data);
+          const current = data.find((p: any) => p.slug === selectedCmsSlug);
+          if (current) setCmsPageForm(current);
+        }
+      }
+    } catch (e) {
+      console.error("Error loading CMS pages:", e);
+    }
+  };
+
+  const handleSaveCmsPage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCmsStatus("Saving page content to database...");
+    try {
+      const res = await fetch(`${API_BASE}/admin/pages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(cmsPageForm)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCmsStatus("✅ Page updated successfully! Changes are live across storefront.");
+        clearAllCache();
+        triggerGlobalDataSync();
+        await fetchCmsPages();
+        setTimeout(() => setCmsStatus(""), 4000);
+      } else {
+        setCmsStatus(`❌ Error: ${data.error || "Failed to save page"}`);
+      }
+    } catch (err: any) {
+      setCmsStatus(`❌ Error: ${err.message || "Network error"}`);
+    }
+  };
 
   // ─── BANNER / HOMEPAGE IMAGES MANAGEMENT STATES ───────────────────────────
   const [banners, setBanners] = useState<any[]>([]);
@@ -436,6 +486,7 @@ export default function AdminPage() {
       fetchProductsList();
       fetchCategoriesAndBrands();
       fetchUsersList();
+      fetchCmsPages();
     }
   }, [isAdmin, token]);
 
@@ -1051,6 +1102,20 @@ export default function AdminPage() {
               <Users size={18} /> Users & Staff
             </div>
             <span style={{ fontSize: "11px", backgroundColor: "rgba(255,255,255,0.2)", padding: "2px 7px", borderRadius: "10px" }}>{usersList.length}</span>
+          </div>
+
+          <div 
+            onClick={() => { setActiveTab("pages"); fetchCmsPages(); }} 
+            style={{ padding: "12px 16px", borderRadius: "8px", cursor: "pointer", display: "flex", alignItems: "center", gap: "12px", fontSize: "14px", fontWeight: "600", backgroundColor: activeTab === "pages" ? "#00c6ff" : "transparent", color: activeTab === "pages" ? "#fff" : "#cbd5e1" }}
+          >
+            <FileText size={18} /> Website Policy Pages
+          </div>
+
+          <div 
+            onClick={() => setActiveTab("marketing")} 
+            style={{ padding: "12px 16px", borderRadius: "8px", cursor: "pointer", display: "flex", alignItems: "center", gap: "12px", fontSize: "14px", fontWeight: "600", backgroundColor: activeTab === "marketing" ? "#00c6ff" : "transparent", color: activeTab === "marketing" ? "#fff" : "#cbd5e1" }}
+          >
+            <Bell size={18} /> Live Marketing & Socket
           </div>
 
           <div 
@@ -2018,6 +2083,150 @@ export default function AdminPage() {
                   SAVE ALL SETTINGS
                 </button>
               </form>
+            </div>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════════════
+              TAB: CMS & POLICY PAGES BUILDER
+          ════════════════════════════════════════════════════════════════════ */}
+          {activeTab === "pages" && (
+            <div style={{ backgroundColor: "#fff", borderRadius: "12px", padding: "28px", border: "1px solid #e2e8f0", maxWidth: "950px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
+                <div>
+                  <h3 style={{ fontSize: "18px", fontWeight: "800", color: "#1e293b", margin: 0 }}>Website Policy Pages & CMS Content Control</h3>
+                  <p style={{ fontSize: "13px", color: "#64748b", margin: "4px 0 0 0" }}>Edit website policy pages directly from admin. Changes update live across the storefront and database.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchCmsPages}
+                  style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", backgroundColor: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}
+                >
+                  <RefreshCw size={13} /> Refresh Data
+                </button>
+              </div>
+
+              {cmsStatus && (
+                <div style={{ padding: "12px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: "700", marginBottom: "18px", backgroundColor: cmsStatus.includes("✅") ? "#f0fdf4" : "#fef2f2", color: cmsStatus.includes("✅") ? "#166534" : "#991b1b" }}>
+                  {cmsStatus}
+                </div>
+              )}
+
+              {/* Selector for 9 Core Policy Pages */}
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "22px", paddingBottom: "14px", borderBottom: "2px solid #f1f5f9" }}>
+                {[
+                  { slug: "contact", label: "Contact Us" },
+                  { slug: "points", label: "Points & Rewards" },
+                  { slug: "faq", label: "FAQs" },
+                  { slug: "shipping-delivery", label: "Shipping & Delivery" },
+                  { slug: "terms", label: "Terms & Conditions" },
+                  { slug: "refund-policy", label: "Refund Policy" },
+                  { slug: "privacy-policy", label: "Privacy Policy" },
+                  { slug: "about", label: "Our Story" },
+                  { slug: "authenticity", label: "Authenticity" }
+                ].map(p => (
+                  <button
+                    key={p.slug}
+                    type="button"
+                    onClick={() => {
+                      setSelectedCmsSlug(p.slug);
+                      const found = cmsPages.find(item => item.slug === p.slug);
+                      if (found) {
+                        setCmsPageForm(found);
+                      } else {
+                        setCmsPageForm({ slug: p.slug, title: p.label, contentHtml: "", metaTitle: "", metaDescription: "" });
+                      }
+                    }}
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: "6px",
+                      border: "none",
+                      fontWeight: "700",
+                      fontSize: "12.5px",
+                      cursor: "pointer",
+                      backgroundColor: selectedCmsSlug === p.slug ? "#00c6ff" : "#f1f5f9",
+                      color: selectedCmsSlug === p.slug ? "#ffffff" : "#475569",
+                      transition: "all 0.15s ease"
+                    }}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+
+              <form onSubmit={handleSaveCmsPage} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "12.5px", fontWeight: "700", color: "#334155", marginBottom: "6px" }}>Page Title *</label>
+                    <input
+                      type="text"
+                      required
+                      value={cmsPageForm.title}
+                      onChange={(e) => setCmsPageForm({ ...cmsPageForm, title: e.target.value })}
+                      style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13.5px" }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "12.5px", fontWeight: "700", color: "#334155", marginBottom: "6px" }}>URL Slug (Storefront URL)</label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={`/${cmsPageForm.slug}`}
+                      style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #cbd5e1", backgroundColor: "#f8fafc", fontSize: "13.5px", color: "#00c6ff", fontWeight: "800" }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                    <label style={{ fontSize: "13px", fontWeight: "800", color: "#1e293b" }}>Visual Content Editor</label>
+                    <span style={{ fontSize: "11px", color: "#0284c7", fontWeight: "700" }}>Click formatting buttons below to insert sections</span>
+                  </div>
+
+                  {/* WYSIWYG Quick Insert Bar */}
+                  <div style={{ backgroundColor: "#f8fafc", padding: "8px 12px", borderRadius: "8px 8px 0 0", border: "1px solid #cbd5e1", borderBottom: "none", display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+                    <button type="button" onClick={() => setCmsPageForm({ ...cmsPageForm, contentHtml: cmsPageForm.contentHtml + " <h2>Section Heading</h2>\n" })} style={{ padding: "4px 10px", fontSize: "12px", fontWeight: "800", backgroundColor: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "4px", cursor: "pointer" }}>H2 Heading</button>
+                    <button type="button" onClick={() => setCmsPageForm({ ...cmsPageForm, contentHtml: cmsPageForm.contentHtml + " <h3>Subheading</h3>\n" })} style={{ padding: "4px 10px", fontSize: "12px", fontWeight: "800", backgroundColor: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "4px", cursor: "pointer" }}>H3 Subheading</button>
+                    <button type="button" onClick={() => setCmsPageForm({ ...cmsPageForm, contentHtml: cmsPageForm.contentHtml + " <p><strong>Bold announcement text here</strong></p>\n" })} style={{ padding: "4px 10px", fontSize: "12px", fontWeight: "800", backgroundColor: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "4px", cursor: "pointer" }}><b>B</b> Bold</button>
+                    <button type="button" onClick={() => setCmsPageForm({ ...cmsPageForm, contentHtml: cmsPageForm.contentHtml + " <ul>\n  <li>Delivery Milestone 1</li>\n  <li>Delivery Milestone 2</li>\n</ul>\n" })} style={{ padding: "4px 10px", fontSize: "12px", fontWeight: "800", backgroundColor: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "4px", cursor: "pointer" }}>• Bullet List</button>
+                    <button type="button" onClick={() => {
+                      const img = prompt("Enter Image URL:", "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800");
+                      if (img) setCmsPageForm({ ...cmsPageForm, contentHtml: cmsPageForm.contentHtml + `\n<img src="${img}" alt="Notice" style="max-width: 100%; border-radius: 8px; margin: 12px 0;" />\n` });
+                    }} style={{ padding: "4px 12px", fontSize: "12px", fontWeight: "800", backgroundColor: "#e0f2fe", color: "#0369a1", border: "1px solid #bae6fd", borderRadius: "4px", cursor: "pointer" }}>📷 Insert Image</button>
+                  </div>
+
+                  <textarea
+                    rows={12}
+                    value={cmsPageForm.contentHtml}
+                    onChange={(e) => setCmsPageForm({ ...cmsPageForm, contentHtml: e.target.value })}
+                    style={{ width: "100%", padding: "14px", borderRadius: "0 0 8px 8px", border: "1px solid #cbd5e1", fontSize: "13.5px", lineHeight: "1.6", outline: "none" }}
+                    placeholder="Type page text or HTML markup here..."
+                  />
+                </div>
+
+                {/* Live Preview Canvas */}
+                <div>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: "800", color: "#1e293b", marginBottom: "8px" }}>Live Storefront Page Preview</label>
+                  <div
+                    style={{ padding: "24px", borderRadius: "10px", border: "1px solid #e2e8f0", backgroundColor: "#f8fafc", minHeight: "120px" }}
+                    dangerouslySetInnerHTML={{ __html: cmsPageForm.contentHtml || "<p style='color: #94a3b8; font-style: italic;'>No custom text written yet. Content typed above will appear here live.</p>" }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button type="submit" style={{ backgroundColor: "#00c6ff", color: "#fff", border: "none", padding: "12px 32px", borderRadius: "8px", fontWeight: "800", fontSize: "14px", cursor: "pointer", boxShadow: "0 4px 12px rgba(0,198,255,0.3)" }}>
+                    Save & Publish Page Live 🚀
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════════════
+              TAB: LIVE MARKETING & SOCKET.IO PROMO BROADCASTER
+          ════════════════════════════════════════════════════════════════════ */}
+          {activeTab === "marketing" && (
+            <div style={{ maxWidth: "1000px" }}>
+              <SocketIoPromoBroadcaster token={token} />
             </div>
           )}
 

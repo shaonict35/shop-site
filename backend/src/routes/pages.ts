@@ -156,12 +156,11 @@ const DEFAULT_PAGES_DATA: Record<string, { title: string; contentHtml: string }>
         <p><strong>📞 Customer Support Hotline:</strong> 01609013011 (10 AM - 10 PM)</p>
         <p><strong>💬 Official Merchant Number:</strong> 01609013011 (GlowGoodly)</p>
         <p><strong>✉️ Email Address:</strong> support@glowgoodly.com</p>
-        <p><strong>📍 Corporate Office:</strong> House 12, Road 5, Dhanmondi, Dhaka 1205, Bangladesh</p>
+        <p><strong>📍 Corporate Office:</strong> 1268/3 East Monipur, Mirpur-2, Dhaka-1216, Bangladesh</p>
       </div>
     `
   }
 };
-
 
 let isPagesCleanedInDb = false;
 
@@ -169,11 +168,15 @@ async function ensureCleanPagesInDb() {
   if (isPagesCleanedInDb) return;
   try {
     for (const [slug, data] of Object.entries(DEFAULT_PAGES_DATA)) {
-      const pageItem = { slug, title: data.title, contentHtml: data.contentHtml, updatedAt: new Date().toISOString() };
-      await db.collection("cms_pages").doc(slug).set(pageItem);
+      const docRef = db.collection("cms_pages").doc(slug);
+      const existing = await docRef.get();
+      if (!existing.exists) {
+        const pageItem = { slug, title: data.title, contentHtml: data.contentHtml, updatedAt: new Date().toISOString() };
+        await docRef.set(pageItem);
+      }
     }
   } catch (e) {
-    console.error("Error cleaning CMS pages in database:", e);
+    console.error("Error checking CMS pages in database:", e);
   } finally {
     isPagesCleanedInDb = true;
   }
@@ -212,9 +215,10 @@ router.get("/pages/:slug", async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/admin/pages — Admin: Get list of all CMS pages
-router.get("/admin/pages", async (req: Request, res: Response) => {
+// GET /api/admin/pages (and /admin/pages) — Admin: Get list of all CMS pages
+router.get(["/admin/pages", "/api/admin/pages"], async (req: Request, res: Response) => {
   try {
+    await ensureCleanPagesInDb();
     const snapshot = await db.collection("cms_pages").get();
     const pages: any[] = [];
     snapshot.forEach((doc: any) => {
@@ -236,8 +240,8 @@ router.get("/admin/pages", async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/admin/pages — Admin: Save/Update CMS page content
-router.post("/api/admin/pages", async (req: Request, res: Response) => {
+// POST /api/admin/pages (and /admin/pages) — Admin: Save/Update CMS page content
+router.post(["/admin/pages", "/api/admin/pages"], async (req: Request, res: Response) => {
   try {
     const { slug, title, contentHtml, metaTitle, metaDescription } = req.body;
     if (!slug || !title) {
@@ -253,10 +257,36 @@ router.post("/api/admin/pages", async (req: Request, res: Response) => {
       contentHtml: contentHtml || "",
       metaTitle: metaTitle || null,
       metaDescription: metaDescription || null,
+      isCustomized: true,
       updatedAt: new Date().toISOString(),
     };
 
     await docRef.set(pageData);
+    res.json({ success: true, page: pageData });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/admin/pages/:slug
+router.put(["/admin/pages/:slug", "/api/admin/pages/:slug"], async (req: Request, res: Response) => {
+  try {
+    const { slug } = req.params;
+    const { title, contentHtml, metaTitle, metaDescription } = req.body;
+    const cleanSlug = String(slug).toLowerCase().trim();
+    const docRef = db.collection("cms_pages").doc(cleanSlug);
+
+    const pageData = {
+      slug: cleanSlug,
+      title: title || cleanSlug,
+      contentHtml: contentHtml || "",
+      metaTitle: metaTitle || null,
+      metaDescription: metaDescription || null,
+      isCustomized: true,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await docRef.set(pageData, { merge: true });
     res.json({ success: true, page: pageData });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

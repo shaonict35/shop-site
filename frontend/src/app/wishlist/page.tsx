@@ -6,7 +6,7 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import MobileNavbar from "../../components/MobileNavbar";
 import { useApp } from "../../context/AppContext";
-import { API_BASE } from "../../utils/api";
+import { API_BASE, getProductUrl } from "../../utils/api";
 
 interface Variant {
   id: string;
@@ -19,6 +19,7 @@ interface Variant {
 interface Product {
   id: string;
   name: string;
+  slug?: string;
   brand?: { id: string; name: string };
   images?: { id: string; url: string; isPrimary: boolean }[];
   variants?: Variant[];
@@ -173,7 +174,7 @@ export default function WishlistPage() {
                     </svg>
                   </button>
 
-                  <Link href={`/product/${p.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+                  <Link href={getProductUrl(p)} style={{ textDecoration: "none", color: "inherit" }}>
                     <div style={{ width: "100%", height: "230px", overflow: "hidden", backgroundColor: "#f8fafc", position: "relative" }}>
                       <img 
                         src={primaryImage} 

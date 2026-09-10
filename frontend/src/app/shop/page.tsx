@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, Suspense } from "react";
-import { fetchWithCache, API_BASE } from "../../utils/api";
+import { fetchWithCache, API_BASE, getProductUrl } from "../../utils/api";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Header from "../../components/Header";
@@ -23,6 +23,7 @@ interface Variant {
 interface Product {
   id: string;
   name: string;
+  slug?: string;
   description: string;
   brand: { id: string; name: string };
   category: { id: string; name: string; parent?: { name: string } };
@@ -829,7 +830,7 @@ function ShopPageContent() {
                         </svg>
                       </div>
 
-                      <Link href={`/product/${p.id}`} className="card-image" style={{ padding: "16px", display: "flex", justifyContent: "center", alignItems: "center", minHeight: "180px" }}>
+                      <Link href={getProductUrl(p)} className="card-image" style={{ padding: "16px", display: "flex", justifyContent: "center", alignItems: "center", minHeight: "180px" }}>
                         <img 
                           src={primaryImage} 
                           alt={p.name} 
@@ -842,7 +843,7 @@ function ShopPageContent() {
 
                       <div className="card-body" style={{ padding: "0 14px 12px 14px", textAlign: "center", flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                         <div>
-                          <Link href={`/product/${p.id}`} className="card-title" style={{ fontSize: "14px", fontWeight: "700", color: "#0f172a", textDecoration: "none", display: "block", marginBottom: "6px", lineHeight: "1.3" }}>
+                          <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "700", color: "#0f172a", textDecoration: "none", display: "block", marginBottom: "6px", lineHeight: "1.3" }}>
                             {p.name}
                           </Link>
                           {isDiscounted && <span style={{ display: "inline-block", backgroundColor: "#ffe4e6", color: "#be185d", padding: "2px 10px", borderRadius: "12px", fontSize: "10.5px", fontWeight: "900", marginBottom: "6px" }}>SALE</span>}

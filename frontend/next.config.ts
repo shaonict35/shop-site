@@ -9,9 +9,7 @@ const nextConfig: NextConfig = {
     minimumCacheTTL: 31536000,
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
-      { protocol: "https", hostname: "bk.shajgoj.com" },
       { protocol: "https", hostname: "logo.clearbit.com" },
-      { protocol: "https", hostname: "shop.shajgoj.com" },
     ],
   },
   onDemandEntries: {

@@ -7,6 +7,7 @@ import MobileNavbar from "../../components/MobileNavbar";
 import { useApp } from "../../context/AppContext";
 import Link from "next/link";
 import { ShoppingBag, ArrowRight, Trash2, Plus, Minus, ShieldCheck } from "lucide-react";
+import { getProductUrl } from "../../utils/api";
 
 export default function CartPage() {
   const { cart, removeFromCart, updateCartQuantity, clearCart } = useApp();
@@ -57,7 +58,7 @@ export default function CartPage() {
                       <img src={item.image} alt={item.name} style={{ width: "70px", height: "70px", objectFit: "cover", borderRadius: "10px", border: "1px solid #f1f5f9" }} />
                       
                       <div style={{ flex: 1 }}>
-                        <Link href={`/product/${item.productId}`} style={{ fontSize: "14px", fontWeight: "800", color: "#0f172a", textDecoration: "none", display: "block" }}>
+                        <Link href={getProductUrl({ id: item.productId, name: item.name, slug: item.slug })} style={{ fontSize: "14px", fontWeight: "800", color: "#0f172a", textDecoration: "none", display: "block" }}>
                           {item.name}
                         </Link>
                         <span style={{ fontSize: "12px", color: "#64748b", fontWeight: "600" }}>{item.variantName}</span>

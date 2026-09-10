@@ -106,17 +106,17 @@ app.use("/api/settings", settingsRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/bkash", bkashRouter);
 
-// ─── SHAJGOJ BK.SHAJGOJ.COM WP-JSON & WOOCOMMERCE BACKEND MIRROR ENDPOINTS ───
+// ─── GLOWGOODLY WP-JSON & WOOCOMMERCE COMPATIBILITY MIRROR ENDPOINTS ───
 app.use("/wp-json/wp/v2/posts", (req, res) => res.redirect("/api/blogs"));
 app.use("/wp-json/wp/v2/categories", (req, res) => res.redirect("/api/categories"));
 app.use("/wp-json/wc/v3/products", (req, res) => res.redirect("/api/products"));
 app.use("/wp-json/wc/v3/orders", (req, res) => res.redirect("/api/orders"));
 app.get("/wp-json", (req, res) => {
   res.json({
-    name: "Shajgoj & GlowGoodly E-Commerce Backend Engine",
+    name: "GlowGoodly E-Commerce Backend Engine",
     description: "Production API for Products, Banners, Categories, Brands & Orders",
-    url: "http://bk.shajgoj.com",
-    namespaces: ["wp/v2", "wc/v3", "shajgoj/v1", "glowgoodly/v1"],
+    url: "https://shop.glowgoodly.com",
+    namespaces: ["wp/v2", "wc/v3", "glowgoodly/v1"],
     routes: {
       "/wp-json/wc/v3/products": { methods: ["GET", "POST"] },
       "/wp-json/wc/v3/categories": { methods: ["GET"] },

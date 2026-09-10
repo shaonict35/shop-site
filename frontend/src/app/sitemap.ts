@@ -1,5 +1,5 @@
 import { MetadataRoute } from 'next';
-import { API_BASE } from '../utils/api';
+import { API_BASE, generateSlug } from '../utils/api';
 
 export const dynamic = "force-static";
 
@@ -63,7 +63,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const products = await res.json();
       if (Array.isArray(products)) {
         productPages = products.map((p: any) => ({
-          url: `${baseUrl}/product/${p.id}`,
+          url: `${baseUrl}/product/${p.slug || generateSlug(p.name) || p.id}`,
           lastModified: p.updatedAt ? new Date(p.updatedAt) : new Date(),
           changeFrequency: 'weekly' as const,
           priority: 0.8,

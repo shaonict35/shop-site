@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useApp } from "../context/AppContext";
-import { fetchWithCache, API_BASE } from "../utils/api";
+import { fetchWithCache, API_BASE, getProductUrl } from "../utils/api";
 
 function BrandLogo({ src, alt, fallbackText }: { src: string; alt: string; fallbackText: string }) {
   const [error, setError] = useState(false);
@@ -648,7 +648,7 @@ export default function Header() {
                     return (
                       <div
                         key={p.id}
-                        onClick={() => { setShowSuggestions(false); window.location.href = `/product/${p.id}`; }}
+                        onClick={() => { setShowSuggestions(false); window.location.href = getProductUrl(p); }}
                         style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid #f8fafc", transition: "background 0.15s" }}
                         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#fdf2f6")}
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}

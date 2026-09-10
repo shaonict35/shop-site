@@ -15,6 +15,17 @@ export const clearProductsCache = () => {
 };
 const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes fast high-speed cache
 
+export function generateSlug(text: string): string {
+  if (!text) return "";
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/[\s_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 // GET /api/categories
 router.get("/categories", async (req: Request, res: Response) => {
   try {
@@ -26,7 +37,12 @@ router.get("/categories", async (req: Request, res: Response) => {
     const snapshot = await db.collection("categories").get();
     const categoriesList: any[] = [];
     snapshot.forEach(doc => {
-      categoriesList.push({ id: doc.id, ...doc.data() });
+      const data = doc.data() as any;
+      categoriesList.push({ 
+        id: doc.id, 
+        ...data,
+        slug: data?.slug || generateSlug(data?.name || doc.id)
+      });
     });
 
     const parents = categoriesList.filter(c => !c.parentId);
@@ -56,9 +72,11 @@ router.post("/categories", async (req: any, res: any) => {
     }
     const docId = id || db.collection("categories").doc().id;
     const docRef = db.collection("categories").doc(docId);
+    const cleanSlug = generateSlug(name);
     const data = {
       id: docId,
       name,
+      slug: cleanSlug,
       parentId: parentId || null,
       imageUrl: imageUrl || "",
       updatedAt: new Date().toISOString()
@@ -94,7 +112,12 @@ router.get("/brands", async (req: Request, res: Response) => {
     const snapshot = await db.collection("brands").get();
     const brandsList: any[] = [];
     snapshot.forEach(doc => {
-      brandsList.push({ id: doc.id, ...doc.data() });
+      const bData = doc.data() as any;
+      brandsList.push({ 
+        id: doc.id, 
+        ...bData,
+        slug: bData?.slug || generateSlug(bData?.name || doc.id)
+      });
     });
 
     if (!isBypass) {
@@ -112,7 +135,8 @@ router.post("/brands", async (req: any, res: any) => {
   try {
     const { id, name, logoUrl, originCountry } = req.body || {};
     if (!name) return res.status(400).json({ error: "Brand name is required" });
-    const docId = id || name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    const cleanSlug = generateSlug(name);
+    const docId = id || cleanSlug;
     const docRef = db.collection("brands").doc(docId);
     const existingDoc = await docRef.get();
     const existingData = existingDoc.exists ? existingDoc.data() : {};
@@ -121,6 +145,7 @@ router.post("/brands", async (req: any, res: any) => {
       ...existingData,
       id: docId,
       name,
+      slug: cleanSlug,
       originCountry: originCountry !== undefined ? originCountry : (existingData?.originCountry || "International"),
       logoUrl: logoUrl || existingData?.logoUrl || "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200&q=80",
       updatedAt: new Date().toISOString()
@@ -244,8 +269,9 @@ const getProductsHandler = async (req: Request, res: Response) => {
 
     // Strip heavy description/ingredients/howToUse fields for super lightweight list response (35x smaller payload)
     const optimizedList = productsList.map(p => {
+      const slug = p.slug || generateSlug(p.name || p.id);
       const { description, ingredients, howToUse, metaDescription, metaKeywords, ...rest } = p;
-      return rest;
+      return { ...rest, slug };
     });
 
     const totalCount = optimizedList.length;
@@ -286,13 +312,16 @@ router.get("/products/:id", async (req: Request, res: Response) => {
     let productData: any = null;
 
     if (doc.exists) {
-      productData = { id: doc.id, ...doc.data() };
+      const d = doc.data() as any;
+      productData = { id: doc.id, ...d, slug: d?.slug || generateSlug(d?.name || doc.id) };
     } else {
-      // Fallback search across products if doc ID format differs
+      // Fallback search across products by ID or clean slug
       const snap = await db.collection("products").get();
       snap.forEach(d => {
-        if (d.id === id || (d.data() && (d.data().id === id || d.data().slug === id))) {
-          productData = { id: d.id, ...d.data() };
+        const dData = d.data() as any;
+        const dSlug = dData?.slug || generateSlug(dData?.name || d.id);
+        if (d.id === id || dData?.id === id || dSlug === id || generateSlug(d.id) === id) {
+          productData = { id: d.id, ...dData, slug: dSlug };
         }
       });
     }
@@ -305,7 +334,7 @@ router.get("/products/:id", async (req: Request, res: Response) => {
     let reviews: any[] = [];
     try {
       const reviewsSnapshot = await db.collection("reviews")
-        .where("productId", "==", id)
+        .where("productId", "==", productData.id)
         .get();
         
       reviewsSnapshot.forEach(rDoc => {
@@ -326,10 +355,14 @@ router.get("/products/:id", async (req: Request, res: Response) => {
       if (productData.categoryId) {
         const allProductsSnap = await db.collection("products").limit(50).get();
         allProductsSnap.forEach(rDoc => {
-          if (rDoc.id !== id && relatedProducts.length < 8) {
-            const pData = rDoc.data();
+          if (rDoc.id !== productData.id && relatedProducts.length < 8) {
+            const pData = rDoc.data() as any;
             if (pData.categoryId === productData.categoryId) {
-              relatedProducts.push({ id: rDoc.id, ...pData });
+              relatedProducts.push({ 
+                id: rDoc.id, 
+                ...pData,
+                slug: pData?.slug || generateSlug(pData?.name || rDoc.id)
+              });
             }
           }
         });
@@ -355,14 +388,27 @@ router.post("/products/:id/reviews", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Customer name, rating, and comment are required" });
     }
 
+    let targetProductId = id;
     const productDoc = await db.collection("products").doc(id as string).get();
     if (!productDoc.exists) {
-      return res.status(404).json({ error: "Product not found" });
+      const snap = await db.collection("products").get();
+      let found = false;
+      snap.forEach(d => {
+        const dData = d.data() as any;
+        const dSlug = dData?.slug || generateSlug(dData?.name || d.id);
+        if (d.id === id || dData?.id === id || dSlug === id || generateSlug(d.id) === id) {
+          targetProductId = d.id;
+          found = true;
+        }
+      });
+      if (!found) {
+        return res.status(404).json({ error: "Product not found" });
+      }
     }
 
     const reviewRef = db.collection("reviews").doc();
     const review = {
-      productId: id,
+      productId: targetProductId,
       customerName,
       rating: parseInt(rating),
       comment,
@@ -427,8 +473,10 @@ router.post("/products", async (req: Request, res: Response) => {
     const brandJson = brandDoc.exists ? { id: brandDoc.id, ...brandDoc.data() } : null;
 
     const docRef = db.collection("products").doc();
+    const cleanSlug = req.body.slug ? generateSlug(req.body.slug) : generateSlug(name);
     const product = {
       name,
+      slug: cleanSlug,
       description: description || "",
       brandId,
       brand: brandJson,
@@ -528,9 +576,14 @@ const updateProductHandler = async (req: Request, res: Response) => {
       updatedImages = currentProduct.images;
     }
 
+    const cleanSlug = req.body.slug 
+      ? generateSlug(req.body.slug) 
+      : (name ? generateSlug(name) : (currentProduct.slug || generateSlug(currentProduct.name || id)));
+
     const updatedProduct = {
       ...currentProduct,
       name: name !== undefined ? name : currentProduct.name,
+      slug: cleanSlug,
       description: description !== undefined ? description : currentProduct.description,
       brandId: brandId !== undefined ? brandId : currentProduct.brandId,
       brand: brandJson,

@@ -8,7 +8,8 @@ import PromoBanner from "../../../components/PromoBanner";
 import Footer from "../../../components/Footer";
 import MobileNavbar from "../../../components/MobileNavbar";
 import { useApp } from "../../../context/AppContext";
-import { API_BASE } from "../../../utils/api";
+import { API_BASE, getProductUrl } from "../../../utils/api";
+import GlowLoader from "../../../components/GlowLoader";
 
 interface Variant {
   id: string;
@@ -21,6 +22,7 @@ interface Variant {
 interface Product {
   id: string;
   name: string;
+  slug?: string;
   description: string;
   brand: { id: string; name: string };
   category: { id: string; name: string };
@@ -429,9 +431,7 @@ function CategoryPageContent() {
             </div>
 
             {loading ? (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "300px" }}>
-                <div style={{ display: "inline-block", width: "36px", height: "36px", border: "3px solid #f3f3f3", borderTop: "3px solid #e52860", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
-              </div>
+              <GlowLoader text="Loading Products..." subtext="Filtering authentic cosmetics & skincare" />
             ) : visibleProducts.length === 0 ? (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "400px", fontSize: "15px", fontWeight: "700", color: "#718096" }}>No products found matching your filters.</div>
             ) : (
@@ -456,12 +456,12 @@ function CategoryPageContent() {
                         </svg>
                       </div>
 
-                      <Link href={`/product/${p.id}`} className="card-image">
+                      <Link href={getProductUrl(p)} className="card-image">
                         <img src={primaryImage} alt={p.name} />
                       </Link>
 
                       <div className="card-body">
-                        <Link href={`/product/${p.id}`} className="card-title">{p.name}</Link>
+                        <Link href={getProductUrl(p)} className="card-title">{p.name}</Link>
                         <span className="card-shipping-badge">Free Shipping</span>
 
                         <div className="card-price-row">

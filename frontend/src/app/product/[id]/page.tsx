@@ -14,13 +14,14 @@ async function getProduct(id: string) {
       ? process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, "") + "/api"
       : "http://localhost:5000/api";
 
-    const res = await fetch(`${apiBase}/products/${id}`, {
+    const res = await fetch(`${apiBase}/products/${encodeURIComponent(id)}`, {
       next: { revalidate: 60 },
       signal: AbortSignal.timeout(3500),
     });
 
     if (!res.ok) return null;
-    return await res.json();
+    const data = await res.json();
+    return data?.product || data;
   } catch {
     return null;
   }
@@ -51,6 +52,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     product.images?.[0]?.url ||
     "https://shop.glowgoodly.com/user-glow-logo.png";
 
+  const productSlug = product.slug || id;
+
   return {
     title: `${product.name} — Authentic in Bangladesh`,
     description,
@@ -62,12 +65,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       "glowgoodly",
     ],
     alternates: {
-      canonical: `https://shop.glowgoodly.com/product/${id}`,
+      canonical: `https://shop.glowgoodly.com/product/${productSlug}`,
     },
     openGraph: {
       title: `${product.name} | GlowGoodly Bangladesh`,
       description,
-      url: `https://shop.glowgoodly.com/product/${id}`,
+      url: `https://shop.glowgoodly.com/product/${productSlug}`,
       siteName: "GlowGoodly",
       images: [
         {
@@ -132,7 +135,7 @@ export default async function Page({ params }: Props) {
       },
       "offers": {
         "@type": "Offer",
-        "url": `https://shop.glowgoodly.com/product/${product.id}`,
+        "url": `https://shop.glowgoodly.com/product/${product.slug || product.id}`,
         "priceCurrency": "BDT",
         "price": price,
         "priceValidUntil": "2027-12-31",

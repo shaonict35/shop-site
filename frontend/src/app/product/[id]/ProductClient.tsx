@@ -7,7 +7,7 @@ import Footer from "../../../components/Footer";
 import { useApp } from "../../../context/AppContext";
 import { trackViewContent } from "../../../utils/pixel";
 import Link from "next/link";
-import { API_BASE } from "../../../utils/api";
+import { API_BASE, getProductUrl, generateSlug } from "../../../utils/api";
 import GlowLoader from "../../../components/GlowLoader";
 
 interface Variant {
@@ -119,7 +119,7 @@ export default function ProductPage() {
           const listRes = await fetch(`${API_BASE}/products`, { cache: "no-store" });
           if (listRes.ok) {
             const list = await listRes.json();
-            const matched = (list || []).find((p: any) => p.id === productId || p.slug === productId);
+            const matched = (list || []).find((p: any) => p.id === productId || p.slug === productId || generateSlug(p.name) === productId);
             if (matched) {
               data = { product: matched, relatedProducts: list.slice(0, 6) };
             }
@@ -1231,12 +1231,12 @@ export default function ProductPage() {
                       </svg>
                     </div>
 
-                    <Link href={`/product/${p.id}`} className="card-image" style={{ height: "210px", backgroundColor: "#ffffff", padding: "14px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Link href={getProductUrl(p)} className="card-image" style={{ height: "210px", backgroundColor: "#ffffff", padding: "14px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                       <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
                     </Link>
 
                     <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
-                      <Link href={`/product/${p.id}`} className="card-title" style={{ fontSize: "13.5px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "6px", height: "36px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                      <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "13.5px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "6px", height: "36px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                         {p.name}
                       </Link>
                       <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "9.5px", fontWeight: "900", padding: "2px 10px", borderRadius: "10px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>

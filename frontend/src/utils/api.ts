@@ -26,6 +26,23 @@ const getBaseApiUrl = () => {
 export const API_BASE = getBaseApiUrl();
 export const API_ROOT = API_BASE.replace(/\/api\/?$/, "");
 
+export function generateSlug(text: string): string {
+  if (!text) return "";
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "") // remove special characters
+    .replace(/[\s_-]+/g, "-") // collapse spaces and dashes
+    .replace(/^-+|-+$/g, ""); // trim dashes
+}
+
+export function getProductUrl(p: { id?: string; slug?: string; name?: string } | null | undefined): string {
+  if (!p) return "/shop";
+  const slug = p.slug || (p.name ? generateSlug(p.name) : p.id) || p.id;
+  return `/product/${slug}`;
+}
+
 
 export async function fetchWithCache(url: string, bypassCache: boolean = false) {
   const now = Date.now();

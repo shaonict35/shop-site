@@ -125,11 +125,9 @@ export default function RootLayout({
       <head>
         {/* Resource Preconnect & Performance Hints */}
         <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://bk.shajgoj.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://logo.clearbit.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://www.clarity.ms" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://images.unsplash.com" />
-        <link rel="dns-prefetch" href="https://bk.shajgoj.com" />
         <link rel="dns-prefetch" href="https://www.clarity.ms" />
 
         {/* Google Schema.org JSON-LD Structured Data */}
