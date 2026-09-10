@@ -1,0 +1,32 @@
+
+> backend@1.0.0 dev
+> tsx watch src/server.ts
+
+◇ injected env (0) from .env // tip: ⌘ suppress logs { quiet: true }
+◇ injected env (0) from .env // tip: ⌘ override existing { override: true }
+
+⚠️  WARNING: Google Firebase credentials not found!
+Please place your service account key in: backend/firebase-service-account.json
+Or set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY in backend/.env
+ℹ️  FALLING BACK TO LOCAL SQLITE PRISMA DATABASE MOCK FOR FIREBASE QUERYING
+
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+Error: Transform failed with 1 error:
+c:\Users\skhan\Desktop\Shop_Site\shop-site\backend\src\routes\banners.ts:305:0: ERROR: Unexpected "export"
+    at failureErrorWithLog (c:\Users\skhan\Desktop\Shop_Site\shop-site\backend\node_modules\esbuild\lib\main.js:1748:15)
+    at c:\Users\skhan\Desktop\Shop_Site\shop-site\backend\node_modules\esbuild\lib\main.js:1017:50
+    at responseCallbacks.<computed> (c:\Users\skhan\Desktop\Shop_Site\shop-site\backend\node_modules\esbuild\lib\main.js:884:9)
+    at handleIncomingPacket (c:\Users\skhan\Desktop\Shop_Site\shop-site\backend\node_modules\esbuild\lib\main.js:939:12)
+    at Socket.readFromStdout (c:\Users\skhan\Desktop\Shop_Site\shop-site\backend\node_modules\esbuild\lib\main.js:862:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23) {
+  name: 'TransformError'
+}
+
+Node.js v24.18.0

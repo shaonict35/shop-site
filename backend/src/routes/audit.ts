@@ -13,40 +13,6 @@ router.get("/admin/audit-logs", authenticateJWT as any, requireRole(["SuperAdmin
       logs.push({ id: doc.id, ...doc.data() });
     });
 
-    if (logs.length === 0) {
-      const mockLogs = [
-        {
-          id: "log_101",
-          userName: (req.user as any)?.name || (req.user as any)?.email || "Admin User",
-          userRole: req.user?.role || "SuperAdmin",
-
-          action: "Product Price Updated",
-          details: "Updated CeraVe Foaming Cleanser price to ৳1950",
-          ipAddress: "103.205.180.12",
-          timestamp: new Date(Date.now() - 3600000 * 1).toISOString(),
-        },
-        {
-          id: "log_102",
-          userName: "Manager Staff",
-          userRole: "Manager",
-          action: "Order Status Changed",
-          details: "Changed Order #GG-8842 from Pending to Shipped (Steadfast Courier)",
-          ipAddress: "103.205.180.14",
-          timestamp: new Date(Date.now() - 3600000 * 5).toISOString(),
-        },
-        {
-          id: "log_103",
-          userName: "System Audit",
-          userRole: "System",
-          action: "Store Settings Backup",
-          details: "Automated daily settings & catalog backup exported",
-          ipAddress: "localhost",
-          timestamp: new Date(Date.now() - 3600000 * 24).toISOString(),
-        }
-      ];
-      return res.json(mockLogs);
-    }
-
     logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     res.json(logs);
   } catch (error: any) {

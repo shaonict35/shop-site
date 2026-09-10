@@ -1,0 +1,41 @@
+# Robots.txt for GlowGoodly Store
+# Website: https://shop.glowgoodly.com
+
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /valobasa/
+Disallow: /api/
+Disallow: /account/
+Disallow: /checkout/
+Disallow: /cart/
+Disallow: /thank-you/
+Disallow: /bkash-portal/
+Disallow: /*?*search=
+Disallow: /*?*sort=
+
+User-agent: Googlebot
+Allow: /
+Disallow: /admin/
+Disallow: /valobasa/
+Disallow: /api/
+Disallow: /account/
+Disallow: /checkout/
+Disallow: /cart/
+Disallow: /thank-you/
+Disallow: /bkash-portal/
+
+User-agent: Bingbot
+Allow: /
+Disallow: /admin/
+Disallow: /valobasa/
+Disallow: /api/
+Disallow: /account/
+Disallow: /checkout/
+Disallow: /cart/
+Disallow: /thank-you/
+Disallow: /bkash-portal/
+
+# Sitemap
+Sitemap: https://shop.glowgoodly.com/sitemap.xml
+Host: https://shop.glowgoodly.com

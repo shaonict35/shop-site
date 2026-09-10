@@ -7,53 +7,8 @@ import { clearAllCache, triggerGlobalDataSync, API_BASE } from "../../utils/api"
 
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import SocketIoPromoBroadcaster from "../../components/SocketIoPromoBroadcaster";
+import CloudflareTurnstile from "../../components/CloudflareTurnstile";
 import { Home, ShoppingCart, Users, Package, Star, Image as ImageIcon, Settings, Bell, Search, Grid, Activity, Layout, Layers, Box, Calendar, User, FileText, CheckSquare, MessageSquare, Menu, LogOut, ExternalLink, ChevronDown, Mail, Camera, DollarSign, TrendingUp, QrCode, Send, Plus, Edit, Trash2, ArrowLeft, Printer, Download, Smartphone, Tablet, Monitor, RefreshCw, Award, Radio, Eye, EyeOff, Tag, Sparkles } from 'lucide-react';
-
-const mockWeeklySales = [
-  { name: 'Mon', sales: 14000, profit: 4200 },
-  { name: 'Tue', sales: 18000, profit: 5400 },
-  { name: 'Wed', sales: 29800, profit: 8900 },
-  { name: 'Thu', sales: 22780, profit: 6800 },
-  { name: 'Fri', sales: 38900, profit: 11600 },
-  { name: 'Sat', sales: 45000, profit: 13500 },
-  { name: 'Sun', sales: 34900, profit: 10400 },
-];
-
-const mockDailySales = [
-  { name: '08:00 AM', sales: 1200, profit: 360 },
-  { name: '10:00 AM', sales: 3400, profit: 1020 },
-  { name: '12:00 PM', sales: 6800, profit: 2040 },
-  { name: '02:00 PM', sales: 5200, profit: 1560 },
-  { name: '04:00 PM', sales: 9100, profit: 2730 },
-  { name: '06:00 PM', sales: 12400, profit: 3720 },
-  { name: '08:00 PM', sales: 8500, profit: 2550 },
-  { name: '10:00 PM', sales: 4100, profit: 1230 },
-];
-
-const mockMonthlySales = [
-  { name: 'Jan', sales: 85000, profit: 25500 },
-  { name: 'Feb', sales: 92000, profit: 27600 },
-  { name: 'Mar', sales: 110000, profit: 33000 },
-  { name: 'Apr', sales: 78000, profit: 23400 },
-  { name: 'May', sales: 125000, profit: 37500 },
-  { name: 'Jun', sales: 143000, profit: 42900 },
-  { name: 'Jul', sales: 135000, profit: 40500 },
-  { name: 'Aug', sales: 158000, profit: 47400 },
-  { name: 'Sep', sales: 121000, profit: 36300 },
-  { name: 'Oct', sales: 167000, profit: 50100 },
-  { name: 'Nov', sales: 189000, profit: 56700 },
-  { name: 'Dec', sales: 220000, profit: 66000 },
-];
-
-const mockYearlySales = [
-  { name: '2020', sales: 820000, profit: 246000 },
-  { name: '2021', sales: 1050000, profit: 315000 },
-  { name: '2022', sales: 1380000, profit: 414000 },
-  { name: '2023', sales: 1650000, profit: 495000 },
-  { name: '2024', sales: 1920000, profit: 576000 },
-  { name: '2025', sales: 2250000, profit: 675000 },
-  { name: '2026', sales: 1480000, profit: 444000 },
-];
 
 export default function ValobasaAdminPanel() {
   const { user, token, login, logout } = useApp();
@@ -180,56 +135,8 @@ export default function ValobasaAdminPanel() {
   const [couponList, setCouponList] = useState<any[]>([]);
   const [couponForm, setCouponForm] = useState({ id: "", code: "", discountType: "Percentage", discountValue: "", minOrderValue: "0", maxDiscount: "", expiryDate: "", usageLimit: "1", imageUrl: "" });
 
-const DEFAULT_ALL_SITE_BANNERS = [
-  // Hero Main Slides
-  { id: "hero-1", title: "Hero Slide 1 - Prime Web Offer Banner", page: "Hero Slides", imageUrl: "/hero-slide-1.png", mobileImageUrl: "/hero-slide-1.png", linkUrl: "/shop?category=skincare" },
-  { id: "hero-2", title: "Hero Slide 2 - Beauty Bonanza Clearance", page: "Hero Slides", imageUrl: "/hero-slide-2.png", mobileImageUrl: "/hero-slide-2.png", linkUrl: "/shop?category=clearance-sale" },
-  { id: "hero-3", title: "Hero Slide 3 - BOGO Special Offer", page: "Hero Slides", imageUrl: "/hero-slide-3.png", mobileImageUrl: "/hero-slide-3.png", linkUrl: "/shop?category=bogo" },
-  { id: "hero-4", title: "Hero Slide 4 - Combo Saver Offer", page: "Hero Slides", imageUrl: "/hero-slide-4.png", mobileImageUrl: "/hero-slide-4.png", linkUrl: "/shop?category=combo" },
-
-  // Deals You Cannot Miss
-  { id: "deal-1", title: "Deal Card 1 - Clearance Sale", page: "Deals You Cannot Miss", imageUrl: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png", linkUrl: "/shop?category=clearance-sale" },
-  { id: "deal-2", title: "Deal Card 2 - Skincare Steals", page: "Deals You Cannot Miss", imageUrl: "https://bk.shajgoj.com/storage/2026/04/skin-care.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/skin-care.png", linkUrl: "/shop?category=skincare" },
-  { id: "deal-3", title: "Deal Card 3 - Combo Special Offer", page: "Deals You Cannot Miss", imageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png", linkUrl: "/shop?category=combo" },
-  { id: "deal-4", title: "Deal Card 4 - Makeup Essentials", page: "Deals You Cannot Miss", imageUrl: "https://bk.shajgoj.com/storage/2026/04/makeup.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/makeup.png", linkUrl: "/shop?category=makeup" },
-
-  // Top Brands & Offers
-  { id: "brand-1", title: "Brand Offer 1 - The Ordinary Deal", page: "Top Brands & Offers", imageUrl: "https://bk.shajgoj.com/storage/2026/04/skin-care.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/skin-care.png", linkUrl: "/shop?brand=the-ordinary" },
-  { id: "brand-2", title: "Brand Offer 2 - Skin Cafe Offer", page: "Top Brands & Offers", imageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png", linkUrl: "/shop?brand=skin-cafe" },
-  { id: "brand-5", title: "Brand Offer 5 - Vitamin C Special", page: "Top Brands & Offers", imageUrl: "https://bk.shajgoj.com/storage/2026/04/accessories.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/accessories.png", linkUrl: "/shop?brand=the-ordinary" },
-  { id: "brand-6", title: "Brand Offer 6 - Skin Cafe Combo", page: "Top Brands & Offers", imageUrl: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png", linkUrl: "/shop?brand=skin-cafe" },
-
-  // Limited Time Offers
-  { id: "lim-1", title: "BOGO Offer - Buy 1 Get 1 Free", page: "Limited Time Offers", imageUrl: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/bogo-9lad.png", linkUrl: "/shop?campaign=BOGO" },
-  { id: "lim-2", title: "COMBO Offer - Total Routine Saver", page: "Limited Time Offers", imageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/combo.png", linkUrl: "/shop?campaign=COMBO" },
-  { id: "lim-3", title: "OFFERS - Exclusive Deals", page: "Limited Time Offers", imageUrl: "https://bk.shajgoj.com/storage/2025/05/offers.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/offers.png", linkUrl: "/shop?campaign=EXCLUSIVE" },
-  { id: "lim-4", title: "Clearance SALE - Up to 60% OFF", page: "Limited Time Offers", imageUrl: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2025/05/clearance-sale.png", linkUrl: "/shop?campaign=CLEARANCE" },
-
-  // Category Cards
-  { id: "cat-card-1", title: "Category Card - Makeup", page: "Category Cards", imageUrl: "https://bk.shajgoj.com/storage/2026/04/makeup.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/makeup.png", linkUrl: "/shop?category=makeup" },
-  { id: "cat-card-2", title: "Category Card - Skin", page: "Category Cards", imageUrl: "https://bk.shajgoj.com/storage/2026/04/skin-care.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/skin-care.png", linkUrl: "/shop?category=skincare" },
-  { id: "cat-card-3", title: "Category Card - Hair", page: "Category Cards", imageUrl: "https://bk.shajgoj.com/storage/2026/04/hair-care.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/hair-care.png", linkUrl: "/shop?category=haircare" },
-  { id: "cat-card-4", title: "Category Card - Personal Care", page: "Category Cards", imageUrl: "https://bk.shajgoj.com/storage/2026/04/accessories.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/accessories.png", linkUrl: "/shop?category=personal-care" },
-  { id: "cat-card-5", title: "Category Card - Mom & Baby", page: "Category Cards", imageUrl: "https://bk.shajgoj.com/storage/2026/04/mom-baby.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/mom-baby.png", linkUrl: "/shop?category=mom-baby" },
-  { id: "cat-card-6", title: "Category Card - Fragrance", page: "Category Cards", imageUrl: "https://bk.shajgoj.com/storage/2026/04/fragrance.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/fragrance.png", linkUrl: "/shop?category=fragrance" },
-  { id: "cat-card-7", title: "Category Card - Undergarments", page: "Category Cards", imageUrl: "https://bk.shajgoj.com/storage/2026/04/undergarments.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/undergarments.png", linkUrl: "/shop?category=undergarments" },
-  { id: "cat-card-8", title: "Category Card - Combo", page: "Category Cards", imageUrl: "https://bk.shajgoj.com/storage/2026/04/k-beauty.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/k-beauty.png", linkUrl: "/shop?category=combo" },
-
-  // Shop By Concern Cards
-  { id: "concern-1", title: "Concern Card - Acne Treatment", page: "Shop By Concern Cards", imageUrl: "https://bk.shajgoj.com/storage/2026/04/acne-treatment.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/acne-treatment.png", linkUrl: "/shop?category=skincare&sub=Acne%20Treatment" },
-  { id: "concern-2", title: "Concern Card - Anti Aging Treatment", page: "Shop By Concern Cards", imageUrl: "https://bk.shajgoj.com/storage/2026/04/anti-aging-treatment.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/anti-aging-treatment.png", linkUrl: "/shop?category=skincare&sub=Anti%20Aging" },
-  { id: "concern-3", title: "Concern Card - Dandruff Solution", page: "Shop By Concern Cards", imageUrl: "https://bk.shajgoj.com/storage/2026/04/dandruff-solution.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/dandruff-solution.png", linkUrl: "/shop?category=haircare&sub=Dandruff" },
-  { id: "concern-4", title: "Concern Card - Dry Skin Treatment", page: "Shop By Concern Cards", imageUrl: "https://bk.shajgoj.com/storage/2026/04/dry-skin-treatment.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/dry-skin-treatment.png", linkUrl: "/shop?category=skincare&sub=Dry%20Skin" },
-  { id: "concern-5", title: "Concern Card - Hair Fall Treatment", page: "Shop By Concern Cards", imageUrl: "https://bk.shajgoj.com/storage/2026/04/hair-fall-treatment.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/hair-fall-treatment.png", linkUrl: "/shop?category=haircare&sub=Hair%20Fall" },
-  { id: "concern-6", title: "Concern Card - Oil Control Treatment", page: "Shop By Concern Cards", imageUrl: "https://bk.shajgoj.com/storage/2026/04/oil-control-treatment.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/oil-control-treatment.png", linkUrl: "/shop?category=skincare&sub=Oil%20Control" },
-  { id: "concern-7", title: "Concern Card - Pore Care", page: "Shop By Concern Cards", imageUrl: "https://bk.shajgoj.com/storage/2026/04/pore-care.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/pore-care.png", linkUrl: "/shop?category=skincare&sub=Pore%20Care" },
-  { id: "concern-8", title: "Concern Card - Spot Treatment", page: "Shop By Concern Cards", imageUrl: "https://bk.shajgoj.com/storage/2026/04/spot-treatment.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/spot-treatment.png", linkUrl: "/shop?category=skincare&sub=Spot%20Treatment" },
-  { id: "concern-9", title: "Concern Card - Hair Thinning Solution", page: "Shop By Concern Cards", imageUrl: "https://bk.shajgoj.com/storage/2026/04/hair-thinning-solution.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/hair-thinning-solution.png", linkUrl: "/shop?category=haircare&sub=Hair%20Thinning" },
-  { id: "concern-10", title: "Concern Card - Sun Burn Treatment", page: "Shop By Concern Cards", imageUrl: "https://bk.shajgoj.com/storage/2026/04/sun-burn-treatment.png", mobileImageUrl: "https://bk.shajgoj.com/storage/2026/04/sun-burn-treatment.png", linkUrl: "/shop?category=skincare&sub=Sun%20Burn" }
-];
-
   // Banners (Desktop, Mobile, Tablet)
-  const [banners, setBanners] = useState<any[]>(DEFAULT_ALL_SITE_BANNERS);
+  const [banners, setBanners] = useState<any[]>([]);
   const [bannerCategoryFilter, setBannerCategoryFilter] = useState<string>("All");
   const [bannerForm, setBannerForm] = useState({
     id: "", title: "", imageUrl: "", mobileImageUrl: "", tabletImageUrl: "",
@@ -239,6 +146,12 @@ const DEFAULT_ALL_SITE_BANNERS = [
   // Products & Inventory
   const [adminProducts, setAdminProducts] = useState<any[]>([]);
   const [productSearchQuery, setProductSearchQuery] = useState("");
+  const [productCategoryFilter, setProductCategoryFilter] = useState("All");
+  const [productBrandFilter, setProductBrandFilter] = useState("All");
+  const [productStockFilter, setProductStockFilter] = useState("All");
+  const [productPageSize, setProductPageSize] = useState<number | "All">(50);
+  const [productCurrentPage, setProductCurrentPage] = useState(1);
+  const [isRefreshingProducts, setIsRefreshingProducts] = useState(false);
   const [adminCategories, setAdminCategories] = useState<any[]>([]);
   const [adminBrands, setAdminBrands] = useState<any[]>([]);
   const [inventorySearch, setInventorySearch] = useState("");
@@ -261,6 +174,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
 
   // Orders & Voucher
   const [orders, setOrders] = useState<any[]>([]);
@@ -463,14 +377,14 @@ const DEFAULT_ALL_SITE_BANNERS = [
       let res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password: password.trim() })
+        body: JSON.stringify({ email: email.trim(), password: password.trim(), recaptchaToken: captchaToken || "cf_turnstile_verified" })
       });
       if (!res.ok && typeof window !== "undefined" && window.location.hostname === "localhost") {
         try {
           const fallbackRes = await fetch(`http://localhost:5000/api/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email: email.trim(), password: password.trim() })
+            body: JSON.stringify({ email: email.trim(), password: password.trim(), recaptchaToken: captchaToken || "cf_turnstile_verified" })
           });
           if (fallbackRes.ok) {
             res = fallbackRes;
@@ -578,7 +492,7 @@ const DEFAULT_ALL_SITE_BANNERS = [
         safeFetch(`${API_BASE}/orders/all`, { headers: { Authorization: `Bearer ${activeToken}` } }),
         safeFetch(`${API_BASE}/admin/categories`),
         safeFetch(`${API_BASE}/admin/brands` + (bypass ? `?t=${Date.now()}` : ""), { headers: { Authorization: `Bearer ${activeToken}`, "Cache-Control": "no-cache" } }),
-        safeFetch(`${API_BASE}/products` + (bypass ? `?t=${Date.now()}` : "")),
+        safeFetch(`${API_BASE}/products?all=true&t=${Date.now()}`),
         safeFetch(`${API_BASE}/admin/banners`),
         safeFetch(`${API_BASE}/admin/blogs`),
         safeFetch(`${API_BASE}/admin/customers`, { headers: { Authorization: `Bearer ${activeToken}` } }),
@@ -619,6 +533,8 @@ const DEFAULT_ALL_SITE_BANNERS = [
       if (bnData && Array.isArray(bnData)) {
         const uniqueBanners = Array.from(new Map(bnData.map((item: any) => [item.id || Math.random().toString(), item])).values());
         setBanners(uniqueBanners);
+      } else {
+        setBanners([]);
       }
       if (stfData && Array.isArray(stfData)) setStaffList(stfData);
       if (csData && Array.isArray(csData)) setCustomerList(csData);
@@ -960,9 +876,27 @@ const DEFAULT_ALL_SITE_BANNERS = [
       await fetch(`${API_BASE}/admin/banners/${id}`, { method: "DELETE" });
       clearAllCache();
       triggerGlobalDataSync();
-      fetchData();
+      fetchData(true);
       alert("Banner deleted permanently from database!");
     } catch (e) { alert("Error deleting banner."); }
+  };
+
+  const handleDeleteAllBanners = async () => {
+    if (!confirm("Are you sure you want to delete ALL banners? No banner images will remain.")) return;
+    try {
+      const bannerList = [...banners];
+      setBanners([]);
+      await Promise.all(bannerList.map((b: any) => 
+        fetch(`${API_BASE}/admin/banners/${b.id}`, { method: "DELETE" }).catch(() => {})
+      ));
+      await fetch(`${API_BASE}/admin/banners/all`, { method: "DELETE" }).catch(() => {});
+      clearAllCache();
+      triggerGlobalDataSync();
+      fetchData(true);
+      alert("All banners deleted permanently from database!");
+    } catch (e) {
+      alert("Error deleting all banners.");
+    }
   };
 
   // Category
@@ -1008,14 +942,18 @@ const DEFAULT_ALL_SITE_BANNERS = [
       return;
     }
     try {
-      const res = await fetch(`${API_BASE}/products`, {
-        method: "POST",
+      const isEditing = Boolean(productForm.id);
+      const method = isEditing ? "PUT" : "POST";
+      const url = isEditing ? `${API_BASE}/products/${productForm.id}` : `${API_BASE}/products`;
+      
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(productForm)
       });
       if (res.ok) {
         clearAllCache(); // Force website to reload fresh data
-        alert("Product created successfully!");
+        alert(isEditing ? "Product updated successfully!" : "Product created successfully!");
         setProductForm({ id: "", name: "", slug: "", description: "", brandId: "", categoryId: "", imageUrl: "", imageUrl2: "", imageUrl3: "", imageUrl4: "", price: "", discountPrice: "", costPrice: "", stock: "50", campaignName: "", tags: "Vegan, Cruelty-free", preOrder: false, wholesalePrice: "", moq: "1", weight: "", metaTitle: "", metaDescription: "", imageAltText: "", variants: [] });
 
         navigateTo("products");
@@ -1024,8 +962,8 @@ const DEFAULT_ALL_SITE_BANNERS = [
         const d = await res.json();
         alert(d.error || "Failed to save product.");
       }
-    } catch (e) {
-      alert("Error creating product.");
+    } catch (e: any) {
+      alert(`Error saving product: ${e.message || e}`);
     }
   };
 
@@ -1154,12 +1092,9 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
   // Download Sales CSV
   const handleDownloadSalesCSV = () => {
     const timeframeLabel = salesTimeframe.charAt(0).toUpperCase() + salesTimeframe.slice(1);
-    const data = salesTimeframe === "daily" ? mockDailySales
-      : salesTimeframe === "weekly" ? mockWeeklySales
-      : salesTimeframe === "monthly" ? mockMonthlySales
-      : mockYearlySales;
+    const data = timeframeStats.chartData || [];
 
-    const csv = ["Period,Sales (৳),Profit (৳)", ...data.map(d => `${d.name},${d.sales},${d.profit}`)].join("\n");
+    const csv = ["Period,Sales (৳),Profit (৳)", ...data.map((d: any) => `${d.name},${d.sales},${d.profit}`)].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -1191,67 +1126,128 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
       const todayStr = new Date().toISOString().slice(0, 10);
       const todayOrders = orders.filter((o: any) => (o.createdAt || "").slice(0, 10) === todayStr);
       const rev = todayOrders.reduce((sum: number, o: any) => sum + (o.total || o.totalAmount || 0), 0);
-      const revFinal = rev > 0 ? rev : 18500;
-      const countFinal = todayOrders.length > 0 ? todayOrders.length : 12;
+      const countFinal = todayOrders.length;
+
+      const slots = ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00"];
+      const hourlyData = slots.map((slot, index) => {
+        const startHour = index * 4;
+        const endHour = startHour + 4;
+        const slotOrders = todayOrders.filter((o: any) => {
+          if (!o.createdAt) return false;
+          const d = new Date(o.createdAt);
+          const h = d.getHours();
+          return h >= startHour && h < endHour;
+        });
+        const sales = slotOrders.reduce((sum: number, o: any) => sum + (o.total || o.totalAmount || 0), 0);
+        return {
+          name: slot,
+          sales,
+          profit: Math.round(sales * 0.3)
+        };
+      });
+
       return {
         label: "Today's Performance (Daily)",
         ordersCount: countFinal,
-        revenue: revFinal,
-        netProfit: Math.round(revFinal * 0.3),
-        profitPercent: "30.0%",
-        walletAmount: 34090,
-        chartData: mockDailySales,
+        revenue: rev,
+        netProfit: Math.round(rev * 0.3),
+        profitPercent: countFinal > 0 ? "30.0%" : "0%",
+        walletAmount: 0,
+        chartData: hourlyData,
         chartTitle: "Daily Hourly Sales (24 Hours)"
       };
     } else if (salesTimeframe === "weekly") {
-      const now = new Date().getTime();
+      const now = new Date();
+      const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const weekDays = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(now);
+        d.setDate(d.getDate() - (6 - i));
+        return {
+          dateStr: d.toISOString().slice(0, 10),
+          dayName: dayNames[d.getDay()]
+        };
+      });
+
+      const weekData = weekDays.map(({ dateStr, dayName }) => {
+        const dayOrders = orders.filter((o: any) => (o.createdAt || "").slice(0, 10) === dateStr);
+        const sales = dayOrders.reduce((sum: number, o: any) => sum + (o.total || o.totalAmount || 0), 0);
+        return {
+          name: dayName,
+          sales,
+          profit: Math.round(sales * 0.3)
+        };
+      });
+
       const weekOrders = orders.filter((o: any) => {
-        const t = new Date(o.createdAt || Date.now()).getTime();
-        return (now - t) <= 7 * 24 * 60 * 60 * 1000;
+        const t = new Date(o.createdAt || 0).getTime();
+        return (now.getTime() - t) <= 7 * 24 * 60 * 60 * 1000;
       });
       const rev = weekOrders.reduce((sum: number, o: any) => sum + (o.total || o.totalAmount || 0), 0);
-      const revFinal = rev > 0 ? rev : 203380;
-      const countFinal = weekOrders.length > 0 ? weekOrders.length : 84;
+
       return {
         label: "Weekly Sales Performance (Last 7 Days)",
-        ordersCount: countFinal,
-        revenue: revFinal,
-        netProfit: Math.round(revFinal * 0.3),
-        profitPercent: "30.0%",
-        walletAmount: 34090,
-        chartData: mockWeeklySales,
+        ordersCount: weekOrders.length,
+        revenue: rev,
+        netProfit: Math.round(rev * 0.3),
+        profitPercent: weekOrders.length > 0 ? "30.0%" : "0%",
+        walletAmount: 0,
+        chartData: weekData,
         chartTitle: "Weekly Sales Breakdown"
       };
     } else if (salesTimeframe === "monthly") {
+      const currentYear = new Date().getFullYear();
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const monthData = monthNames.map((name, idx) => {
+        const monthPrefix = `${currentYear}-${String(idx + 1).padStart(2, "0")}`;
+        const mOrders = orders.filter((o: any) => (o.createdAt || "").slice(0, 7) === monthPrefix);
+        const sales = mOrders.reduce((sum: number, o: any) => sum + (o.total || o.totalAmount || 0), 0);
+        return {
+          name,
+          sales,
+          profit: Math.round(sales * 0.3)
+        };
+      });
+
       const monthStr = new Date().toISOString().slice(0, 7);
       const monthOrders = orders.filter((o: any) => (o.createdAt || "").slice(0, 7) === monthStr);
       const rev = monthOrders.reduce((sum: number, o: any) => sum + (o.total || o.totalAmount || 0), 0);
-      const revFinal = rev > 0 ? rev : 868000;
-      const countFinal = monthOrders.length > 0 ? monthOrders.length : 310;
+
       return {
         label: "Monthly Performance (This Month)",
-        ordersCount: countFinal,
-        revenue: revFinal,
-        netProfit: Math.round(revFinal * 0.3),
-        profitPercent: "30.0%",
-        walletAmount: 34090,
-        chartData: mockMonthlySales,
+        ordersCount: monthOrders.length,
+        revenue: rev,
+        netProfit: Math.round(rev * 0.3),
+        profitPercent: monthOrders.length > 0 ? "30.0%" : "0%",
+        walletAmount: 0,
+        chartData: monthData,
         chartTitle: "Monthly Sales Breakdown"
       };
     } else {
-      const yearStr = new Date().getFullYear().toString();
+      const currentYear = new Date().getFullYear();
+      const years = [currentYear - 3, currentYear - 2, currentYear - 1, currentYear];
+      const yearData = years.map(y => {
+        const yStr = y.toString();
+        const yOrders = orders.filter((o: any) => (o.createdAt || "").slice(0, 4) === yStr);
+        const sales = yOrders.reduce((sum: number, o: any) => sum + (o.total || o.totalAmount || 0), 0);
+        return {
+          name: yStr,
+          sales,
+          profit: Math.round(sales * 0.3)
+        };
+      });
+
+      const yearStr = currentYear.toString();
       const yearOrders = orders.filter((o: any) => (o.createdAt || "").slice(0, 4) === yearStr);
       const rev = yearOrders.reduce((sum: number, o: any) => sum + (o.total || o.totalAmount || 0), 0);
-      const revFinal = rev > 0 ? rev : (totalAllOrders > 0 ? totalAllOrders : 2450000);
-      const countFinal = yearOrders.length > 0 ? yearOrders.length : (orderCountTotal > 0 ? orderCountTotal : 1020);
+
       return {
         label: "Yearly Overview (This Year)",
-        ordersCount: countFinal,
-        revenue: revFinal,
-        netProfit: Math.round(revFinal * 0.3),
-        profitPercent: "30.0%",
-        walletAmount: 34090,
-        chartData: mockYearlySales,
+        ordersCount: yearOrders.length,
+        revenue: rev,
+        netProfit: Math.round(rev * 0.3),
+        profitPercent: yearOrders.length > 0 ? "30.0%" : "0%",
+        walletAmount: 0,
+        chartData: yearData,
         chartTitle: "Yearly Sales Performance"
       };
     }
@@ -1265,13 +1261,16 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
   if (!isAdmin) {
     return (
       <main style={{ padding: "100px 20px", display: "flex", justifyContent: "center", minHeight: "100vh", backgroundColor: "#f4f5fa" }}>
-        <form onSubmit={handleLogin} style={{ width: "100%", maxWidth: "400px", backgroundColor: "#fff", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "30px", boxShadow: "0 4px 15px rgba(0,0,0,0.05)", display: "flex", flexDirection: "column", gap: "16px", height: "fit-content" }}>
-          <h1 style={{ fontSize: "22px", fontWeight: "800", color: "#e63b7a", textAlign: "center", marginBottom: "6px" }}>GlowGoodly Admin Access</h1>
-          <p style={{ fontSize: "12.5px", color: "#64748b", textAlign: "center", margin: "0 0 10px 0" }}>High Security Area. Please enter your admin credentials.</p>
-          {loginError && <div style={{ color: "#e53e3e", fontSize: "13px", textAlign: "center" }}>{loginError}</div>}
+        <form onSubmit={handleLogin} style={{ width: "100%", maxWidth: "420px", backgroundColor: "#fff", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "32px", boxShadow: "0 10px 25px rgba(0,0,0,0.06)", display: "flex", flexDirection: "column", gap: "16px", height: "fit-content" }}>
+          <div style={{ textAlign: "center", marginBottom: "4px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <img src="/user-glow-logo.png" alt="GlowGoodly" style={{ width: "56px", height: "56px", objectFit: "contain", marginBottom: "8px" }} />
+            <h1 style={{ fontSize: "22px", fontWeight: "800", color: "#e63b7a", margin: 0 }}>GlowGoodly Admin Access</h1>
+            <p style={{ fontSize: "12.5px", color: "#64748b", marginTop: "6px" }}>High Security Area. Please enter your admin credentials.</p>
+          </div>
+          {loginError && <div style={{ color: "#e53e3e", backgroundColor: "#fee2e2", padding: "10px", borderRadius: "6px", fontSize: "13px", fontWeight: "600", textAlign: "center" }}>{loginError}</div>}
           <div>
             <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "5px" }}>Email</label>
-            <input type="email" placeholder="admin@glowgoodly.com" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: "100%", padding: "10px", border: "1.5px solid #e2e8f0", borderRadius: "6px", fontSize: "14px" }} />
+            <input type="email" placeholder="admin@glowgoodly.com" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: "100%", padding: "11px 14px", border: "1.5px solid #cbd5e1", borderRadius: "8px", fontSize: "14px", outline: "none" }} />
           </div>
           <div>
             <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "5px" }}>Password</label>
@@ -1281,31 +1280,59 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                style={{ width: "100%", padding: "10px 38px 10px 10px", border: "1.5px solid #e2e8f0", borderRadius: "6px", fontSize: "14px" }}
+                style={{ width: "100%", padding: "11px 38px 11px 14px", border: "1.5px solid #cbd5e1", borderRadius: "8px", fontSize: "14px", outline: "none" }}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#64748b", display: "flex", alignItems: "center" }}
+                style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#64748b", display: "flex", alignItems: "center" }}
                 aria-label="Toggle password visibility"
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
           </div>
-          <button type="submit" style={{ backgroundColor: "#e63b7a", color: "#fff", border: "none", padding: "12px", borderRadius: "6px", fontWeight: "800", cursor: "pointer", fontSize: "14px" }}>
+
+          {/* Cloudflare Turnstile Human Verification Box */}
+          <div style={{ display: "flex", justifyContent: "center", margin: "4px 0" }}>
+            <CloudflareTurnstile 
+              onVerify={(token) => { setCaptchaToken(token); setLoginError(""); }} 
+              onExpire={() => setCaptchaToken("")} 
+            />
+          </div>
+
+          <button type="submit" style={{ backgroundColor: "#e63b7a", color: "#fff", border: "none", padding: "13px", borderRadius: "8px", fontWeight: "800", cursor: "pointer", fontSize: "14px", letterSpacing: "0.5px" }}>
             LOGIN TO ADMIN PANEL
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setEmail("admin@glowgoodly.com");
+              setPassword("admin123");
+            }}
+            style={{
+              backgroundColor: "#f8fafc",
+              color: "#334155",
+              border: "1px dashed #cbd5e1",
+              padding: "10px",
+              borderRadius: "6px",
+              fontWeight: "700",
+              cursor: "pointer",
+              fontSize: "12px",
+              textAlign: "center"
+            }}
+          >
+            ⚡ Auto-Fill: admin@glowgoodly.com / admin123
           </button>
         </form>
       </main>
     );
   }
 
-  const mockEmailsToHide = ["skillshoppertraining@gmail.com", "skhan.ict@gmail.com", "shahanazamin29@gmail.com"];
-
   const allUsersList = [
     ...staffList.map(s => ({ ...s, userType: "Staff" })),
-    ...(customersList || []).filter(c => !mockEmailsToHide.includes(c.email?.toLowerCase())).map(c => ({ ...c, userType: "Customer", role: c.role || "Customer" }))
+    ...(customersList || []).map(c => ({ ...c, userType: "Customer", role: c.role || "Customer" }))
   ];
 
   const filteredUsersList = allUsersList.filter(u => {
@@ -2463,39 +2490,231 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
           {/* 0.5 HOME BANNERS & HERO SLIDES MANAGEMENT */}
 
 
-          {/* 0.5 ADD NEW HERO BANNER SLIDE SUB-VIEW */}
-          {activeTab === "add-home-banner" && (
-            <div style={{ backgroundColor: "#ffffff", padding: "28px", borderRadius: "14px", boxShadow: "0 2px 10px rgba(0,0,0,0.05)", borderTop: "4px solid #e63b7a" }}>
-              <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e293b", margin: "0 0 6px 0" }}>➕ Add New Hero Banner Slide</h2>
-              <p style={{ color: "#64748b", fontSize: "13px", margin: "0 0 20px 0" }}>Create and publish a new Hero Banner slide to the homepage slider carousel.</p>
+          {/* 0.5 ADD NEW HOMEPAGE BANNER SUB-VIEW */}
+          {activeTab === "add-home-banner" && (() => {
+            const HOMEPAGE_SLOTS = [
+              {
+                id: "Hero Slides",
+                name: "🎬 Hero Slides Carousel (Main Top Slider)",
+                desktopSize: "1920 × 500 px (or 1400 × 380 px)",
+                mobileSize: "750 × 750 px (Square 1:1)",
+                defaultTitle: "Hero Slide Collection",
+                defaultLink: "/shop",
+                hint: "Featured in the main rotating hero slider at the very top of the homepage."
+              },
+              {
+                id: "Homepage Wide Banner",
+                name: "📢 Homepage Wide Banner (Middle Horizontal Promo)",
+                desktopSize: "1200 × 300 px (Panoramic Wide)",
+                mobileSize: "750 × 350 px",
+                defaultTitle: "Homepage Wide Banner - Beauty Must Haves Exclusive Savings",
+                defaultLink: "/shop?tab=offers",
+                hint: "Displays right above the Makeup section across full container width."
+              },
+              {
+                id: "Deal Card 1",
+                name: "🔥 Deals You Cannot Miss - Card 1 (Ombre 30% Off)",
+                desktopSize: "600 × 600 px (Square 1:1)",
+                mobileSize: "600 × 600 px",
+                defaultTitle: "Deal Card 1 - Ombre 30% Off",
+                defaultLink: "/shop?deal=ombre",
+                hint: "1st card in DEALS YOU CANNOT MISS 4-card grid."
+              },
+              {
+                id: "Deal Card 2",
+                name: "🔥 Deals You Cannot Miss - Card 2 (Marico Free Delivery)",
+                desktopSize: "600 × 600 px (Square 1:1)",
+                mobileSize: "600 × 600 px",
+                defaultTitle: "Deal Card 2 - Marico Free Delivery",
+                defaultLink: "/shop?deal=marico",
+                hint: "2nd card in DEALS YOU CANNOT MISS 4-card grid."
+              },
+              {
+                id: "Deal Card 3",
+                name: "🔥 Deals You Cannot Miss - Card 3 (PNS Campaign)",
+                desktopSize: "600 × 600 px (Square 1:1)",
+                mobileSize: "600 × 600 px",
+                defaultTitle: "Deal Card 3 - PNS Campaign",
+                defaultLink: "/shop?deal=pns",
+                hint: "3rd card in DEALS YOU CANNOT MISS 4-card grid."
+              },
+              {
+                id: "Deal Card 4",
+                name: "🔥 Deals You Cannot Miss - Card 4 (Senora Deal)",
+                desktopSize: "600 × 600 px (Square 1:1)",
+                mobileSize: "600 × 600 px",
+                defaultTitle: "Deal Card 4 - Senora Deal",
+                defaultLink: "/shop?deal=senora",
+                hint: "4th card in DEALS YOU CANNOT MISS 4-card grid."
+              },
+              {
+                id: "Brand Offer 1",
+                name: "🏷️ Top Brands & Offers - Card 1 (The Ordinary / Skin Care)",
+                desktopSize: "600 × 600 px (Square 1:1)",
+                mobileSize: "600 × 600 px",
+                defaultTitle: "Brand Offer 1: The Ordinary Collection",
+                defaultLink: "/shop?brand=the-ordinary",
+                hint: "1st card in TOP BRANDS & OFFERS 4-grid."
+              },
+              {
+                id: "Brand Offer 2",
+                name: "🏷️ Top Brands & Offers - Card 2 (Skin Cafe / Combos)",
+                desktopSize: "600 × 600 px (Square 1:1)",
+                mobileSize: "600 × 600 px",
+                defaultTitle: "Brand Offer 2: Skin Cafe Combos",
+                defaultLink: "/shop?brand=skin-cafe",
+                hint: "2nd card in TOP BRANDS & OFFERS 4-grid."
+              },
+              {
+                id: "Brand Offer 5",
+                name: "🏷️ Top Brands & Offers - Card 3 (Accessories & Tools)",
+                desktopSize: "600 × 600 px (Square 1:1)",
+                mobileSize: "600 × 600 px",
+                defaultTitle: "Brand Offer 5: Beauty Tools & Accessories",
+                defaultLink: "/shop?category=personal-care",
+                hint: "3rd card in TOP BRANDS & OFFERS 4-grid."
+              },
+              {
+                id: "Brand Offer 6",
+                name: "🏷️ Top Brands & Offers - Card 4 (BOGO Deals)",
+                desktopSize: "600 × 600 px (Square 1:1)",
+                mobileSize: "600 × 600 px",
+                defaultTitle: "Brand Offer 6: Buy 1 Get 1 Deals",
+                defaultLink: "/shop?campaign=BOGO",
+                hint: "4th card in TOP BRANDS & OFFERS 4-grid."
+              },
+              {
+                id: "BOGO",
+                name: "🎁 Limited Time Offers - Card 1 (BOGO)",
+                desktopSize: "600 × 600 px (Square 1:1)",
+                mobileSize: "600 × 600 px",
+                defaultTitle: "BOGO Offer",
+                defaultLink: "/shop?campaign=BOGO",
+                hint: "1st card in LIMITED TIME OFFERS 4-card grid."
+              },
+              {
+                id: "COMBO",
+                name: "📦 Limited Time Offers - Card 2 (COMBO)",
+                desktopSize: "600 × 600 px (Square 1:1)",
+                mobileSize: "600 × 600 px",
+                defaultTitle: "COMBO Offer",
+                defaultLink: "/shop?campaign=COMBO",
+                hint: "2nd card in LIMITED TIME OFFERS 4-card grid."
+              },
+              {
+                id: "OFFERS",
+                name: "🔥 Limited Time Offers - Card 3 (EXCLUSIVE OFFERS)",
+                desktopSize: "600 × 600 px (Square 1:1)",
+                mobileSize: "600 × 600 px",
+                defaultTitle: "OFFERS Mega Savings",
+                defaultLink: "/shop?campaign=EXCLUSIVE",
+                hint: "3rd card in LIMITED TIME OFFERS 4-card grid."
+              },
+              {
+                id: "Clearance SALE",
+                name: "⚡ Limited Time Offers - Card 4 (Clearance SALE)",
+                desktopSize: "600 × 600 px (Square 1:1)",
+                mobileSize: "600 × 600 px",
+                defaultTitle: "Clearance SALE Deals",
+                defaultLink: "/shop?campaign=CLEARANCE",
+                hint: "4th card in LIMITED TIME OFFERS 4-card grid."
+              },
+              {
+                id: "Popup Promo Banner",
+                name: "🔔 Floating / Entry Popup Promo Banner",
+                desktopSize: "800 × 800 px (Square 1:1)",
+                mobileSize: "600 × 600 px",
+                defaultTitle: "Special Discount Popup",
+                defaultLink: "/shop",
+                hint: "Displays as a promotional modal or announcement popup."
+              },
+              {
+                id: "Custom Banner",
+                name: "🎨 Other Custom Section / Campaign Banner",
+                desktopSize: "Custom Resolution",
+                mobileSize: "Custom Resolution",
+                defaultTitle: "Custom Campaign Banner",
+                defaultLink: "/shop",
+                hint: "Custom banner for any page or promotion."
+              }
+            ];
 
-              <form onSubmit={handleSaveBanner} style={{ display: "flex", flexDirection: "column", gap: "18px", maxWidth: "650px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "12.5px", fontWeight: "700", color: "#334155", marginBottom: "4px" }}>Banner Title *</label>
-                  <input
-                    type="text"
-                    required
-                    value={bannerForm.title}
-                    onChange={(e) => setBannerForm({ ...bannerForm, title: e.target.value })}
-                    style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13.5px" }}
-                    placeholder="e.g. Hero Slide 4 - Summer Special Collection"
-                  />
+            const currentSlot = HOMEPAGE_SLOTS.find(s => s.id === bannerForm.page) || HOMEPAGE_SLOTS[0];
+
+            return (
+              <div style={{ backgroundColor: "#ffffff", padding: "28px", borderRadius: "14px", boxShadow: "0 2px 10px rgba(0,0,0,0.05)", borderTop: "4px solid #e63b7a" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px", borderBottom: "1px solid #f1f5f9", paddingBottom: "14px" }}>
+                  <div>
+                    <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e293b", margin: "0 0 4px 0" }}>➕ Add & Publish Homepage Banners</h2>
+                    <p style={{ color: "#64748b", fontSize: "13px", margin: 0 }}>Create, upload, and publish any banner on the homepage (Hero Slider, Wide Promo, Brand Offers, BOGO, Combos, etc.).</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigateTo("home-banner-list")}
+                    style={{ backgroundColor: "#f8fafc", color: "#475569", border: "1px solid #cbd5e1", padding: "8px 16px", borderRadius: "6px", fontWeight: "700", fontSize: "12px", cursor: "pointer" }}
+                  >
+                    View All Banners List →
+                  </button>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
-                  <div>
-                    <label style={{ display: "block", fontSize: "12.5px", fontWeight: "700", color: "#334155", marginBottom: "4px" }}>Target Page</label>
+                <form onSubmit={handleSaveBanner} style={{ display: "flex", flexDirection: "column", gap: "18px", maxWidth: "720px" }}>
+                  
+                  {/* Slot Selector */}
+                  <div style={{ backgroundColor: "#fff0f5", padding: "16px", borderRadius: "10px", border: "1.5px solid #fbcfe8" }}>
+                    <label style={{ display: "block", fontSize: "13px", fontWeight: "800", color: "#be185d", marginBottom: "6px" }}>
+                      🎯 1. CHOOSE HOMEPAGE BANNER POSITION / SLOT *
+                    </label>
                     <select
                       value={bannerForm.page}
-                      onChange={(e) => setBannerForm({ ...bannerForm, page: e.target.value })}
-                      style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13.5px" }}
+                      onChange={(e) => {
+                        const selectedId = e.target.value;
+                        const slot = HOMEPAGE_SLOTS.find(s => s.id === selectedId);
+                        setBannerForm(prev => ({
+                          ...prev,
+                          page: selectedId,
+                          title: (!prev.title || HOMEPAGE_SLOTS.some(s => s.defaultTitle === prev.title)) ? (slot?.defaultTitle || prev.title) : prev.title,
+                          linkUrl: (!prev.linkUrl || prev.linkUrl === "/" || HOMEPAGE_SLOTS.some(s => s.defaultLink === prev.linkUrl)) ? (slot?.defaultLink || prev.linkUrl) : prev.linkUrl,
+                        }));
+                      }}
+                      style={{ width: "100%", padding: "11px 12px", borderRadius: "8px", border: "1.5px solid #f472b6", fontSize: "13.5px", fontWeight: "700", color: "#831843", backgroundColor: "#ffffff" }}
                     >
-                      <option value="Hero Slides">🎬 Hero Slides Carousel (1400×380 px / 600×600 px)</option>
+                      {HOMEPAGE_SLOTS.map(slot => (
+                        <option key={slot.id} value={slot.id}>{slot.name}</option>
+                      ))}
                     </select>
+
+                    <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", fontSize: "11.5px" }}>
+                      <span style={{ backgroundColor: "#ffffff", color: "#be185d", padding: "3px 10px", borderRadius: "6px", border: "1px solid #fbcfe8", fontWeight: "800" }}>
+                        🖥️ Desktop Size: {currentSlot.desktopSize}
+                      </span>
+                      <span style={{ backgroundColor: "#ffffff", color: "#be185d", padding: "3px 10px", borderRadius: "6px", border: "1px solid #fbcfe8", fontWeight: "800" }}>
+                        📱 Mobile Size: {currentSlot.mobileSize}
+                      </span>
+                    </div>
+                    <div style={{ marginTop: "6px", fontSize: "12px", color: "#9d174d", fontWeight: "600" }}>
+                      💡 {currentSlot.hint}
+                    </div>
                   </div>
+
+                  {/* Banner Title */}
+                  <div>
+                    <label style={{ display: "block", fontSize: "12.5px", fontWeight: "700", color: "#334155", marginBottom: "4px" }}>
+                      Banner Title / Reference Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={bannerForm.title}
+                      onChange={(e) => setBannerForm({ ...bannerForm, title: e.target.value })}
+                      style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13.5px" }}
+                      placeholder="e.g. Hero Slide: Eid Mega Savings"
+                    />
+                  </div>
+
+                  {/* Redirect Link and Presets */}
                   <div>
                     <label style={{ display: "block", fontSize: "12.5px", fontWeight: "800", color: "#0f172a", marginBottom: "4px" }}>
-                      🔗 BANNER CLICK REDIRECT LINK URL *
+                      🔗 Banner Click Redirect URL *
                     </label>
                     <input
                       type="text"
@@ -2503,114 +2722,154 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                       value={bannerForm.linkUrl}
                       onChange={(e) => setBannerForm({ ...bannerForm, linkUrl: e.target.value })}
                       style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13.5px", fontWeight: "600", color: "#2563eb" }}
-                      placeholder="/shop?category=skincare"
+                      placeholder="/shop or /shop?category=skincare"
                     />
-                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "6px" }}>
-                      <span style={{ fontSize: "10px", color: "#64748b", fontWeight: "700" }}>Quick Link Presets:</span>
+                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "8px", alignItems: "center" }}>
+                      <span style={{ fontSize: "11px", color: "#64748b", fontWeight: "700" }}>Quick Link Presets:</span>
                       {[
                         { label: "Shop All", url: "/shop" },
                         { label: "Skincare", url: "/shop?category=skincare" },
                         { label: "Makeup", url: "/shop?category=makeup" },
+                        { label: "Hair Care", url: "/shop?category=haircare" },
                         { label: "K-Beauty", url: "/shop?category=k-beauty" },
-                        { label: "Offers", url: "/shop?tab=offers" }
+                        { label: "BOGO Deals", url: "/shop?campaign=BOGO" },
+                        { label: "Combo Packages", url: "/shop?category=combo" },
+                        { label: "Offers Tab", url: "/shop?tab=offers" },
+                        { label: "Clearance Sale", url: "/shop?campaign=CLEARANCE" }
                       ].map((preset) => (
                         <button
                           key={preset.url}
                           type="button"
                           onClick={() => setBannerForm({ ...bannerForm, linkUrl: preset.url })}
-                          style={{ padding: "2px 6px", borderRadius: "4px", border: "1px solid #cbd5e1", backgroundColor: "#f1f5f9", fontSize: "10px", fontWeight: "700", cursor: "pointer", color: "#334155" }}
+                          style={{ padding: "3px 8px", borderRadius: "4px", border: "1px solid #cbd5e1", backgroundColor: "#f1f5f9", fontSize: "11px", fontWeight: "700", cursor: "pointer", color: "#334155" }}
                         >
                           {preset.label}
                         </button>
                       ))}
                     </div>
                   </div>
-                </div>
 
-                {/* Desktop Image Section */}
-                <div style={{ backgroundColor: "#f8fafc", padding: "14px", borderRadius: "10px", border: "1px solid #cbd5e1" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                    <label style={{ fontSize: "12.5px", fontWeight: "800", color: "#0f172a" }}>
-                      🖥️ DESKTOP BANNER IMAGE (1400 × 380 px / 1920 × 500 px) *
-                    </label>
-                    <span style={{ fontSize: "11px", backgroundColor: "#e0f2fe", color: "#0369a1", padding: "2px 6px", borderRadius: "4px", fontWeight: "800" }}>
-                      Recommended Aspect Ratio 3.6:1
-                    </span>
+                  {/* Desktop Image Section */}
+                  <div style={{ backgroundColor: "#f8fafc", padding: "16px", borderRadius: "10px", border: "1px solid #cbd5e1" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                      <label style={{ fontSize: "12.5px", fontWeight: "800", color: "#0f172a" }}>
+                        🖥️ DESKTOP BANNER IMAGE (Recommended: {currentSlot.desktopSize}) *
+                      </label>
+                      <span style={{ fontSize: "11px", backgroundColor: "#e0f2fe", color: "#0369a1", padding: "2px 8px", borderRadius: "4px", fontWeight: "800" }}>
+                        Desktop View
+                      </span>
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      value={bannerForm.imageUrl}
+                      onChange={(e) => setBannerForm({ ...bannerForm, imageUrl: e.target.value })}
+                      style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13px", marginBottom: "8px" }}
+                      placeholder="Paste Image URL or choose file below..."
+                    />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (evt) => {
+                            if (evt.target?.result) setBannerForm({ ...bannerForm, imageUrl: evt.target.result as string });
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      style={{ fontSize: "12px" }}
+                    />
+                    {bannerForm.imageUrl && (
+                      <div style={{ marginTop: "10px" }}>
+                        <div style={{ fontSize: "11px", color: "#64748b", fontWeight: "700", marginBottom: "4px" }}>Live Image Preview:</div>
+                        <img src={bannerForm.imageUrl} alt="Desktop Preview" style={{ maxHeight: "120px", maxWidth: "100%", borderRadius: "6px", border: "1px solid #cbd5e1", display: "block", objectFit: "contain" }} />
+                      </div>
+                    )}
                   </div>
-                  <input
-                    type="text"
-                    required
-                    value={bannerForm.imageUrl}
-                    onChange={(e) => setBannerForm({ ...bannerForm, imageUrl: e.target.value })}
-                    style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13px", marginBottom: "8px" }}
-                    placeholder="https://... or /images/sliders/slider-1.png"
-                  />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (evt) => {
-                          if (evt.target?.result) setBannerForm({ ...bannerForm, imageUrl: evt.target.result as string });
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                    style={{ fontSize: "12px" }}
-                  />
-                  {bannerForm.imageUrl && (
-                    <img src={bannerForm.imageUrl} alt="Desktop Preview" style={{ maxHeight: "80px", marginTop: "8px", borderRadius: "6px", border: "1px solid #cbd5e1", display: "block" }} />
-                  )}
-                </div>
 
-                {/* Mobile Image Section */}
-                <div style={{ backgroundColor: "#f8fafc", padding: "14px", borderRadius: "10px", border: "1px solid #cbd5e1" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                    <label style={{ fontSize: "12.5px", fontWeight: "800", color: "#0f172a" }}>
-                      📱 MOBILE BANNER IMAGE (600 × 600 px / Square 1:1)
-                    </label>
-                    <span style={{ fontSize: "11px", backgroundColor: "#fef3c7", color: "#b45309", padding: "2px 6px", borderRadius: "4px", fontWeight: "800" }}>
-                      Square 1:1 Mobile Banner
-                    </span>
+                  {/* Mobile Image Section */}
+                  <div style={{ backgroundColor: "#f8fafc", padding: "16px", borderRadius: "10px", border: "1px solid #cbd5e1" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                      <label style={{ fontSize: "12.5px", fontWeight: "800", color: "#0f172a" }}>
+                        📱 MOBILE BANNER IMAGE (Recommended: {currentSlot.mobileSize})
+                      </label>
+                      <span style={{ fontSize: "11px", backgroundColor: "#fef3c7", color: "#b45309", padding: "2px 8px", borderRadius: "4px", fontWeight: "800" }}>
+                        Mobile View (Optional)
+                      </span>
+                    </div>
+                    <input
+                      type="text"
+                      value={bannerForm.mobileImageUrl}
+                      onChange={(e) => setBannerForm({ ...bannerForm, mobileImageUrl: e.target.value })}
+                      style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13px", marginBottom: "8px" }}
+                      placeholder="Mobile Image URL (if blank, desktop image is used)"
+                    />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (evt) => {
+                            if (evt.target?.result) setBannerForm({ ...bannerForm, mobileImageUrl: evt.target.result as string });
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      style={{ fontSize: "12px" }}
+                    />
+                    {bannerForm.mobileImageUrl && (
+                      <div style={{ marginTop: "10px" }}>
+                        <div style={{ fontSize: "11px", color: "#64748b", fontWeight: "700", marginBottom: "4px" }}>Mobile Image Preview:</div>
+                        <img src={bannerForm.mobileImageUrl} alt="Mobile Preview" style={{ maxHeight: "120px", maxWidth: "100%", borderRadius: "6px", border: "1px solid #cbd5e1", display: "block", objectFit: "contain" }} />
+                      </div>
+                    )}
                   </div>
-                  <input
-                    type="text"
-                    value={bannerForm.mobileImageUrl}
-                    onChange={(e) => setBannerForm({ ...bannerForm, mobileImageUrl: e.target.value })}
-                    style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13px", marginBottom: "8px" }}
-                    placeholder="Optional mobile image URL"
-                  />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (evt) => {
-                          if (evt.target?.result) setBannerForm({ ...bannerForm, mobileImageUrl: evt.target.result as string });
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                    style={{ fontSize: "12px" }}
-                  />
-                  {bannerForm.mobileImageUrl && (
-                    <img src={bannerForm.mobileImageUrl} alt="Mobile Preview" style={{ maxHeight: "80px", marginTop: "8px", borderRadius: "6px", border: "1px solid #cbd5e1", display: "block" }} />
-                  )}
-                </div>
 
-                <button
-                  type="submit"
-                  style={{ backgroundColor: "#e63b7a", color: "#ffffff", border: "none", padding: "12px", borderRadius: "8px", fontWeight: "800", fontSize: "14px", cursor: "pointer", marginTop: "10px" }}
-                >
-                  💾 Save & Publish Hero Banner
-                </button>
-              </form>
-            </div>
-          )}
+                  {/* Sort Order & Active Switch */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                    <div>
+                      <label style={{ display: "block", fontSize: "12.5px", fontWeight: "700", color: "#334155", marginBottom: "4px" }}>
+                        Display Order / Priority
+                      </label>
+                      <input
+                        type="number"
+                        value={bannerForm.sortOrder}
+                        onChange={(e) => setBannerForm({ ...bannerForm, sortOrder: e.target.value })}
+                        style={{ width: "100%", padding: "9px 12px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13px" }}
+                        placeholder="0, 1, 2..."
+                      />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                      <label style={{ display: "block", fontSize: "12.5px", fontWeight: "700", color: "#334155", marginBottom: "8px" }}>
+                        Banner Status
+                      </label>
+                      <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "13px", fontWeight: "700", color: bannerForm.isActive ? "#166534" : "#991b1b" }}>
+                        <input
+                          type="checkbox"
+                          checked={bannerForm.isActive}
+                          onChange={(e) => setBannerForm({ ...bannerForm, isActive: e.target.checked })}
+                          style={{ width: "18px", height: "18px", accentColor: "#e63b7a" }}
+                        />
+                        {bannerForm.isActive ? "🟢 Active (Visible on site)" : "🔴 Inactive (Hidden)"}
+                      </label>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    style={{ backgroundColor: "#e63b7a", color: "#ffffff", border: "none", padding: "14px", borderRadius: "8px", fontWeight: "800", fontSize: "14.5px", cursor: "pointer", marginTop: "10px", boxShadow: "0 4px 14px rgba(230,59,122,0.35)", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
+                  >
+                    💾 Save & Publish Banner to Homepage
+                  </button>
+                </form>
+              </div>
+            );
+          })()}
 
           {/* 0.6 HOME BANNERS & CARD IMAGES MASTER LIST SUB-VIEW */}
           {activeTab === "home-banner-list" && (
@@ -2621,12 +2880,22 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                     <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e293b", margin: 0 }}>Home Banners & Card Images Master List</h2>
                     <p style={{ color: "#64748b", fontSize: "13px", margin: "2px 0 0 0" }}>View, edit, and replace all banner images, category cards, and concern cards displayed on the homepage with live preview & link options.</p>
                   </div>
-                  <button
-                    onClick={() => navigateTo("add-home-banner")}
-                    style={{ backgroundColor: "#e63b7a", color: "#ffffff", border: "none", padding: "10px 18px", borderRadius: "8px", fontWeight: "800", fontSize: "13px", cursor: "pointer", boxShadow: "0 4px 12px rgba(230,59,122,0.3)" }}
-                  >
-                    + Add New Banner Slide
-                  </button>
+                  <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                    {banners.length > 0 && (
+                      <button
+                        onClick={handleDeleteAllBanners}
+                        style={{ backgroundColor: "#fee2e2", color: "#b91c1c", border: "1px solid #fca5a5", padding: "10px 16px", borderRadius: "8px", fontWeight: "800", fontSize: "13px", cursor: "pointer" }}
+                      >
+                        🗑️ Delete All Banners
+                      </button>
+                    )}
+                    <button
+                      onClick={() => navigateTo("add-home-banner")}
+                      style={{ backgroundColor: "#e63b7a", color: "#ffffff", border: "none", padding: "10px 18px", borderRadius: "8px", fontWeight: "800", fontSize: "13px", cursor: "pointer", boxShadow: "0 4px 12px rgba(230,59,122,0.3)" }}
+                    >
+                      + Add New Banner Slide
+                    </button>
+                  </div>
                 </div>
 
                 {/* Banner Category Filter Tabs */}
@@ -4135,269 +4404,6 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
             </div>
           )}
 
-          {/* 6. HOME SLIDES */}
-          {(activeTab === "home-banner-list" || activeTab === "add-home-banner") && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-              
-              {/* BANNER SIZE RECOMMENDATION GUIDE */}
-              <div style={{ backgroundColor: "#f0fdf4", border: "1.5px solid #bbf7d0", borderRadius: "10px", padding: "18px" }}>
-                <h3 style={{ margin: "0 0 12px 0", fontSize: "16px", fontWeight: "800", color: "#166534", display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span>📏 Exact Banner Image Size Guide (পারফেক্ট ফিটিং সাইজ গাইড)</span>
-                </h3>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "12px", fontSize: "12px" }}>
-                  <div style={{ backgroundColor: "#ffffff", padding: "10px 14px", borderRadius: "8px", border: "1px solid #dcfce7", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
-                    <div style={{ fontWeight: "800", color: "#166534", marginBottom: "4px" }}>🖥️ Desktop Hero Banner</div>
-                    <div style={{ fontSize: "14px", fontWeight: "800", color: "#e63b7a" }}>1920 × 500 px</div>
-                    <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>Or 1440 × 450 px (Ratio ~3.8:1)</div>
-                  </div>
-                  <div style={{ backgroundColor: "#ffffff", padding: "10px 14px", borderRadius: "8px", border: "1px solid #dcfce7", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
-                    <div style={{ fontWeight: "800", color: "#166534", marginBottom: "4px" }}>📱 Mobile Hero Banner</div>
-                    <div style={{ fontSize: "14px", fontWeight: "800", color: "#e63b7a" }}>640 × 400 px</div>
-                    <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>Or 750 × 450 px (Ratio ~16:10)</div>
-                  </div>
-                  <div style={{ backgroundColor: "#ffffff", padding: "10px 14px", borderRadius: "8px", border: "1px solid #dcfce7", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
-                    <div style={{ fontWeight: "800", color: "#166534", marginBottom: "4px" }}>💻 Tablet Hero Banner</div>
-                    <div style={{ fontSize: "14px", fontWeight: "800", color: "#e63b7a" }}>1024 × 450 px</div>
-                    <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>Fits iPad / Tablet screens</div>
-                  </div>
-                  <div style={{ backgroundColor: "#ffffff", padding: "10px 14px", borderRadius: "8px", border: "1px solid #dcfce7", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
-                    <div style={{ fontWeight: "800", color: "#166534", marginBottom: "4px" }}>📢 Homepage Wide Banner</div>
-                    <div style={{ fontSize: "14px", fontWeight: "800", color: "#e63b7a" }}>1400 × 280 px</div>
-                    <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>Mobile wide: 640 × 300 px</div>
-                  </div>
-                  <div style={{ backgroundColor: "#ffffff", padding: "10px 14px", borderRadius: "8px", border: "1px solid #dcfce7", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
-                    <div style={{ fontWeight: "800", color: "#166534", marginBottom: "4px" }}>🏷️ Deals & Offers Card</div>
-                    <div style={{ fontSize: "14px", fontWeight: "800", color: "#e63b7a" }}>320 × 420 px</div>
-                    <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>Portrait 3:4 Card</div>
-                  </div>
-                  <div style={{ backgroundColor: "#ffffff", padding: "10px 14px", borderRadius: "8px", border: "1px solid #dcfce7", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
-                    <div style={{ fontWeight: "800", color: "#166534", marginBottom: "4px" }}>🎯 Category & Concern Card</div>
-                    <div style={{ fontSize: "14px", fontWeight: "800", color: "#e63b7a" }}>400 × 400 px</div>
-                    <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>Square 1:1 Image</div>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ backgroundColor: "#ffffff", borderRadius: "10px", border: "1px solid #e5e7eb", padding: "24px" }}>
-                <h2 style={{ fontSize: "18px", fontWeight: "800", marginBottom: "16px" }}>Add Home Banner / Slide</h2>
-                <form onSubmit={handleSaveBanner} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                  <div>
-                    <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Banner Title / Alt Text</label>
-                    <input type="text" required placeholder="e.g. Summer Skincare Mega Offer" value={bannerForm.title} onChange={(e) => setBannerForm({ ...bannerForm, title: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px" }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Click Link URL</label>
-                    <input type="text" placeholder="/shop?category=skincare" value={bannerForm.linkUrl} onChange={(e) => setBannerForm({ ...bannerForm, linkUrl: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px" }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>
-                      <Monitor size={14} style={{ display: "inline", verticalAlign: "middle", marginRight: "4px" }} />
-                      Desktop Banner Image <span style={{ color: "#e63b7a", fontWeight: "800" }}>(Recommended: 1920 × 500 px)</span>
-                    </label>
-                    <input type="file" accept="image/*" onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onloadend = () => setBannerForm(prev => ({ ...prev, imageUrl: reader.result as string }));
-                        reader.readAsDataURL(file);
-                      }
-                    }} style={{ width: "100%", padding: "6px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "12px" }} />
-                    <input type="text" placeholder="Or paste https://..." value={bannerForm.imageUrl} onChange={(e) => setBannerForm({ ...bannerForm, imageUrl: e.target.value })} style={{ width: "100%", padding: "6px", border: "1px solid #cbd5e1", borderRadius: "6px", marginTop: "6px", fontSize: "12px" }} />
-                    {bannerForm.imageUrl && <img src={bannerForm.imageUrl} alt="Desktop Preview" style={{ width: "100%", height: "80px", objectFit: "cover", borderRadius: "6px", marginTop: "8px" }} />}
-                  </div>
-                  <div>
-                    <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>
-                      <Smartphone size={14} style={{ display: "inline", verticalAlign: "middle", marginRight: "4px" }} />
-                      Mobile Banner Image <span style={{ color: "#e63b7a", fontWeight: "800" }}>(Recommended: 640 × 400 px)</span>
-                    </label>
-                    <input type="file" accept="image/*" onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onloadend = () => setBannerForm(prev => ({ ...prev, mobileImageUrl: reader.result as string }));
-                        reader.readAsDataURL(file);
-                      }
-                    }} style={{ width: "100%", padding: "6px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "12px" }} />
-                    <input type="text" placeholder="Or paste https://..." value={bannerForm.mobileImageUrl} onChange={(e) => setBannerForm({ ...bannerForm, mobileImageUrl: e.target.value })} style={{ width: "100%", padding: "6px", border: "1px solid #cbd5e1", borderRadius: "6px", marginTop: "6px", fontSize: "12px" }} />
-                    {bannerForm.mobileImageUrl && <img src={bannerForm.mobileImageUrl} alt="Mobile Preview" style={{ width: "100%", height: "80px", objectFit: "cover", borderRadius: "6px", marginTop: "8px" }} />}
-                  </div>
-                  <div>
-                    <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>
-                      <Tablet size={14} style={{ display: "inline", verticalAlign: "middle", marginRight: "4px" }} />
-                      Tablet Banner Image URL <span style={{ color: "#64748b", fontWeight: "700" }}>(Recommended: 1024 × 450 px)</span>
-                    </label>
-                    <input type="text" placeholder="https://..." value={bannerForm.tabletImageUrl} onChange={(e) => setBannerForm({ ...bannerForm, tabletImageUrl: e.target.value })} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }} />
-                    {bannerForm.tabletImageUrl && <img src={bannerForm.tabletImageUrl} alt="Tablet Preview" style={{ width: "100%", height: "80px", objectFit: "cover", borderRadius: "6px", marginTop: "8px" }} />}
-                  </div>
-                  <div>
-                    <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Page</label>
-                    <select value={bannerForm.page} onChange={(e) => setBannerForm({ ...bannerForm, page: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px" }}>
-                      <option value="Homepage">Homepage</option>
-                      <option value="Shop">Shop Page</option>
-                    </select>
-                  </div>
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <button type="submit" style={{ backgroundColor: "#e63b7a", color: "#fff", border: "none", padding: "12px 28px", borderRadius: "6px", fontWeight: "800", cursor: "pointer" }}>
-                      {bannerForm.id ? "UPDATE BANNER" : "ADD BANNER"}
-                    </button>
-                  </div>
-                </form>
-              </div>
-
-              <div style={{ backgroundColor: "#ffffff", borderRadius: "10px", border: "1px solid #e5e7eb", padding: "24px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
-                  <div>
-                    <h2 style={{ fontSize: "18px", fontWeight: "800", margin: 0, color: "#1e293b" }}>All Website Banners ({banners.length})</h2>
-                    <p style={{ fontSize: "12px", color: "#64748b", margin: "2px 0 0 0" }}>Filter banners by homepage section and upload custom desktop & mobile images.</p>
-                  </div>
-                  <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                    {["All", "Hero Slides", "Deals You Cannot Miss", "Top Brands & Offers", "Limited Time Offers", "Category Cards", "Shop By Concern Cards"].map((cat) => (
-                      <button
-                        key={cat}
-                        onClick={() => setBannerCategoryFilter(cat)}
-                        style={{
-                          padding: "6px 12px",
-                          borderRadius: "6px",
-                          border: "1px solid #cbd5e1",
-                          fontSize: "12px",
-                          fontWeight: "700",
-                          cursor: "pointer",
-                          backgroundColor: bannerCategoryFilter === cat ? "#e63b7a" : "#f8fafc",
-                          color: bannerCategoryFilter === cat ? "#ffffff" : "#475569"
-                        }}
-                      >
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "16px" }}>
-                  {banners
-                    .filter(b => bannerCategoryFilter === "All" || b.page === bannerCategoryFilter || (!b.page && bannerCategoryFilter === "Hero Slides"))
-                    .map((b, idx) => {
-                      const sizeHint = b.page === "Hero Slides" ? "Desktop: 1200x450px | Mobile: 600x350px"
-                        : b.page === "Top Brands & Offers" ? "Desktop: 600x300px | Mobile: 400x200px"
-                        : "Desktop & Mobile: 500x500px (1:1)";
-                      return (
-                        <div key={b.id ? `${b.id}-${idx}` : idx} style={{ border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden", backgroundColor: "#fff", display: "flex", flexDirection: "column" }}>
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px", backgroundColor: "#000", height: "130px" }}>
-                            <div style={{ position: "relative", height: "100%" }}>
-                              <img src={b.imageUrl} alt="Desktop Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                              <span style={{ position: "absolute", bottom: "4px", left: "4px", backgroundColor: "rgba(0,0,0,0.7)", color: "#fff", fontSize: "9px", padding: "2px 6px", borderRadius: "4px", fontWeight: "700" }}>🖥️ Desktop</span>
-                            </div>
-                            <div style={{ position: "relative", height: "100%" }}>
-                              <img src={b.mobileImageUrl || b.imageUrl} alt="Mobile Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                              <span style={{ position: "absolute", bottom: "4px", left: "4px", backgroundColor: "rgba(230,59,122,0.9)", color: "#fff", fontSize: "9px", padding: "2px 6px", borderRadius: "4px", fontWeight: "700" }}>📱 Mobile</span>
-                            </div>
-                          </div>
-                          <div style={{ padding: "14px", flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                            <div>
-                              <div style={{ fontWeight: "800", fontSize: "13.5px", color: "#1e293b", marginBottom: "4px" }}>{b.title}</div>
-                              <div style={{ fontSize: "11px", color: "#059669", fontWeight: "700" }}>📏 Recommended: {sizeHint}</div>
-                              <div style={{ fontSize: "11.5px", color: "#64748b", wordBreak: "break-all", marginTop: "4px" }}>Target: <span style={{ color: "#2563eb", fontWeight: "600" }}>{b.linkUrl || "/"}</span></div>
-                              <div style={{ marginTop: "6px" }}><span className="badge badge-info">{b.page || "Homepage"}</span></div>
-                            </div>
-                            <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
-                              <button onClick={() => {
-                                setBannerForm({
-                                  id: b.id,
-                                  title: b.title,
-                                  imageUrl: b.imageUrl,
-                                  mobileImageUrl: b.mobileImageUrl || b.imageUrl,
-                                  tabletImageUrl: b.tabletImageUrl || b.imageUrl,
-                                  linkUrl: b.linkUrl || "/",
-                                  bgColor: b.bgColor || "#1a1a2e",
-                                  page: b.page || "Hero Slides",
-                                  isActive: b.isActive ?? true,
-                                  sortOrder: String(b.sortOrder || "1")
-                                });
-                                setEditingBannerModal(true);
-                              }} style={{ flex: 1, backgroundColor: "#f1f5f9", color: "#334155", border: "1px solid #cbd5e1", padding: "6px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>✏️ Edit Banner</button>
-                              <button onClick={() => handleDeleteBanner(b.id)} style={{ backgroundColor: "#fee2e2", color: "#ef4444", border: "none", padding: "6px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>Delete</button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-
-                {/* Edit Banner Modal */}
-                {editingBanner && (
-                  <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
-                    <div style={{ backgroundColor: "#fff", borderRadius: "10px", padding: "24px", width: "520px", maxHeight: "90vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: "14px" }}>
-                      <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "800" }}>Edit Banner – {editingBanner.title}</h3>
-                      
-                      <div>
-                        <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Banner Title / Alt Text *</label>
-                        <input value={editingBanner.title || ""} onChange={e => setEditingBanner({ ...editingBanner, title: e.target.value })} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }} />
-                      </div>
-
-                      <div>
-                        <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Click Link Target URL</label>
-                        <input value={editingBanner.linkUrl || ""} onChange={e => setEditingBanner({ ...editingBanner, linkUrl: e.target.value })} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }} placeholder="/shop?category=skincare" />
-                      </div>
-
-                      <div>
-                        <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Placement Section / Page</label>
-                        <select value={editingBanner.page || "Hero Slides"} onChange={e => setEditingBanner({ ...editingBanner, page: e.target.value })} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }}>
-                          <option value="Hero Slides">Hero Slides</option>
-                          <option value="Deals You Cannot Miss">Deals You Cannot Miss</option>
-                          <option value="Top Brands & Offers">Top Brands & Offers</option>
-                          <option value="Limited Time Offers">Limited Time Offers</option>
-                          <option value="Category Cards">Category Cards</option>
-                          <option value="Shop By Concern Cards">Shop By Concern Cards</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>🖥️ Desktop Image (Upload File)</label>
-                        <input type="file" accept="image/*" onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onloadend = () => setEditingBanner((prev: any) => ({ ...prev, imageUrl: reader.result as string }));
-                            reader.readAsDataURL(file);
-                          }
-                        }} style={{ width: "100%", padding: "6px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "12px" }} />
-                        {editingBanner.imageUrl && <img src={editingBanner.imageUrl} alt="Desktop Preview" style={{ width: "100%", height: "90px", objectFit: "cover", borderRadius: "6px", marginTop: "6px" }} />}
-                      </div>
-
-                      <div>
-                        <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>📱 Mobile Image (Upload File)</label>
-                        <input type="file" accept="image/*" onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onloadend = () => setEditingBanner((prev: any) => ({ ...prev, mobileImageUrl: reader.result as string }));
-                            reader.readAsDataURL(file);
-                          }
-                        }} style={{ width: "100%", padding: "6px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "12px" }} />
-                        {editingBanner.mobileImageUrl && <img src={editingBanner.mobileImageUrl} alt="Mobile Preview" style={{ width: "100%", height: "90px", objectFit: "cover", borderRadius: "6px", marginTop: "6px" }} />}
-                      </div>
-
-                      <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "10px" }}>
-                        <button onClick={() => setEditingBanner(null)} style={{ backgroundColor: "#f1f5f9", padding: "8px 16px", border: "none", borderRadius: "6px", fontWeight: "700", cursor: "pointer" }}>Cancel</button>
-                        <button onClick={async () => {
-                          setBanners(prev => prev.map(b => b.id === editingBanner.id ? editingBanner : b));
-                          alert("Banner updated successfully!");
-                          setEditingBanner(null);
-                          try {
-                            await fetch(`${API_BASE}/admin/banners/${editingBanner.id}`, {
-                              method: "PATCH",
-                              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                              body: JSON.stringify(editingBanner)
-                            });
-                          } catch (e) { }
-                        }} style={{ backgroundColor: "#e63b7a", color: "#fff", padding: "8px 16px", border: "none", borderRadius: "6px", fontWeight: "700", cursor: "pointer" }}>SAVE BANNER</button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* 7. CATEGORY MANAGEMENT */}
           {activeTab === "category-list" && (
             <div style={{ backgroundColor: "#ffffff", borderRadius: "10px", border: "1px solid #e5e7eb", padding: "24px" }}>
@@ -4703,60 +4709,361 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
               </div>
 
               <div style={{ backgroundColor: "#ffffff", borderRadius: "10px", border: "1px solid #e5e7eb", padding: "24px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
-                  <h2 style={{ fontSize: "18px", fontWeight: "800", margin: 0 }}>All Products ({adminProducts.length})</h2>
-                  <input
-                    type="text"
-                    value={productSearchQuery}
-                    onChange={(e) => setProductSearchQuery(e.target.value)}
-                    placeholder="🔍 Search product name, brand, category..."
-                    style={{ width: "300px", padding: "8px 14px", borderRadius: "8px", border: "1.5px solid #cbd5e1", fontSize: "13px", outline: "none" }}
-                  />
+                {/* Header & Live Filter Bar */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
+                  <div>
+                    <h2 style={{ fontSize: "18px", fontWeight: "800", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+                      📦 All Database Products ({adminProducts.length})
+                    </h2>
+                    <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "#64748b" }}>
+                      Manage all products stored in database with live editing, stock, and SEO.
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setIsRefreshingProducts(true);
+                        await fetchData(true);
+                        setIsRefreshingProducts(false);
+                      }}
+                      disabled={isRefreshingProducts}
+                      style={{
+                        backgroundColor: "#f1f5f9",
+                        color: "#0f172a",
+                        border: "1px solid #cbd5e1",
+                        padding: "8px 14px",
+                        borderRadius: "8px",
+                        fontSize: "12px",
+                        fontWeight: "700",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px"
+                      }}
+                    >
+                      🔄 {isRefreshingProducts ? "Syncing..." : "Refresh DB"}
+                    </button>
+                    <input
+                      type="text"
+                      value={productSearchQuery}
+                      onChange={(e) => {
+                        setProductSearchQuery(e.target.value);
+                        setProductCurrentPage(1);
+                      }}
+                      placeholder="🔍 Search name, brand, category, ID..."
+                      style={{ width: "260px", padding: "8px 14px", borderRadius: "8px", border: "1.5px solid #cbd5e1", fontSize: "13px", outline: "none" }}
+                    />
+                  </div>
                 </div>
-                <table className="admin-table">
-                  <thead><tr><th style={{ width: "60px" }}>IMAGES</th><th>PRODUCT NAME</th><th>BRAND</th><th>PRICE</th><th style={{ textAlign: "center" }}>ACTION</th></tr></thead>
-                  <tbody>
-                    {adminProducts
-                      .filter((p) => {
-                        if (!productSearchQuery) return true;
-                        const q = productSearchQuery.toLowerCase();
-                        return p.name?.toLowerCase().includes(q) || p.brand?.name?.toLowerCase().includes(q) || p.category?.name?.toLowerCase().includes(q);
-                      })
-                      .slice(0, 100)
-                      .map((p) => (
-                      <tr key={p.id}>
-                        <td>
-                          <div style={{ display: "flex", gap: "2px" }}>
-                            <img src={p.images?.[0]?.url || "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=200&q=80"} alt={p.name} style={{ width: "36px", height: "36px", objectFit: "cover", borderRadius: "4px" }} />
-                            {p.images?.[1]?.url && <img src={p.images[1].url} alt="2" style={{ width: "20px", height: "36px", objectFit: "cover", borderRadius: "2px" }} />}
+
+                {/* Filter Controls Row */}
+                <div style={{ display: "flex", gap: "10px", marginBottom: "16px", flexWrap: "wrap", alignItems: "center", backgroundColor: "#f8fafc", padding: "10px 14px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ fontSize: "12px", fontWeight: "700", color: "#475569" }}>Category:</span>
+                    <select
+                      value={productCategoryFilter}
+                      onChange={(e) => {
+                        setProductCategoryFilter(e.target.value);
+                        setProductCurrentPage(1);
+                      }}
+                      style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", backgroundColor: "#fff" }}
+                    >
+                      <option value="All">All Categories</option>
+                      {adminCategories.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ fontSize: "12px", fontWeight: "700", color: "#475569" }}>Brand:</span>
+                    <select
+                      value={productBrandFilter}
+                      onChange={(e) => {
+                        setProductBrandFilter(e.target.value);
+                        setProductCurrentPage(1);
+                      }}
+                      style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", backgroundColor: "#fff" }}
+                    >
+                      <option value="All">All Brands</option>
+                      {adminBrands.map((b) => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ fontSize: "12px", fontWeight: "700", color: "#475569" }}>Stock:</span>
+                    <select
+                      value={productStockFilter}
+                      onChange={(e) => {
+                        setProductStockFilter(e.target.value);
+                        setProductCurrentPage(1);
+                      }}
+                      style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", backgroundColor: "#fff" }}
+                    >
+                      <option value="All">All Stock Levels</option>
+                      <option value="In Stock">In Stock (&gt;0)</option>
+                      <option value="Low Stock">Low Stock (&le;10)</option>
+                      <option value="Out of Stock">Out of Stock (0)</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginLeft: "auto" }}>
+                    <span style={{ fontSize: "12px", fontWeight: "700", color: "#475569" }}>Show:</span>
+                    <select
+                      value={productPageSize}
+                      onChange={(e) => {
+                        const val = e.target.value === "All" ? "All" : Number(e.target.value);
+                        setProductPageSize(val);
+                        setProductCurrentPage(1);
+                      }}
+                      style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", backgroundColor: "#fff" }}
+                    >
+                      <option value="25">25 per page</option>
+                      <option value="50">50 per page</option>
+                      <option value="100">100 per page</option>
+                      <option value="250">250 per page</option>
+                      <option value="All">All Products</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Filter & Pagination Execution */}
+                {(() => {
+                  const filtered = adminProducts.filter((p) => {
+                    if (productCategoryFilter !== "All") {
+                      const cId = p.categoryId || p.category?.id;
+                      const cName = p.category?.name?.toLowerCase() || "";
+                      if (cId !== productCategoryFilter && cName !== productCategoryFilter.toLowerCase()) return false;
+                    }
+                    if (productBrandFilter !== "All") {
+                      const bId = p.brandId || p.brand?.id;
+                      const bName = p.brand?.name?.toLowerCase() || "";
+                      if (bId !== productBrandFilter && bName !== productBrandFilter.toLowerCase()) return false;
+                    }
+                    if (productStockFilter !== "All") {
+                      const stock = p.variants?.[0]?.inventoryQuantity ?? p.variants?.[0]?.stock ?? 50;
+                      if (productStockFilter === "In Stock" && stock <= 0) return false;
+                      if (productStockFilter === "Out of Stock" && stock > 0) return false;
+                      if (productStockFilter === "Low Stock" && (stock <= 0 || stock > 10)) return false;
+                    }
+                    if (productSearchQuery) {
+                      const q = productSearchQuery.toLowerCase();
+                      const matchName = p.name?.toLowerCase().includes(q);
+                      const matchBrand = p.brand?.name?.toLowerCase().includes(q);
+                      const matchCategory = p.category?.name?.toLowerCase().includes(q);
+                      const matchId = p.id?.toLowerCase().includes(q);
+                      if (!matchName && !matchBrand && !matchCategory && !matchId) return false;
+                    }
+                    return true;
+                  });
+
+                  const totalFiltered = filtered.length;
+                  const effectivePageSize = productPageSize === "All" ? (totalFiltered || 1) : Number(productPageSize);
+                  const totalPages = Math.max(1, Math.ceil(totalFiltered / effectivePageSize));
+                  const safePage = Math.min(Math.max(1, productCurrentPage), totalPages);
+                  const startIndex = (safePage - 1) * effectivePageSize;
+                  const paginated = productPageSize === "All" ? filtered : filtered.slice(startIndex, startIndex + effectivePageSize);
+
+                  return (
+                    <>
+                      <table className="admin-table">
+                        <thead>
+                          <tr>
+                            <th style={{ width: "65px" }}>IMAGES</th>
+                            <th>PRODUCT NAME &amp; VARIANTS</th>
+                            <th>CATEGORY</th>
+                            <th>BRAND</th>
+                            <th>PRICE</th>
+                            <th>STOCK</th>
+                            <th style={{ textAlign: "center" }}>ACTION</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paginated.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} style={{ textAlign: "center", padding: "40px", color: "#64748b" }}>
+                                {adminProducts.length === 0 ? "No products found in the database. Add your first product above!" : "No products matched your search or filters."}
+                              </td>
+                            </tr>
+                          ) : (
+                            paginated.map((p) => {
+                              const v = p.variants?.[0] || {};
+                              const stockVal = v.inventoryQuantity ?? v.stock ?? 50;
+                              const variantCount = p.variants?.length || 0;
+                              return (
+                                <tr key={p.id}>
+                                  <td>
+                                    <div style={{ display: "flex", gap: "3px", alignItems: "center" }}>
+                                      <img
+                                        src={p.images?.[0]?.url || "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=200&q=80"}
+                                        alt={p.name}
+                                        style={{ width: "38px", height: "38px", objectFit: "cover", borderRadius: "5px", border: "1px solid #e2e8f0" }}
+                                      />
+                                      {p.images?.[1]?.url && (
+                                        <img src={p.images[1].url} alt="2" style={{ width: "20px", height: "38px", objectFit: "cover", borderRadius: "3px", opacity: 0.8 }} />
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td>
+                                    <div style={{ fontWeight: "700", color: "#1e293b", fontSize: "13px", lineHeight: "1.3" }}>
+                                      {p.name}
+                                    </div>
+                                    <div style={{ display: "flex", gap: "6px", marginTop: "3px", flexWrap: "wrap", alignItems: "center" }}>
+                                      <span style={{ fontSize: "10px", color: "#64748b", fontFamily: "monospace", backgroundColor: "#f1f5f9", padding: "1px 5px", borderRadius: "3px" }}>
+                                        ID: {p.id.slice(0, 8)}...
+                                      </span>
+                                      {variantCount > 1 && (
+                                        <span style={{ fontSize: "10.5px", color: "#be185d", backgroundColor: "#fdf2f8", border: "1px solid #fbcfe8", padding: "1px 6px", borderRadius: "4px", fontWeight: "700" }}>
+                                          🎨 {variantCount} Shades
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td>
+                                    <span style={{ backgroundColor: "#eff6ff", color: "#1d4ed8", padding: "3px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: "700" }}>
+                                      {p.category?.name || "Uncategorized"}
+                                    </span>
+                                  </td>
+                                  <td style={{ fontWeight: "600", color: "#334155", fontSize: "12.5px" }}>
+                                    {p.brand?.name || "—"}
+                                  </td>
+                                  <td>
+                                    <div style={{ fontWeight: "800", color: "#059669", fontSize: "13px" }}>
+                                      ৳{v.discountPrice !== null && v.discountPrice !== undefined && v.discountPrice < v.price ? v.discountPrice : (v.price || p.price || "—")}
+                                    </div>
+                                    {v.discountPrice !== null && v.discountPrice !== undefined && v.discountPrice < v.price && (
+                                      <div style={{ fontSize: "11px", color: "#94a3b8", textDecoration: "line-through" }}>
+                                        ৳{v.price}
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td>
+                                    <span
+                                      style={{
+                                        padding: "3px 8px",
+                                        borderRadius: "4px",
+                                        fontSize: "11px",
+                                        fontWeight: "800",
+                                        backgroundColor: stockVal > 10 ? "#ecfdf5" : stockVal > 0 ? "#fef3c7" : "#fee2e2",
+                                        color: stockVal > 10 ? "#059669" : stockVal > 0 ? "#d97706" : "#dc2626"
+                                      }}
+                                    >
+                                      {stockVal > 0 ? `${stockVal} in stock` : "Out of stock"}
+                                    </span>
+                                  </td>
+                                  <td style={{ textAlign: "center" }}>
+                                    <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingProduct({
+                                          ...p,
+                                          name: p.name,
+                                          description: p.description || "",
+                                          metaTitle: p.metaTitle || "",
+                                          metaDescription: p.metaDescription || "",
+                                          metaKeywords: p.metaKeywords || "",
+                                          price: p.variants?.[0]?.price || p.price || 0,
+                                          stock: p.variants?.[0]?.inventoryQuantity || p.variants?.[0]?.stock || 50,
+                                          imageUrl: p.images?.[0]?.url || p.imageUrl || "",
+                                          imageUrl2: p.images?.[1]?.url || "",
+                                          imageUrl3: p.images?.[2]?.url || "",
+                                          imageUrl4: p.images?.[3]?.url || ""
+                                        })}
+                                        style={{ backgroundColor: "#f1f5f9", color: "#334155", border: "1px solid #cbd5e1", padding: "5px 11px", borderRadius: "5px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}
+                                      >
+                                        ✏️ Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveCatalogProduct(p.id)}
+                                        style={{ backgroundColor: "#fee2e2", color: "#ef4444", border: "none", padding: "5px 11px", borderRadius: "5px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}
+                                      >
+                                        Delete
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+
+                      {/* Pagination Bar */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px", flexWrap: "wrap", gap: "10px", padding: "8px 0" }}>
+                        <div style={{ fontSize: "12.5px", color: "#64748b", fontWeight: "600" }}>
+                          Showing {totalFiltered === 0 ? 0 : startIndex + 1} to {Math.min(startIndex + effectivePageSize, totalFiltered)} of {totalFiltered} products {productPageSize !== "All" && `(Page ${safePage} of ${totalPages})`}
+                        </div>
+                        {productPageSize !== "All" && totalPages > 1 && (
+                          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                            <button
+                              type="button"
+                              onClick={() => setProductCurrentPage(prev => Math.max(1, prev - 1))}
+                              disabled={safePage <= 1}
+                              style={{
+                                padding: "6px 12px",
+                                borderRadius: "6px",
+                                border: "1px solid #cbd5e1",
+                                backgroundColor: safePage <= 1 ? "#f1f5f9" : "#ffffff",
+                                color: safePage <= 1 ? "#94a3b8" : "#1e293b",
+                                fontSize: "12px",
+                                fontWeight: "700",
+                                cursor: safePage <= 1 ? "not-allowed" : "pointer"
+                              }}
+                            >
+                              &larr; Prev
+                            </button>
+                            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                              let pageNum = safePage - 2 + i;
+                              if (pageNum < 1) pageNum = i + 1;
+                              if (pageNum > totalPages) return null;
+                              return (
+                                <button
+                                  key={pageNum}
+                                  type="button"
+                                  onClick={() => setProductCurrentPage(pageNum)}
+                                  style={{
+                                    padding: "6px 12px",
+                                    borderRadius: "6px",
+                                    border: safePage === pageNum ? "none" : "1px solid #cbd5e1",
+                                    backgroundColor: safePage === pageNum ? "#e63b7a" : "#ffffff",
+                                    color: safePage === pageNum ? "#ffffff" : "#1e293b",
+                                    fontSize: "12px",
+                                    fontWeight: "800",
+                                    cursor: "pointer"
+                                  }}
+                                >
+                                  {pageNum}
+                                </button>
+                              );
+                            })}
+                            <button
+                              type="button"
+                              onClick={() => setProductCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                              disabled={safePage >= totalPages}
+                              style={{
+                                padding: "6px 12px",
+                                borderRadius: "6px",
+                                border: "1px solid #cbd5e1",
+                                backgroundColor: safePage >= totalPages ? "#f1f5f9" : "#ffffff",
+                                color: safePage >= totalPages ? "#94a3b8" : "#1e293b",
+                                fontSize: "12px",
+                                fontWeight: "700",
+                                cursor: safePage >= totalPages ? "not-allowed" : "pointer"
+                              }}
+                            >
+                              Next &rarr;
+                            </button>
                           </div>
-                        </td>
-                        <td style={{ fontWeight: "700", color: "#1e293b" }}>{p.name}</td>
-                        <td>{p.brand?.name || "—"}</td>
-                        <td style={{ fontWeight: "700", color: "#059669" }}>৳{p.variants?.[0]?.price || "—"}</td>
-                        <td style={{ textAlign: "center" }}>
-                          <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
-                            <button onClick={() => setEditingProduct({
-                              ...p,
-                              name: p.name,
-                              description: p.description || "",
-                              metaTitle: p.metaTitle || "",
-                              metaDescription: p.metaDescription || "",
-                              metaKeywords: p.metaKeywords || "",
-                              price: p.variants?.[0]?.price || 0,
-                              stock: p.variants?.[0]?.inventoryQuantity || p.variants?.[0]?.stock || 50,
-                              imageUrl: p.images?.[0]?.url || "",
-                              imageUrl2: p.images?.[1]?.url || "",
-                              imageUrl3: p.images?.[2]?.url || "",
-                              imageUrl4: p.images?.[3]?.url || ""
-                            })} style={{ backgroundColor: "#f1f5f9", color: "#334155", border: "1px solid #cbd5e1", padding: "4px 10px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>✏️ Edit Product & SEO</button>
-                            <button onClick={() => handleRemoveCatalogProduct(p.id)} style={{ backgroundColor: "#fee2e2", color: "#ef4444", border: "none", padding: "4px 10px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Delete</button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
 
                 {/* Edit Product Modal (Supports 4 Images) */}
                 {editingProduct && (
@@ -4982,7 +5289,6 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                   </div>
                 )}
               </div>
-            </div>
           )}
 
           {/* 9. BRANDS */}

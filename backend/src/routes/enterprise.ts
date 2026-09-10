@@ -15,52 +15,6 @@ router.get("/admin/batches", authenticateJWT as any, requireRole(["SuperAdmin", 
       batches.push({ id: doc.id, ...doc.data() });
     });
 
-    if (batches.length === 0) {
-      const now = new Date();
-      const mockBatches = [
-        {
-          id: "BATCH-CV-2026-01",
-          productName: "CeraVe Hydrating Facial Cleanser 236ml",
-          brandName: "CeraVe",
-          batchNumber: "B2026A",
-          quantityReceived: 100,
-          remainingStock: 12,
-          manufacturingDate: "2024-05-10",
-          expiryDate: "2026-09-15",
-          storageLocation: "Warehouse A - Shelf 3",
-          fifoPriority: 1,
-          status: "Expiring Soon",
-        },
-        {
-          id: "BATCH-CX-2026-04",
-          productName: "COSRX Advanced Snail 96 Mucin Power Essence",
-          brandName: "COSRX",
-          batchNumber: "B2026B",
-          quantityReceived: 150,
-          remainingStock: 45,
-          manufacturingDate: "2025-01-15",
-          expiryDate: "2027-01-15",
-          storageLocation: "Warehouse A - Shelf 5",
-          fifoPriority: 2,
-          status: "Healthy",
-        },
-        {
-          id: "BATCH-TO-2026-09",
-          productName: "The Ordinary Niacinamide 10% + Zinc 1%",
-          brandName: "The Ordinary",
-          batchNumber: "B2025Z",
-          quantityReceived: 80,
-          remainingStock: 6,
-          manufacturingDate: "2024-02-01",
-          expiryDate: "2026-08-20",
-          storageLocation: "Warehouse B - Shelf 1",
-          fifoPriority: 1,
-          status: "Expiring Soon (FIFO Priority)",
-        }
-      ];
-      return res.json(mockBatches);
-    }
-
     res.json(batches);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -103,34 +57,6 @@ router.get("/admin/subscriptions", authenticateJWT as any, requireRole(["SuperAd
       subs.push({ id: doc.id, ...doc.data() });
     });
 
-    if (subs.length === 0) {
-      const mockSubs = [
-        {
-          id: "SUB-801",
-          customerName: "Sadia Islam",
-          customerPhone: "01755443322",
-          planName: "Monthly Glow Skincare Box",
-          frequency: "Every 30 Days",
-          monthlyPrice: 3500,
-          discountPercent: 15,
-          nextDeliveryDate: "2026-08-10",
-          status: "Active Auto-Replenish",
-        },
-        {
-          id: "SUB-802",
-          customerName: "Fariha Ahmed",
-          customerPhone: "01822334455",
-          planName: "COSRX Cleanser Auto-Delivery",
-          frequency: "Every 60 Days",
-          monthlyPrice: 1450,
-          discountPercent: 10,
-          nextDeliveryDate: "2026-09-01",
-          status: "Active Auto-Replenish",
-        }
-      ];
-      return res.json(mockSubs);
-    }
-
     res.json(subs);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -147,32 +73,6 @@ router.get("/admin/wallet", authenticateJWT as any, requireRole(["SuperAdmin", "
     snapshot.forEach(doc => {
       wallets.push({ id: doc.id, ...doc.data() });
     });
-
-    if (wallets.length === 0) {
-      const mockWallets = [
-        {
-          id: "w_101",
-          customerName: "Rahim Chowdhury",
-          customerEmail: "rahim@gmail.com",
-          customerPhone: "01711223344",
-          walletBalance: 1250,
-          totalRefundsReceived: 1850,
-          lastTransaction: "Store Credit Refund for Order #GG-8812 (+৳1,250)",
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: "w_102",
-          customerName: "Nusrat Jahan",
-          customerEmail: "nusrat.j@hotmail.com",
-          customerPhone: "01899887766",
-          walletBalance: 600,
-          totalRefundsReceived: 600,
-          lastTransaction: "Loyalty Point Conversion Bonus (+৳600)",
-          updatedAt: new Date().toISOString(),
-        }
-      ];
-      return res.json(mockWallets);
-    }
 
     res.json(wallets);
   } catch (error: any) {
@@ -238,36 +138,6 @@ router.get("/admin/rma", authenticateJWT as any, requireRole(["SuperAdmin", "Man
     snapshot.forEach(doc => {
       rmas.push({ id: doc.id, ...doc.data() });
     });
-
-    if (rmas.length === 0) {
-      const mockRMA = [
-        {
-          id: "RMA-9001",
-          orderNumber: "GG-8842",
-          customerName: "Sharmin Sultana",
-          customerPhone: "01788990011",
-          productName: "CeraVe Hydrating Cleanser",
-          reason: "Leaked parcel inside transit",
-          rmaStep: "Parcel Inspected & Approved",
-          resolution: "Refund to Wallet",
-          refundAmount: 1850,
-          createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
-        },
-        {
-          id: "RMA-9002",
-          orderNumber: "GG-8810",
-          customerName: "Mahmud Hasan",
-          customerPhone: "01911223344",
-          productName: "COSRX Snail Mucin 96",
-          reason: "Wrong shade selected",
-          rmaStep: "Replacement Dispatched",
-          resolution: "Exchange Item",
-          refundAmount: 0,
-          createdAt: new Date(Date.now() - 3600000 * 36).toISOString(),
-        }
-      ];
-      return res.json(mockRMA);
-    }
 
     res.json(rmas);
   } catch (error: any) {

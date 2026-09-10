@@ -5,15 +5,24 @@ const router = Router();
 
 // Memory cache for products queries to maximize performance
 export const productsCache = new Map<string, { data: any; expiry: number }>();
+export const categoriesCache = { data: null as any, expiry: 0 };
+export const brandsCache = { data: null as any, expiry: 0 };
 
 export const clearProductsCache = () => {
   productsCache.clear();
+  categoriesCache.data = null;
+  brandsCache.data = null;
 };
-const CACHE_DURATION_MS = 5000; // 5 seconds fast refresh cache
+const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes fast high-speed cache
 
 // GET /api/categories
 router.get("/categories", async (req: Request, res: Response) => {
   try {
+    const isBypass = req.query.bypass === "true" || req.query.t;
+    if (!isBypass && categoriesCache.data && categoriesCache.expiry > Date.now()) {
+      return res.json(categoriesCache.data);
+    }
+
     const snapshot = await db.collection("categories").get();
     const categoriesList: any[] = [];
     snapshot.forEach(doc => {
@@ -27,6 +36,11 @@ router.get("/categories", async (req: Request, res: Response) => {
       ...parent,
       subCategories: subCategories.filter(sub => sub.parentId === parent.id)
     }));
+
+    if (!isBypass) {
+      categoriesCache.data = result;
+      categoriesCache.expiry = Date.now() + CACHE_DURATION_MS;
+    }
     res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -50,6 +64,7 @@ router.post("/categories", async (req: any, res: any) => {
       updatedAt: new Date().toISOString()
     };
     await docRef.set(data, { merge: true });
+    categoriesCache.data = null;
     res.json({ message: "Category saved successfully", category: data });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -61,6 +76,7 @@ router.delete("/categories/:id", async (req: any, res: any) => {
   try {
     const { id } = req.params;
     await db.collection("categories").doc(id).delete();
+    categoriesCache.data = null;
     res.json({ message: "Category deleted successfully" });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -70,33 +86,88 @@ router.delete("/categories/:id", async (req: any, res: any) => {
 // GET /api/brands
 router.get("/brands", async (req: Request, res: Response) => {
   try {
+    const isBypass = req.query.bypass === "true" || req.query.t;
+    if (!isBypass && brandsCache.data && brandsCache.expiry > Date.now()) {
+      return res.json(brandsCache.data);
+    }
+
     const snapshot = await db.collection("brands").get();
     const brandsList: any[] = [];
     snapshot.forEach(doc => {
       brandsList.push({ id: doc.id, ...doc.data() });
     });
+
+    if (!isBypass) {
+      brandsCache.data = brandsList;
+      brandsCache.expiry = Date.now() + CACHE_DURATION_MS;
+    }
     res.json(brandsList);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// GET /api/products
-router.get("/products", async (req: Request, res: Response) => {
+// POST /api/brands (Add/Update Brand)
+router.post("/brands", async (req: any, res: any) => {
   try {
+    const { id, name, logoUrl, originCountry } = req.body || {};
+    if (!name) return res.status(400).json({ error: "Brand name is required" });
+    const docId = id || name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    const docRef = db.collection("brands").doc(docId);
+    const existingDoc = await docRef.get();
+    const existingData = existingDoc.exists ? existingDoc.data() : {};
+    
+    const data = {
+      ...existingData,
+      id: docId,
+      name,
+      originCountry: originCountry !== undefined ? originCountry : (existingData?.originCountry || "International"),
+      logoUrl: logoUrl || existingData?.logoUrl || "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200&q=80",
+      updatedAt: new Date().toISOString()
+    };
+    await docRef.set(data, { merge: true });
+    brandsCache.data = null;
+    res.json({ message: "Brand saved successfully", brand: data });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/brands/:id
+router.delete("/brands/:id", async (req: any, res: any) => {
+  try {
+    const { id } = req.params;
+    await db.collection("brands").doc(id).delete();
+    brandsCache.data = null;
+    res.json({ message: "Brand deleted successfully" });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/products and /api/admin/products
+const getProductsHandler = async (req: Request, res: Response) => {
+  try {
+    const isBypass = req.query.bypass === "true" || req.query.t || req.headers["cache-control"] === "no-cache";
     const cacheKey = JSON.stringify(req.query);
-    const cached = productsCache.get(cacheKey);
-    if (cached && cached.expiry > Date.now()) {
-      return res.json(cached.data);
+    if (!isBypass) {
+      const cached = productsCache.get(cacheKey);
+      if (cached && cached.expiry > Date.now()) {
+        return res.json(cached.data);
+      }
     }
 
-    const { category, categoryName, brand, campaign, search, minPrice, maxPrice, sort, ids } = req.query;
+    const { category, categoryName, brand, campaign, search, minPrice, maxPrice, sort, ids, all, includeAll, limit, page } = req.query;
 
     const snapshot = await db.collection("products").get();
     let productsList: any[] = [];
-    snapshot.forEach(doc => {
+    const showAll = all === "true" || includeAll === "true";
+
+    snapshot.forEach((doc: any) => {
       const data = doc.data();
-      if (!data.status || data.status === "Active" || data.status === "active" || data.status === "ACTIVE") {
+      const statusLower = (data.status || "").toLowerCase();
+      // If showAll is true, include everything. Otherwise include all products except explicitly deleted/archived
+      if (showAll || !data.status || (statusLower !== "deleted" && statusLower !== "archived")) {
         productsList.push({ id: doc.id, ...data });
       }
     });
@@ -177,12 +248,31 @@ router.get("/products", async (req: Request, res: Response) => {
       return rest;
     });
 
-    productsCache.set(cacheKey, { data: optimizedList, expiry: Date.now() + CACHE_DURATION_MS });
-    res.json(optimizedList);
+    const totalCount = optimizedList.length;
+    const limitNum = limit ? parseInt(limit as string, 10) : undefined;
+    const pageNum = parseInt(page as string, 10) || 1;
+
+    let resultList = optimizedList;
+    if (limitNum && limitNum > 0) {
+      const startIndex = (pageNum - 1) * limitNum;
+      resultList = optimizedList.slice(startIndex, startIndex + limitNum);
+    }
+
+    res.setHeader("X-Total-Count", totalCount.toString());
+    res.setHeader("X-Page", pageNum.toString());
+    if (limitNum) res.setHeader("X-Limit", limitNum.toString());
+
+    if (!isBypass) {
+      productsCache.set(cacheKey, { data: resultList, expiry: Date.now() + CACHE_DURATION_MS });
+    }
+    res.json(resultList);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
-});
+};
+
+router.get("/products", getProductsHandler);
+router.get("/admin/products", getProductsHandler);
 
 // GET /api/products/:id
 router.get("/products/:id", async (req: Request, res: Response) => {
@@ -468,8 +558,8 @@ router.patch("/products/:id", updateProductHandler);
 router.put("/admin/products/:id", updateProductHandler);
 router.patch("/admin/products/:id", updateProductHandler);
 
-// DELETE /api/products/:id (Admin only - Delete product)
-router.delete("/products/:id", async (req: Request, res: Response) => {
+// DELETE /api/products/:id & /api/admin/products/:id (Admin only - Delete product)
+const deleteProductHandler = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const docRef = db.collection("products").doc(id as string);
@@ -478,12 +568,15 @@ router.delete("/products/:id", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Product not found" });
     }
 
-    await docRef.update({ status: "Inactive" });
+    await docRef.delete();
     productsCache.clear();
     res.json({ message: "Product deleted successfully" });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
-});
+};
+
+router.delete("/products/:id", deleteProductHandler);
+router.delete("/admin/products/:id", deleteProductHandler);
 
 export default router;

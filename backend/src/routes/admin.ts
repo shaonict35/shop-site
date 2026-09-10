@@ -166,6 +166,30 @@ router.get("/staff", authenticateJWT as any, requireRole(["SuperAdmin", "Manager
   }
 });
 
+// GET /api/admin/users (SuperAdmin & Manager)
+router.get("/users", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const snapshot = await db.collection("users").get();
+    const usersList: any[] = [];
+    snapshot.forEach(doc => {
+      const data = doc.data() as any;
+      usersList.push({
+        id: doc.id,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        role: data.role || "Customer",
+        status: data.status || "Active",
+        points: data.points || 0,
+        createdAt: data.createdAt,
+      });
+    });
+    res.json(usersList);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // POST /api/admin/staff (SuperAdmin & Manager)
 router.post("/staff", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -316,13 +340,9 @@ router.get("/customers", authenticateJWT as any, requireRole(["SuperAdmin", "Man
       }
     });
 
-    const mockEmailsToExclude = ["skillshoppertraining@gmail.com", "skhan.ict@gmail.com", "shahanazamin29@gmail.com"];
-
     const enrichedCustomers: any[] = [];
     usersSnapshot.forEach(doc => {
       const c = doc.data() as any;
-      if (mockEmailsToExclude.includes(c.email?.toLowerCase())) return;
-
       const orders = customerOrders.get(doc.id) || [];
 
       const totalOrders = orders.length;
@@ -1011,12 +1031,10 @@ router.patch("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin",
 router.get("/customers", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const snapshot = await db.collection("users").get();
-    const mockEmailsToExclude = ["skillshoppertraining@gmail.com", "skhan.ict@gmail.com", "shahanazamin29@gmail.com"];
     const customers: any[] = [];
 
     snapshot.forEach(doc => {
       const data = doc.data();
-      if (mockEmailsToExclude.includes(data.email?.toLowerCase())) return;
 
       if (!data.role || data.role === "Customer") {
         const { passwordHash, ...safeUser } = data;

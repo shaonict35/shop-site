@@ -143,17 +143,18 @@ const ALL_CATEGORIES = [
 ];
 
 const productMatchesSubcategory = (p: Product, subName: string) => {
-  const target = subName.toLowerCase().trim();
+  if (!p) return false;
+  const target = (subName || "").toLowerCase().trim();
   const cName = p.category?.name?.toLowerCase() || "";
   const pName = (p.category as any)?.parent?.name?.toLowerCase() || "";
 
   // 1. Exact or partial match in DB category name
-  if (cName === target || cName.includes(target)) {
+  if (cName === target || (target && cName.includes(target))) {
     return true;
   }
 
   // 2. Fallback: match by product name or description
-  const prodName = p.name.toLowerCase();
+  const prodName = (p.name || "").toLowerCase();
   
   if (target === "face wash") {
     return prodName.includes("face wash") || prodName.includes("facewash") || prodName.includes("cleanser") || prodName.includes("cleansing");
@@ -266,13 +267,16 @@ function ShopPageContent() {
   const brandQuery = searchParams ? searchParams.get("brand") : null;
   const campaignQuery = searchParams ? searchParams.get("campaign") : null;
   const searchQuery = searchParams ? searchParams.get("search") : null;
+  const dealQuery = searchParams ? searchParams.get("deal") : null;
 
-  // Initialize searchVal from URL ?search= param
+  // Initialize searchVal from URL ?search= or ?deal= param
   useEffect(() => {
     if (searchQuery) {
       setSearchVal(searchQuery);
+    } else if (dealQuery) {
+      setSearchVal(dealQuery);
     }
-  }, [searchQuery]);
+  }, [searchQuery, dealQuery]);
 
   useEffect(() => {
     // Sync filter states with URL query parameters in real-time on query changes
@@ -303,7 +307,7 @@ function ShopPageContent() {
     }
 
     if (brandQuery && brands.length > 0) {
-      const matchedBrand = brands.find(b => b.id === brandQuery || b.name.toLowerCase() === brandQuery.toLowerCase());
+      const matchedBrand = brands.find(b => b && (b.id === brandQuery || (b.name && b.name.toLowerCase() === brandQuery.toLowerCase())));
       if (matchedBrand) {
         setSelectedBrands([matchedBrand.name]);
       } else {
@@ -319,68 +323,11 @@ function ShopPageContent() {
       setLoading(true);
       try {
         const [prodData, brandData] = await Promise.all([
-          fetchWithCache(`${API_BASE}/products`),
-          fetchWithCache(`${API_BASE}/brands`),
+          fetchWithCache(`${API_BASE}/products?includeAll=true&t=${Date.now()}`, true),
+          fetchWithCache(`${API_BASE}/brands?t=${Date.now()}`, true),
         ]);
-        const DEFAULT_STORE_PRODUCTS: any[] = [
-          {
-            id: "prod-skincare-1",
-            name: "The Ordinary Niacinamide 10% + Zinc 1%",
-            description: "High-strength vitamin and mineral blemish formula.",
-            category: { id: "cat-skincare", name: "Skincare" },
-            brand: { id: "brand-ordinary", name: "The Ordinary" },
-            images: [{ id: "img-1", url: "https://images.unsplash.com/photo-1608248597279-f99d160bfbc5?w=600&auto=format&fit=crop&q=80", isPrimary: true }],
-            variants: [{ id: "var-1", name: "30ml", price: 1250, discountPrice: 990, stock: 50, shadeColor: null }]
-          },
-          {
-            id: "prod-skincare-2",
-            name: "CeraVe Foaming Facial Cleanser",
-            description: "Cleanses and removes oil without disrupting the protective skin barrier.",
-            category: { id: "cat-skincare", name: "Skincare" },
-            brand: { id: "brand-cerave", name: "CeraVe" },
-            images: [{ id: "img-2", url: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&auto=format&fit=crop&q=80", isPrimary: true }],
-            variants: [{ id: "var-2", name: "236ml", price: 1850, discountPrice: 1550, stock: 35, shadeColor: null }]
-          },
-          {
-            id: "prod-makeup-1",
-            name: "Maybelline Fit Me Matte + Poreless Liquid Foundation",
-            description: "Ultra-lightweight foundation that mattifies and refines pores.",
-            category: { id: "cat-makeup", name: "Makeup" },
-            brand: { id: "brand-maybelline", name: "Maybelline" },
-            images: [{ id: "img-3", url: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=600&auto=format&fit=crop&q=80", isPrimary: true }],
-            variants: [{ id: "var-3", name: "120 Classic Ivory", price: 1100, discountPrice: 890, stock: 40, shadeColor: "#f3cfb3" }]
-          },
-          {
-            id: "prod-makeup-2",
-            name: "L'Oreal Paris Volume Million Lashes Mascara",
-            description: "Volumizing mascara for intense fan effect lashes.",
-            category: { id: "cat-makeup", name: "Makeup" },
-            brand: { id: "brand-loreal", name: "L'Oreal Paris" },
-            images: [{ id: "img-4", url: "https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=600&auto=format&fit=crop&q=80", isPrimary: true }],
-            variants: [{ id: "var-4", name: "Black", price: 1350, discountPrice: 1050, stock: 25, shadeColor: "#000000" }]
-          },
-          {
-            id: "prod-haircare-1",
-            name: "COSRX Advanced Snail 96 Mucin Power Essence",
-            description: "Lightweight essence that absorbs quickly into skin to impart a natural glow.",
-            category: { id: "cat-skincare", name: "Skincare" },
-            brand: { id: "brand-cosrx", name: "COSRX" },
-            images: [{ id: "img-5", url: "https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=600&auto=format&fit=crop&q=80", isPrimary: true }],
-            variants: [{ id: "var-5", name: "100ml", price: 1750, discountPrice: 1450, stock: 60, shadeColor: null }]
-          },
-          {
-            id: "prod-combo-1",
-            name: "GlowGoodly Hydration Routine Combo",
-            description: "Complete 3-step hydrating routine for glowing skin.",
-            category: { id: "cat-combo", name: "Perfect Match COMBO" },
-            campaignName: "COMBO",
-            brand: { id: "brand-glowgoodly", name: "GlowGoodly" },
-            images: [{ id: "img-6", url: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=600&auto=format&fit=crop&q=80", isPrimary: true }],
-            variants: [{ id: "var-6", name: "Full Set", price: 3500, discountPrice: 2790, stock: 20, shadeColor: null }]
-          }
-        ];
 
-        const validProds = (Array.isArray(prodData) && prodData.length > 0) ? prodData : DEFAULT_STORE_PRODUCTS;
+        const validProds = Array.isArray(prodData) ? prodData : [];
         const validBrands = Array.isArray(brandData) ? brandData : [];
 
         setProducts(validProds);
@@ -475,9 +422,9 @@ function ShopPageContent() {
     }
 
     if (selectedBrands.length > 0) {
-      const lowerSelected = selectedBrands.map(b => b.toLowerCase().trim());
+      const lowerSelected = selectedBrands.map(b => (b || "").toLowerCase().trim());
       filtered = filtered.filter((p) => {
-        const brandName = p.brand?.name?.toLowerCase().trim();
+        const brandName = (p.brand?.name || "").toLowerCase().trim();
         return brandName && lowerSelected.includes(brandName);
       });
     }
@@ -490,9 +437,9 @@ function ShopPageContent() {
       const q = searchVal.toLowerCase();
       filtered = filtered.filter(
         (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.brand?.name?.toLowerCase().includes(q) ||
-          p.category?.name?.toLowerCase().includes(q)
+          (p.name || "").toLowerCase().includes(q) ||
+          (p.brand?.name || "").toLowerCase().includes(q) ||
+          (p.category?.name || "").toLowerCase().includes(q)
       );
     }
 
@@ -506,31 +453,20 @@ function ShopPageContent() {
 
     if (sortVal === "price_asc") {
       filtered.sort((a, b) => {
-        const pa = a.variants[0]?.discountPrice ?? a.variants[0]?.price ?? 0;
-        const pb = b.variants[0]?.discountPrice ?? b.variants[0]?.price ?? 0;
+        const pa = a.variants?.[0]?.discountPrice ?? a.variants?.[0]?.price ?? a.price ?? 0;
+        const pb = b.variants?.[0]?.discountPrice ?? b.variants?.[0]?.price ?? b.price ?? 0;
         return pa - pb;
       });
     } else if (sortVal === "price_desc") {
       filtered.sort((a, b) => {
-        const pa = a.variants[0]?.discountPrice ?? a.variants[0]?.price ?? 0;
-        const pb = b.variants[0]?.discountPrice ?? b.variants[0]?.price ?? 0;
+        const pa = a.variants?.[0]?.discountPrice ?? a.variants?.[0]?.price ?? a.price ?? 0;
+        const pb = b.variants?.[0]?.discountPrice ?? b.variants?.[0]?.price ?? b.price ?? 0;
         return pb - pa;
       });
     }
 
     setVisibleProducts(filtered);
   }, [searchVal, priceRange, sortVal, products, activeCategories, activeSubcategories, selectedBrands, campaignQuery]);
-
-  useEffect(() => {
-    if (isInitial) {
-      setIsInitial(false);
-      return;
-    }
-    const mainContent = document.getElementById("shop-main-section");
-    if (mainContent) {
-      mainContent.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, [activeCategories, activeSubcategories, selectedBrands]);
 
   const handleAddToCart = (product: Product, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -690,7 +626,7 @@ function ShopPageContent() {
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
           {brands
-            .filter((b) => b.name.toLowerCase().includes(brandSearchQuery.toLowerCase()))
+            .filter((b) => b && (b.name || "").toLowerCase().includes(brandSearchQuery.toLowerCase()))
             .slice(0, showAllBrands ? undefined : 15)
             .map((b) => {
               const isChecked = selectedBrands.includes(b.name);
@@ -714,7 +650,7 @@ function ShopPageContent() {
           {brands.length === 0 && <p style={{ fontSize: "12px", color: "#a0aec0", padding: "6px 0" }}>Loading brands...</p>}
         </div>
         
-        {brands.filter((b) => b.name.toLowerCase().includes(brandSearchQuery.toLowerCase())).length > 15 && (
+        {brands.filter((b) => b && (b.name || "").toLowerCase().includes(brandSearchQuery.toLowerCase())).length > 15 && (
           <button 
             onClick={() => setShowAllBrands(!showAllBrands)} 
             style={{ marginTop: "12px", fontSize: "11.5px", fontWeight: "800", color: "#e52860", background: "none", border: "none", cursor: "pointer", padding: "0", textTransform: "uppercase" }}

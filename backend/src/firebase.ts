@@ -137,6 +137,8 @@ class MockCollection {
         id: b.id,
         title: b.title,
         imageUrl: b.imageUrl,
+        mobileImageUrl: b.mobileImageUrl || b.imageUrl,
+        tabletImageUrl: b.tabletImageUrl || b.imageUrl,
         linkUrl: b.linkUrl || null,
         bgColor: b.bgColor || "#1a1a2e",
         page: b.page || "Homepage",
@@ -548,6 +550,52 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
         });
       }
     }
+  } else if (colName === "categories") {
+    try {
+      await prisma.category.upsert({
+        where: { id },
+        update: {
+          name: data.name,
+          parentId: data.parentId || null,
+          imageUrl: data.imageUrl || null,
+        },
+        create: {
+          id,
+          name: data.name,
+          parentId: data.parentId || null,
+          imageUrl: data.imageUrl || null,
+        }
+      });
+    } catch (e) {
+      console.warn("Prisma category upsert note:", e);
+    } finally {
+      if (!inMemoryCollections.has(colName)) {
+        inMemoryCollections.set(colName, new Map());
+      }
+      inMemoryCollections.get(colName)!.set(id, { id, ...data });
+    }
+  } else if (colName === "brands") {
+    try {
+      await prisma.brand.upsert({
+        where: { id },
+        update: {
+          name: data.name,
+          logoUrl: data.logoUrl || null,
+        },
+        create: {
+          id,
+          name: data.name,
+          logoUrl: data.logoUrl || null,
+        }
+      });
+    } catch (e) {
+      console.warn("Prisma brand upsert note:", e);
+    } finally {
+      if (!inMemoryCollections.has(colName)) {
+        inMemoryCollections.set(colName, new Map());
+      }
+      inMemoryCollections.get(colName)!.set(id, { id, ...data });
+    }
   } else {
     if (!inMemoryCollections.has(colName)) {
       inMemoryCollections.set(colName, new Map());
@@ -573,7 +621,19 @@ async function mockUpdatePrisma(colName: string, id: string, data: any) {
   }
   
   if (colName === "banners") {
-    await prisma.promoBanner.update({ where: { id }, data: flatData });
+    try {
+      await prisma.promoBanner.update({ where: { id }, data: flatData });
+    } catch (e) {
+      try {
+        await prisma.promoBanner.upsert({
+          where: { id },
+          update: flatData,
+          create: { id, title: flatData.title || "Banner", imageUrl: flatData.imageUrl || "", ...flatData }
+        });
+      } catch (err) {
+        console.warn("Banner prisma update fallback note:", err);
+      }
+    }
   } else if (colName === "settings") {
     await prisma.setting.update({ where: { id }, data: flatData });
   } else if (colName === "notifications") {
@@ -584,12 +644,15 @@ async function mockUpdatePrisma(colName: string, id: string, data: any) {
     await prisma.user.update({ where: { id }, data: flatData });
   } else if (colName === "orders") {
     await prisma.order.update({ where: { id }, data: flatData });
-  } else {
-    const colMap = inMemoryCollections.get(colName);
-    if (colMap && colMap.has(id)) {
-      colMap.set(id, { ...colMap.get(id), ...data });
-    }
   }
+
+  // Always keep inMemoryCollections synchronized with latest updates
+  if (!inMemoryCollections.has(colName)) {
+    inMemoryCollections.set(colName, new Map());
+  }
+  const colMap = inMemoryCollections.get(colName)!;
+  const prevDoc = colMap.get(id) || {};
+  colMap.set(id, { ...prevDoc, ...data, id });
 }
 
 async function mockDeletePrisma(colName: string, id: string) {

@@ -12,22 +12,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     '/about',
     '/contact',
     '/faq',
-    '/login',
-    '/account',
-    '/wishlist',
-    '/checkout',
-    '/privacy-policy',
-    '/terms-and-conditions',
-    '/refund-policy',
+    '/brands',
+    '/blog',
+    '/authenticity',
     '/routine',
     '/makeup-101',
     '/skin-care-101',
     '/hair-care-101',
+    '/shipping-delivery',
+    '/privacy-policy',
+    '/terms',
+    '/refund-policy',
+    '/trade-license',
   ].map((route) => ({
     url: `${baseUrl}${route}`,
     lastModified: new Date(),
-    changeFrequency: 'daily' as const,
-    priority: route === '' ? 1.0 : 0.8,
+    changeFrequency: (route === '' ? 'daily' : 'weekly') as const,
+    priority: route === '' ? 1.0 : (route === '/shop' ? 0.9 : 0.7),
   }));
 
   const categoryPages = [
@@ -41,18 +42,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     'combo',
     'bogo',
     'clearance-sale',
-    'men',
+    'k-beauty',
   ].map((cat) => ({
     url: `${baseUrl}/shop?category=${cat}`,
     lastModified: new Date(),
     changeFrequency: 'daily' as const,
-    priority: 0.9,
+    priority: 0.85,
   }));
 
   let productPages: MetadataRoute.Sitemap = [];
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
     const res = await fetch(`${API_BASE}/products`, { 
       next: { revalidate: 3600 },
       signal: controller.signal
@@ -63,7 +64,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       if (Array.isArray(products)) {
         productPages = products.map((p: any) => ({
           url: `${baseUrl}/product/${p.id}`,
-          lastModified: new Date(),
+          lastModified: p.updatedAt ? new Date(p.updatedAt) : new Date(),
           changeFrequency: 'weekly' as const,
           priority: 0.8,
         }));

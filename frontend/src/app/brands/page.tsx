@@ -33,7 +33,7 @@ export default function BrandsPage() {
     const fetchBrands = async (bypass: boolean = false) => {
       setLoading(true);
       try {
-        const data = await fetchWithCache(`${API_BASE}/brands`, bypass);
+        const data = await fetchWithCache(`${API_BASE}/brands?t=${Date.now()}`, true);
         if (Array.isArray(data)) {
           setBrands(data);
         }

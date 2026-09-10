@@ -40,34 +40,6 @@ router.get("/admin/abandoned-carts", authenticateJWT as any, requireRole(["Super
       carts.push({ id: doc.id, ...doc.data() });
     });
     
-    if (carts.length === 0) {
-      const mockCarts = [
-        {
-          id: "cart_901",
-          customerName: "Rahim Chowdhury",
-          customerEmail: "rahim@gmail.com",
-          customerPhone: "01711223344",
-          items: [{ productName: "CeraVe Hydrating Cleanser", price: 1850, quantity: 1 }],
-          cartTotal: 1850,
-          lastActive: new Date(Date.now() - 3600000 * 2).toISOString(),
-          status: "Abandoned",
-          reminderSent: false,
-        },
-        {
-          id: "cart_902",
-          customerName: "Nusrat Jahan",
-          customerEmail: "nusrat.j@hotmail.com",
-          customerPhone: "01899887766",
-          items: [{ productName: "COSRX Snail 96 Mucin Power Essence", price: 1650, quantity: 2 }],
-          cartTotal: 3300,
-          lastActive: new Date(Date.now() - 3600000 * 14).toISOString(),
-          status: "Abandoned",
-          reminderSent: true,
-        }
-      ];
-      return res.json(mockCarts);
-    }
-
     carts.sort((a, b) => new Date(b.lastActive || b.createdAt).getTime() - new Date(a.lastActive || a.createdAt).getTime());
     res.json(carts);
   } catch (error: any) {
@@ -102,28 +74,6 @@ router.get("/admin/upsells", async (req: Request, res: Response) => {
     snapshot.forEach(doc => {
       rules.push({ id: doc.id, ...doc.data() });
     });
-
-    if (rules.length === 0) {
-      const mockRules = [
-        {
-          id: "upsell_1",
-          triggerProduct: "COSRX Low pH Good Morning Gel Cleanser",
-          suggestedProduct: "COSRX Oil-Free Ultra-Moisturizing Lotion",
-          discountPercentage: 15,
-          offerMessage: "Get 15% OFF moisturizer when bought together!",
-          isActive: true,
-        },
-        {
-          id: "upsell_2",
-          triggerProduct: "The Ordinary Niacinamide 10% + Zinc 1%",
-          suggestedProduct: "The Ordinary Hyaluronic Acid 2% + B5",
-          discountPercentage: 10,
-          offerMessage: "Pair with Hyaluronic Acid for maximum hydration!",
-          isActive: true,
-        }
-      ];
-      return res.json(mockRules);
-    }
 
     res.json(rules);
   } catch (error: any) {
@@ -171,34 +121,6 @@ router.get("/admin/influencers", authenticateJWT as any, requireRole(["SuperAdmi
     snapshot.forEach(doc => {
       list.push({ id: doc.id, ...doc.data() });
     });
-
-    if (list.length === 0) {
-      const mockList = [
-        {
-          id: "inf_101",
-          name: "GlamBySabrina",
-          email: "sabrina.beauty@gmail.com",
-          promoCode: "SABRINA10",
-          commissionRate: 10,
-          totalSalesGenerated: 45200,
-          totalCommissionEarned: 4520,
-          status: "Active",
-          createdAt: "2026-06-15T10:00:00.000Z",
-        },
-        {
-          id: "inf_102",
-          name: "MakeupWithTanvir",
-          email: "tanvir.looks@youtube.com",
-          promoCode: "TANVIR15",
-          commissionRate: 15,
-          totalSalesGenerated: 28900,
-          totalCommissionEarned: 4335,
-          status: "Active",
-          createdAt: "2026-07-01T12:30:00.000Z",
-        }
-      ];
-      return res.json(mockList);
-    }
 
     res.json(list);
   } catch (error: any) {
