@@ -8,6 +8,7 @@ import { useApp } from "../../../context/AppContext";
 import { trackViewContent } from "../../../utils/pixel";
 import Link from "next/link";
 import { API_BASE } from "../../../utils/api";
+import GlowLoader from "../../../components/GlowLoader";
 
 interface Variant {
   id: string;
@@ -320,8 +321,8 @@ export default function ProductPage() {
     return (
       <>
         <Header />
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "350px" }}>
-          <div style={{ display: "inline-block", width: "36px", height: "36px", border: "3px solid #f3f3f3", borderTop: "3px solid var(--primary)", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+          <GlowLoader text="Loading Product Details..." subtext="Fetching authentic product information" />
         </div>
         <MobileNavbar />
       </>

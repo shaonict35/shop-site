@@ -3294,6 +3294,163 @@ button, a, input, select {
   }
 }
 
+/* ============================================================
+   GLOBAL ANIMATIONS & MODERN LUXURY LOADER
+   ============================================================ */
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes spinReverse {
+  0% { transform: rotate(360deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(229, 40, 96, 0.35);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 32px rgba(229, 40, 96, 0.7);
+    transform: scale(1.025);
+  }
+}
+
+@keyframes floatSoft {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+@keyframes floatCard {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes shimmerEffect {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes badgePulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes rippleWave {
+  0% {
+    box-shadow: 0 0 0 0 rgba(229, 40, 96, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 16px rgba(229, 40, 96, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(229, 40, 96, 0);
+  }
+}
+
+/* Luxury Branded Loader */
+.glow-spinner-ring {
+  width: 52px;
+  height: 52px;
+  border: 3px solid rgba(229, 40, 96, 0.15);
+  border-top: 3px solid #e52860;
+  border-right: 3px solid #f43f5e;
+  border-radius: 50%;
+  animation: spin 0.85s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+  position: relative;
+}
+
+.glow-spinner-inner {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  right: 5px;
+  bottom: 5px;
+  border: 2px solid transparent;
+  border-bottom: 2px solid #fb7185;
+  border-radius: 50%;
+  animation: spinReverse 0.6s linear infinite;
+}
+
+.glow-card-interactive {
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, box-shadow;
+}
+
+.glow-card-interactive:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 16px 36px -10px rgba(229, 40, 96, 0.18), 0 0 0 1px rgba(229, 40, 96, 0.15) !important;
+}
+
+.glow-interactive-button {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glow-interactive-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(229, 40, 96, 0.35);
+}
+
+.glow-interactive-button:active {
+  transform: translateY(1px);
+}
+
+
 
 
 

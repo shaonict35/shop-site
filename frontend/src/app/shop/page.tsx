@@ -9,6 +9,7 @@ import PromoBanner from "../../components/PromoBanner";
 import Footer from "../../components/Footer";
 import MobileNavbar from "../../components/MobileNavbar";
 import { useApp } from "../../context/AppContext";
+import GlowLoader from "../../components/GlowLoader";
 
 
 interface Variant {
@@ -793,9 +794,7 @@ function ShopPageContent() {
 
             {/* Product Grid */}
             {loading ? (
-              <div style={{ textAlign: "center", padding: "60px 0", color: "#e63b7a" }}>
-                <div style={{ display: "inline-block", width: "36px", height: "36px", border: "3px solid #f3f3f3", borderTop: "3px solid #e63b7a", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
-              </div>
+              <GlowLoader text="Loading Products..." subtext="Filtering authentic cosmetics & skincare" />
             ) : visibleProducts.length === 0 ? (
               <div style={{ textAlign: "center", padding: "60px 0", backgroundColor: "#ffffff", borderRadius: "12px", border: "1.5px solid #e2e8f0" }}>
                 <h3 style={{ fontSize: "18px", fontWeight: "800", color: "#1e293b", marginBottom: "8px" }}>No products found</h3>
