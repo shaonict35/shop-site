@@ -86,8 +86,8 @@ app.use("/api", (req, res, next) => {
     res.setHeader("Expires", "0");
     res.setHeader("Surrogate-Control", "no-store");
   } else {
-    // 5 minutes client/browser cache with 10 minutes stale-while-revalidate for instantaneous repeat loading (<100ms)
-    res.setHeader("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
+    // Fast 5-second client micro-cache with revalidation: immediate updates across browsers while retaining instant browsing
+    res.setHeader("Cache-Control", "public, max-age=5, stale-while-revalidate=10, must-revalidate");
   }
   next();
 });

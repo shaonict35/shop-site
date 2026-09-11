@@ -3,20 +3,17 @@
 import React from "react";
 import Link from "next/link";
 import { useApp } from "../context/AppContext";
-import { API_BASE } from "../utils/api";
+import { API_BASE, fetchWithCache } from "../utils/api";
 
 export default function Footer() {
   const { siteSettings } = useApp();
   const [footerMenus, setFooterMenus] = React.useState<any[]>([]);
 
-  const loadFooterMenus = async () => {
+  const loadFooterMenus = async (bypass = false) => {
     try {
-      const res = await fetch(`${API_BASE}/menus?location=Footer`, { cache: "no-store" });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setFooterMenus(data);
-        }
+      const data = await fetchWithCache(`${API_BASE}/menus?location=Footer`, bypass);
+      if (Array.isArray(data) && data.length > 0) {
+        setFooterMenus(data);
       }
     } catch (err) {
       console.warn("Using default footer menus");
@@ -24,8 +21,8 @@ export default function Footer() {
   };
 
   React.useEffect(() => {
-    loadFooterMenus();
-    const handleSync = () => loadFooterMenus();
+    loadFooterMenus(false);
+    const handleSync = () => loadFooterMenus(true);
     window.addEventListener("glowgoodly_data_updated", handleSync);
     return () => window.removeEventListener("glowgoodly_data_updated", handleSync);
   }, []);

@@ -6,16 +6,18 @@ import Footer from "../../components/Footer";
 import MobileNavbar from "../../components/MobileNavbar";
 import { useApp } from "../../context/AppContext";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ShoppingBag, ArrowRight, Trash2, Plus, Minus, ShieldCheck } from "lucide-react";
 import { getProductUrl } from "../../utils/api";
 
 export default function CartPage() {
+  const router = useRouter();
   const { cart, removeFromCart, updateCartQuantity, clearCart } = useApp();
 
   const cartSubtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
 
   const handleProceedToCheckout = () => {
-    window.location.href = "/checkout";
+    router.push("/checkout");
   };
 
   return (

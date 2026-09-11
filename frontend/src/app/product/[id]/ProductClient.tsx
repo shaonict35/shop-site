@@ -7,7 +7,7 @@ import Footer from "../../../components/Footer";
 import { useApp } from "../../../context/AppContext";
 import { trackViewContent } from "../../../utils/pixel";
 import Link from "next/link";
-import { API_BASE, getProductUrl, generateSlug } from "../../../utils/api";
+import { API_BASE, getProductUrl, generateSlug, fetchWithCache } from "../../../utils/api";
 import GlowLoader from "../../../components/GlowLoader";
 
 interface Variant {
@@ -36,9 +36,10 @@ interface ProductDetail {
   reviews: { id: string; customerName: string; rating: number; comment: string; createdAt: string }[];
 }
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
-export default function ProductPage() {
+export default function ProductPage({ initialProduct }: { initialProduct?: any } = {}) {
+  const router = useRouter();
   const { addToCart, wishlist, toggleWishlist } = useApp();
   const routeParams = useParams();
   const rawId = routeParams?.id as string;
@@ -60,9 +61,9 @@ export default function ProductPage() {
 
   const productId = clientProductId || (rawId !== "default" ? rawId : "");
   const [unwrappedParams, setUnwrappedParams] = useState<{ id: string } | null>(null);
-  const [product, setProduct] = useState<ProductDetail | null>(null);
+  const [product, setProduct] = useState<ProductDetail | null>(initialProduct || null);
   const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialProduct);
   const relatedSliderRef = useRef<HTMLDivElement>(null);
   const offersSliderRef = useRef<HTMLDivElement>(null);
   const [isOffersPaused, setIsOffersPaused] = useState(false);
@@ -91,8 +92,13 @@ export default function ProductPage() {
   }, [isOffersPaused]);
 
   // Detail View States
-  const [activeImage, setActiveImage] = useState("");
-  const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
+  const initialCoverImg = initialProduct?.images?.find((img: any) => img.isPrimary)?.url 
+    || initialProduct?.images?.[0]?.url 
+    || (initialProduct?.variants?.[0] as any)?.imageUrl 
+    || "";
+
+  const [activeImage, setActiveImage] = useState(initialCoverImg);
+  const [selectedVariant, setSelectedVariant] = useState<Variant | null>(initialProduct?.variants?.[0] || null);
   const [activeTab, setActiveTab] = useState<"desc" | "ingredients" | "howToUse">("desc");
 
   // Review Form States
@@ -107,19 +113,17 @@ export default function ProductPage() {
       window.scrollTo(0, 0);
     }
     const fetchProductDetails = async () => {
-      setLoading(true);
+      if (!product) {
+        setLoading(true);
+      }
       try {
-        let res = await fetch(`${API_BASE}/products/${productId}`, { cache: "no-store" });
-        let data: any = null;
+        let data: any = await fetchWithCache(`${API_BASE}/products/${productId}`);
 
-        if (res.ok) {
-          data = await res.json();
-        } else {
+        if (!data || !data.product) {
           // Fallback search in full product list
-          const listRes = await fetch(`${API_BASE}/products`, { cache: "no-store" });
-          if (listRes.ok) {
-            const list = await listRes.json();
-            const matched = (list || []).find((p: any) => p.id === productId || p.slug === productId || generateSlug(p.name) === productId);
+          const list = await fetchWithCache(`${API_BASE}/products`);
+          if (Array.isArray(list)) {
+            const matched = list.find((p: any) => p.id === productId || p.slug === productId || generateSlug(p.name) === productId);
             if (matched) {
               data = { product: matched, relatedProducts: list.slice(0, 6) };
             }
@@ -136,9 +140,9 @@ export default function ProductPage() {
             || (data.product.variants?.[0] as any)?.imageUrl 
             || "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&auto=format&fit=crop&q=60";
 
-          setActiveImage(mainCoverImg);
+          setActiveImage((prev: string) => prev || mainCoverImg);
           if (data.product.variants && data.product.variants.length > 0) {
-            setSelectedVariant(data.product.variants[0]);
+            setSelectedVariant((prev: Variant | null) => prev || data.product.variants[0]);
           }
 
           // Meta Pixel ViewContent event
@@ -249,7 +253,7 @@ export default function ProductPage() {
 
   const handleBuyNow = () => {
     handleAddToCart();
-    window.location.href = "/checkout";
+    router.push("/checkout");
   };
 
   const handleReviewSubmit = async (e: React.FormEvent) => {

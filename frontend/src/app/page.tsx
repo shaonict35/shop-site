@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { fetchWithCache, API_BASE, getProductUrl } from "../utils/api";
+import { fetchWithCache, API_BASE, getProductUrl, subscribeToDataSync } from "../utils/api";
 import { registerFcmToken } from "../utils/fcm";
 
 import Header from "../components/Header";
@@ -65,7 +65,7 @@ const DEFAULT_HERO_SLIDES = [
   }
 ];
 
-export const DEFAULT_HOMEPAGE_BANNERS = [
+const DEFAULT_HOMEPAGE_BANNERS = [
   // Deals You Cannot Miss (4 Cards)
   {
     id: "default-deal-1",
@@ -293,12 +293,7 @@ export default function Home() {
     };
     fetchMetadata();
 
-    const handleSyncEvent = () => fetchMetadata(true);
-    window.addEventListener("glowgoodly_data_updated", handleSyncEvent);
-
-    return () => {
-      window.removeEventListener("glowgoodly_data_updated", handleSyncEvent);
-    };
+    return subscribeToDataSync(() => fetchMetadata(true));
   }, []);
 
   // Fetch filtered products
@@ -325,12 +320,7 @@ export default function Home() {
 
     fetchProducts();
 
-    const handleSyncEvent = () => fetchProducts(true);
-    window.addEventListener("glowgoodly_data_updated", handleSyncEvent);
-
-    return () => {
-      window.removeEventListener("glowgoodly_data_updated", handleSyncEvent);
-    };
+    return subscribeToDataSync(() => fetchProducts(true));
   }, [activeCategory, activeBrand, searchQuery, minPrice, maxPrice, sortOption]);
 
 

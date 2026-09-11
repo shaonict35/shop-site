@@ -6,7 +6,7 @@ import Header from "../../components/Header";
 import PromoBanner from "../../components/PromoBanner";
 import Footer from "../../components/Footer";
 import MobileNavbar from "../../components/MobileNavbar";
-import { fetchWithCache, API_BASE, generateSlug } from "../../utils/api";
+import { fetchWithCache, API_BASE, generateSlug, subscribeToDataSync } from "../../utils/api";
 
 interface Brand {
   id: string;
@@ -63,9 +63,7 @@ export default function BrandsPage() {
     };
     fetchBrands();
 
-    const handleSync = () => fetchBrands(true);
-    window.addEventListener("glowgoodly_data_updated", handleSync);
-    return () => window.removeEventListener("glowgoodly_data_updated", handleSync);
+    return subscribeToDataSync(() => fetchBrands(true));
   }, []);
 
   const filteredBrands = brands.filter((b) =>

@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { trackAddToCart } from "../utils/pixel";
-import { API_BASE } from "../utils/api";
+import { API_BASE, fetchWithCache } from "../utils/api";
 
 export interface CartItem {
   id: string; // variantId
@@ -71,19 +71,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const siteSettings = trackingSettings;
 
   // Fetch dynamic integration settings for tracking scripts & navigation links
-  const refreshTracking = async () => {
+  const refreshTracking = async (bypass = false) => {
     try {
-      const res = await fetch(`${API_BASE}/settings/public`);
-      if (res.ok) {
-        const text = await res.text();
-        if (text && text.trim()) {
-          try {
-            const data = JSON.parse(text);
-            setTrackingSettings(data);
-          } catch (err) {
-            console.warn("Invalid JSON in /settings/public response");
-          }
-        }
+      const data = await fetchWithCache(`${API_BASE}/settings/public`, bypass);
+      if (data && typeof data === "object") {
+        setTrackingSettings(data);
       }
     } catch (e) {
       console.log("Could not load dynamic analytics integrations, using defaults.", e);

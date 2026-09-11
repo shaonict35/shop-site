@@ -236,6 +236,40 @@ class MockCollection {
         isApproved: r.isApproved,
         createdAt: r.createdAt.toISOString(),
       }));
+    } else if (this.colName === "menu_items" || this.colName === "menus" || this.colName === "MenuItem") {
+      try {
+        const items = await prisma.menuItem.findMany({
+          orderBy: { sortOrder: "asc" }
+        });
+        data = items.map(m => ({
+          id: m.id,
+          title: m.title,
+          url: m.url,
+          location: m.location,
+          parentId: m.parentId,
+          sortOrder: m.sortOrder,
+          createdAt: m.createdAt.toISOString(),
+          updatedAt: m.updatedAt.toISOString(),
+        }));
+      } catch (err) {
+        // Fallback to in-memory if table does not exist
+      }
+    } else if (this.colName === "cms_pages" || this.colName === "pages" || this.colName === "CmsPage") {
+      try {
+        const items = await prisma.cmsPage.findMany();
+        data = items.map(p => ({
+          id: p.id,
+          slug: p.slug,
+          title: p.title,
+          contentHtml: p.contentHtml,
+          metaTitle: p.metaTitle,
+          metaDescription: p.metaDescription,
+          createdAt: p.createdAt.toISOString(),
+          updatedAt: p.updatedAt.toISOString(),
+        }));
+      } catch (err) {
+        // Fallback to in-memory
+      }
     }
     
     // Always merge inMemoryCollections to support dynamic memory items
@@ -400,6 +434,47 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
         isApproved: Boolean(data.isApproved),
       }
     });
+  } else if (colName === "menu_items" || colName === "menus" || colName === "MenuItem") {
+    try {
+      await prisma.menuItem.upsert({
+        where: { id },
+        update: {
+          title: data.title || "",
+          url: data.url || "",
+          location: data.location || "Header",
+          parentId: data.parentId || null,
+          sortOrder: typeof data.sortOrder === "number" ? data.sortOrder : parseInt(data.sortOrder || "0", 10) || 0,
+        },
+        create: {
+          id,
+          title: data.title || "",
+          url: data.url || "",
+          location: data.location || "Header",
+          parentId: data.parentId || null,
+          sortOrder: typeof data.sortOrder === "number" ? data.sortOrder : parseInt(data.sortOrder || "0", 10) || 0,
+        }
+      });
+    } catch (e) {}
+  } else if (colName === "cms_pages" || colName === "pages" || colName === "CmsPage") {
+    try {
+      await prisma.cmsPage.upsert({
+        where: { slug: data.slug || id },
+        update: {
+          title: data.title || "",
+          contentHtml: data.contentHtml || "",
+          metaTitle: data.metaTitle || null,
+          metaDescription: data.metaDescription || null,
+        },
+        create: {
+          id,
+          slug: data.slug || id,
+          title: data.title || "",
+          contentHtml: data.contentHtml || "",
+          metaTitle: data.metaTitle || null,
+          metaDescription: data.metaDescription || null,
+        }
+      });
+    } catch (e) {}
   } else if (colName === "users") {
     await prisma.user.upsert({
       where: { id },
@@ -467,13 +542,33 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
       }
     }
   } else if (colName === "products") {
+    // 1. Ensure valid Brand in MySQL to satisfy foreign key
+    const finalBrandId = data.brandId || "brand-default";
+    try {
+      await prisma.brand.upsert({
+        where: { id: finalBrandId },
+        update: data.brand?.name ? { name: data.brand.name } : {},
+        create: { id: finalBrandId, name: data.brand?.name || "Authentic Brand" }
+      });
+    } catch (bErr) {}
+
+    // 2. Ensure valid Category in MySQL to satisfy foreign key
+    const finalCategoryId = data.categoryId || "cat-default";
+    try {
+      await prisma.category.upsert({
+        where: { id: finalCategoryId },
+        update: data.category?.name ? { name: data.category.name } : {},
+        create: { id: finalCategoryId, name: data.category?.name || "Cosmetics" }
+      });
+    } catch (cErr) {}
+
     await prisma.product.upsert({
       where: { id },
       update: {
         name: data.name,
         description: data.description || "",
-        brandId: data.brandId,
-        categoryId: data.categoryId,
+        brandId: finalBrandId,
+        categoryId: finalCategoryId,
         status: data.status || "Active",
         campaignName: data.campaignName || null,
         metaTitle: data.metaTitle || null,
@@ -484,8 +579,8 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
         id,
         name: data.name,
         description: data.description || "",
-        brandId: data.brandId,
-        categoryId: data.categoryId,
+        brandId: finalBrandId,
+        categoryId: finalCategoryId,
         status: data.status || "Active",
         campaignName: data.campaignName || null,
         metaTitle: data.metaTitle || null,
@@ -644,6 +739,31 @@ async function mockUpdatePrisma(colName: string, id: string, data: any) {
     await prisma.user.update({ where: { id }, data: flatData });
   } else if (colName === "orders") {
     await prisma.order.update({ where: { id }, data: flatData });
+  } else if (colName === "menu_items" || colName === "menus" || colName === "MenuItem") {
+    try {
+      await prisma.menuItem.update({
+        where: { id },
+        data: {
+          title: flatData.title !== undefined ? flatData.title : undefined,
+          url: flatData.url !== undefined ? flatData.url : undefined,
+          location: flatData.location !== undefined ? flatData.location : undefined,
+          parentId: flatData.parentId !== undefined ? flatData.parentId : undefined,
+          sortOrder: flatData.sortOrder !== undefined ? (typeof flatData.sortOrder === "number" ? flatData.sortOrder : parseInt(flatData.sortOrder || "0", 10) || 0) : undefined,
+        }
+      });
+    } catch (e) {}
+  } else if (colName === "cms_pages" || colName === "pages" || colName === "CmsPage") {
+    try {
+      await prisma.cmsPage.update({
+        where: { id },
+        data: {
+          title: flatData.title !== undefined ? flatData.title : undefined,
+          contentHtml: flatData.contentHtml !== undefined ? flatData.contentHtml : undefined,
+          metaTitle: flatData.metaTitle !== undefined ? flatData.metaTitle : undefined,
+          metaDescription: flatData.metaDescription !== undefined ? flatData.metaDescription : undefined,
+        }
+      });
+    } catch (e) {}
   }
 
   // Always keep inMemoryCollections synchronized with latest updates
@@ -678,6 +798,10 @@ async function mockDeletePrisma(colName: string, id: string) {
       await prisma.category.deleteMany({ where: { id } });
     } else if (colName === "brands") {
       await prisma.brand.deleteMany({ where: { id } });
+    } else if (colName === "menu_items" || colName === "menus" || colName === "MenuItem") {
+      await prisma.menuItem.deleteMany({ where: { id } });
+    } else if (colName === "cms_pages" || colName === "pages" || colName === "CmsPage") {
+      await prisma.cmsPage.deleteMany({ where: { id } });
     }
   } catch (e) {
     console.warn(`Prisma delete fallback note for ${colName} (${id}):`, e);

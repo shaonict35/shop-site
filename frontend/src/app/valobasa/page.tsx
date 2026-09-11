@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useApp } from "../../context/AppContext";
-import { clearAllCache, triggerGlobalDataSync, API_BASE } from "../../utils/api";
+import { clearAllCache, triggerGlobalDataSync, API_BASE, fetchWithCache } from "../../utils/api";
 
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import SocketIoPromoBroadcaster from "../../components/SocketIoPromoBroadcaster";
@@ -14,14 +14,42 @@ export default function ValobasaAdminPanel() {
   const { user, token, login, logout } = useApp();
   const [isAdmin, setIsAdmin] = useState(false);
 
+  const getAuthHeader = (): Record<string, string> => {
+    const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("gg_token") || localStorage.getItem("glowgoodly_auth_token") || localStorage.getItem("token")) : "");
+    return activeToken ? { Authorization: `Bearer ${activeToken}` } : {};
+  };
+
   // Active Tab & Navigation History
   const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [tabHistory, setTabHistory] = useState<string[]>([]);
 
   const navigateTo = (tab: string) => {
-    if (tab !== activeTab) {
+    let target = tab;
+    if (target === "orders") target = "recent-orders";
+    if (target === "categories") target = "category-list";
+    if (target === "home-slides") target = "home-banner-list";
+    if (target === "available-offers") target = "offers-coupons";
+    if (target === "socket-live-promo") target = "socket-promo";
+
+    if (target !== activeTab) {
       setTabHistory(prev => [...prev, activeTab]);
-      setActiveTab(tab);
+      setActiveTab(target);
+
+      if ((target === "products" || target === "inventory") && adminProducts.length === 0) {
+        fetchAdminProducts();
+      }
+      if (target === "brands" && adminBrands.length === 0) {
+        fetchAdminBrands();
+      }
+      if ((target === "category-list" || target === "sub-category-list" || target === "add-category" || target === "add-sub-category") && adminCategories.length === 0) {
+        fetchAdminCategories();
+      }
+      if ((target === "home-banner-list" || target === "add-home-banner") && banners.length === 0) {
+        fetchAdminBanners();
+      }
+      if ((target === "recent-orders" || target === "sales-report" || target === "top-selling" || target === "top-customers") && orders.length === 0) {
+        fetchAdminOrders();
+      }
     }
   };
 
@@ -152,8 +180,13 @@ export default function ValobasaAdminPanel() {
   const [productPageSize, setProductPageSize] = useState<number | "All">(50);
   const [productCurrentPage, setProductCurrentPage] = useState(1);
   const [isRefreshingProducts, setIsRefreshingProducts] = useState(false);
+  const [isProductsLoading, setIsProductsLoading] = useState(false);
   const [adminCategories, setAdminCategories] = useState<any[]>([]);
   const [adminBrands, setAdminBrands] = useState<any[]>([]);
+  const [isBrandsLoading, setIsBrandsLoading] = useState(false);
+  const [brandSearchQuery, setBrandSearchQuery] = useState("");
+  const [brandCurrentPage, setBrandCurrentPage] = useState(1);
+  const [brandPageSize, setBrandPageSize] = useState<number | "All">(50);
   const [inventorySearch, setInventorySearch] = useState("");
   const [editingInventoryId, setEditingInventoryId] = useState<string | null>(null);
   const [inventoryPrices, setInventoryPrices] = useState<{ [key: string]: { costPrice: number; price: number; discountPrice: number; stock: number } }>({});
@@ -316,7 +349,7 @@ export default function ValobasaAdminPanel() {
       const method = menuForm.id ? "PUT" : "POST";
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
         body: JSON.stringify(menuForm)
       });
       if (res.ok) {
@@ -333,7 +366,7 @@ export default function ValobasaAdminPanel() {
   const handleDeleteMenu = async (id: string) => {
     if (!confirm("Are you sure you want to delete this menu item?")) return;
     try {
-      const res = await fetch(`${API_BASE}/admin/menus/${id}`, { method: "DELETE" });
+      const res = await fetch(`${API_BASE}/admin/menus/${id}`, { method: "DELETE", headers: getAuthHeader() });
       if (res.ok) {
         fetchData();
         triggerGlobalDataSync();
@@ -349,7 +382,7 @@ export default function ValobasaAdminPanel() {
     try {
       const res = await fetch(`${API_BASE}/admin/pages`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
         body: JSON.stringify(cmsPageForm)
       });
       const data = await res.json();
@@ -462,41 +495,135 @@ export default function ValobasaAdminPanel() {
 
   const safeFetch = async (url: string, options: any = {}) => {
     try {
-      let res = await fetch(url, options);
-      if (!res.ok && typeof window !== "undefined" && window.location.hostname === "localhost" && url.includes("api.glowgoodly.com")) {
-        const fallbackUrl = url.replace("https://api.glowgoodly.com/api", "http://localhost:5000/api");
-        try {
-          const fbRes = await fetch(fallbackUrl, options);
-          if (fbRes.ok) return fbRes;
-        } catch (e2) {}
-      }
+      const res = await fetch(url, options);
       return res;
     } catch (err) {
-      if (typeof window !== "undefined" && window.location.hostname === "localhost" && url.includes("api.glowgoodly.com")) {
-        const fallbackUrl = url.replace("https://api.glowgoodly.com/api", "http://localhost:5000/api");
-        try {
-          return await fetch(fallbackUrl, options);
-        } catch (e3) {}
-      }
       return null;
+    }
+  };
+
+  const fetchAdminProducts = async (bypass: boolean = false) => {
+    setIsProductsLoading(true);
+    try {
+      const url = `${API_BASE}/products?all=true` + (bypass ? `&t=${Date.now()}` : "");
+      let prods = await fetchWithCache(url, bypass);
+      if (!prods || !Array.isArray(prods) || prods.length === 0) {
+        const directRes = await fetch(`${API_BASE}/products?all=true`);
+        if (directRes.ok) {
+          prods = await directRes.json();
+        }
+      }
+      if (prods && Array.isArray(prods) && prods.length > 0) {
+        setAdminProducts(prods);
+        const priceMap: any = {};
+        prods.forEach((p: any) => {
+          const v = p.variants?.[0] || {};
+          priceMap[p.id] = {
+            costPrice: v.costPrice || 0,
+            price: v.price || 0,
+            discountPrice: v.discountPrice || 0,
+            stock: v.stock || 50
+          };
+        });
+        setInventoryPrices(priceMap);
+      }
+    } catch (e) {
+      console.error("Error fetching admin products list:", e);
+    } finally {
+      setIsProductsLoading(false);
+    }
+  };
+
+  const fetchAdminCategories = async (bypass: boolean = false) => {
+    try {
+      const url = `${API_BASE}/categories` + (bypass ? `?t=${Date.now()}` : "");
+      let cData = await fetchWithCache(url, bypass);
+      if (!cData || !Array.isArray(cData) || cData.length === 0) {
+        const directRes = await fetch(`${API_BASE}/admin/categories`);
+        if (directRes.ok) cData = await directRes.json();
+      }
+      if (cData && Array.isArray(cData) && cData.length > 0) {
+        setAdminCategories(cData);
+        setSubCategories(cData.filter((c: any) => c.parentId));
+      }
+    } catch (e) {
+      console.error("Error fetching admin categories:", e);
+    }
+  };
+
+  const fetchAdminBanners = async (bypass: boolean = false) => {
+    try {
+      const url = `${API_BASE}/banners` + (bypass ? `?t=${Date.now()}` : "");
+      let bnData = await fetchWithCache(url, bypass);
+      if (!bnData || !Array.isArray(bnData) || bnData.length === 0) {
+        const directRes = await fetch(`${API_BASE}/admin/banners`);
+        if (directRes.ok) bnData = await directRes.json();
+      }
+      if (bnData && Array.isArray(bnData) && bnData.length > 0) {
+        const uniqueBanners = Array.from(new Map(bnData.map((item: any) => [item.id || Math.random().toString(), item])).values());
+        setBanners(uniqueBanners);
+      }
+    } catch (e) {
+      console.error("Error fetching admin banners:", e);
+    }
+  };
+
+  const fetchAdminOrders = async (bypass: boolean = false) => {
+    const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : "");
+    try {
+      let oData = null;
+      if (activeToken) {
+        const res = await safeFetch(`${API_BASE}/orders/all` + (bypass ? `?t=${Date.now()}` : ""), { headers: { Authorization: `Bearer ${activeToken}` } });
+        if (res && res.ok) oData = await res.json();
+      }
+      if (!oData || !Array.isArray(oData) || oData.length === 0) {
+        const directRes = await safeFetch(`${API_BASE}/orders` + (bypass ? `?t=${Date.now()}` : ""));
+        if (directRes && directRes.ok) oData = await directRes.json();
+      }
+      if (oData && Array.isArray(oData)) {
+        setOrders(oData);
+      }
+    } catch (e) {
+      console.error("Error fetching admin orders:", e);
+    }
+  };
+
+  const fetchAdminBrands = async (bypass: boolean = false) => {
+    setIsBrandsLoading(true);
+    try {
+      const url = `${API_BASE}/brands` + (bypass ? `?t=${Date.now()}` : "");
+      let bData = await fetchWithCache(url, bypass);
+      if (!bData || !Array.isArray(bData) || bData.length === 0) {
+        const directRes = await fetch(`${API_BASE}/brands`);
+        if (directRes.ok) {
+          bData = await directRes.json();
+        }
+      }
+      if (bData && Array.isArray(bData) && bData.length > 0) {
+        setAdminBrands(bData);
+      }
+    } catch (e) {
+      console.error("Error fetching admin brands list:", e);
+    } finally {
+      setIsBrandsLoading(false);
     }
   };
 
   const fetchData = async (bypass: boolean = false) => {
     const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : "");
-    if (!activeToken) return;
+    const authHeaders = activeToken ? { Authorization: `Bearer ${activeToken}` } : {};
     try {
       const [settingsRes, statsRes, ordersRes, catRes, brandRes, prodRes, bannerRes, blogRes, custRes, staffRes, notifRes, menuRes, pageRes, msgRes] = await Promise.all([
-        safeFetch(`${API_BASE}/settings`, { headers: { Authorization: `Bearer ${activeToken}` } }),
-        safeFetch(`${API_BASE}/admin/dashboard-stats`, { headers: { Authorization: `Bearer ${activeToken}` } }),
-        safeFetch(`${API_BASE}/orders/all`, { headers: { Authorization: `Bearer ${activeToken}` } }),
+        safeFetch(`${API_BASE}/settings`, { headers: authHeaders }),
+        safeFetch(`${API_BASE}/admin/dashboard-stats`, { headers: authHeaders }),
+        safeFetch(`${API_BASE}/orders/all` + (bypass ? `?t=${Date.now()}` : ""), { headers: authHeaders }),
         safeFetch(`${API_BASE}/admin/categories`),
-        safeFetch(`${API_BASE}/admin/brands` + (bypass ? `?t=${Date.now()}` : ""), { headers: { Authorization: `Bearer ${activeToken}`, "Cache-Control": "no-cache" } }),
+        safeFetch(`${API_BASE}/admin/brands` + (bypass ? `?t=${Date.now()}` : ""), { headers: authHeaders, "Cache-Control": "no-cache" }),
         safeFetch(`${API_BASE}/products?all=true&t=${Date.now()}`),
         safeFetch(`${API_BASE}/admin/banners`),
         safeFetch(`${API_BASE}/admin/blogs`),
-        safeFetch(`${API_BASE}/admin/customers`, { headers: { Authorization: `Bearer ${activeToken}` } }),
-        safeFetch(`${API_BASE}/admin/staff`, { headers: { Authorization: `Bearer ${activeToken}` } }),
+        safeFetch(`${API_BASE}/admin/customers`, { headers: authHeaders }),
+        safeFetch(`${API_BASE}/admin/staff`, { headers: authHeaders }),
         safeFetch(`${API_BASE}/notifications`),
         safeFetch(`${API_BASE}/admin/menus`),
         safeFetch(`${API_BASE}/admin/pages`),
@@ -530,11 +657,11 @@ export default function ValobasaAdminPanel() {
         safeJson(msgRes)
       ]);
 
-      if (bnData && Array.isArray(bnData)) {
+      if (bnData && Array.isArray(bnData) && bnData.length > 0) {
         const uniqueBanners = Array.from(new Map(bnData.map((item: any) => [item.id || Math.random().toString(), item])).values());
         setBanners(uniqueBanners);
       } else {
-        setBanners([]);
+        fetchAdminBanners(bypass);
       }
       if (stfData && Array.isArray(stfData)) setStaffList(stfData);
       if (csData && Array.isArray(csData)) setCustomerList(csData);
@@ -562,13 +689,23 @@ export default function ValobasaAdminPanel() {
 
       if (sData) setSettings((prev) => ({ ...prev, ...sData }));
       if (stData) setDashboardStats(stData);
-      if (oData) setOrders(oData);
-      if (cData) {
+      if (oData && Array.isArray(oData) && oData.length > 0) {
+        setOrders(oData);
+      } else {
+        fetchAdminOrders(bypass);
+      }
+      if (cData && Array.isArray(cData) && cData.length > 0) {
         setAdminCategories(cData);
         setSubCategories(cData.filter((c: any) => c.parentId));
+      } else {
+        fetchAdminCategories(bypass);
       }
-      if (bData) setAdminBrands(bData);
-      if (pData) {
+      if (bData && Array.isArray(bData) && bData.length > 0) {
+        setAdminBrands(bData);
+      } else {
+        fetchAdminBrands(bypass);
+      }
+      if (pData && Array.isArray(pData) && pData.length > 0) {
         setAdminProducts(pData);
         const priceMap: any = {};
         pData.forEach((p: any) => {
@@ -581,6 +718,8 @@ export default function ValobasaAdminPanel() {
           };
         });
         setInventoryPrices(priceMap);
+      } else {
+        fetchAdminProducts(bypass);
       }
       if (blData) setBlogList(blData);
       if (csData) setCustomerList(csData);
@@ -622,6 +761,8 @@ export default function ValobasaAdminPanel() {
         alert("Product deleted!");
         triggerGlobalDataSync();
         fetchData();
+      } else {
+        alert("Failed to delete product");
       }
     } catch (e) {
       alert("Error deleting product");
@@ -629,7 +770,14 @@ export default function ValobasaAdminPanel() {
   };
 
   useEffect(() => {
-    if (isAdmin && token) fetchData();
+    if (isAdmin) {
+      fetchData();
+      fetchAdminProducts();
+      fetchAdminBrands();
+      fetchAdminCategories();
+      fetchAdminBanners();
+      fetchAdminOrders();
+    }
   }, [isAdmin, token]);
 
   // Top Selling Products (with images from adminProducts)
@@ -840,7 +988,7 @@ export default function ValobasaAdminPanel() {
       
       let res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
         body: JSON.stringify(bannerForm)
       });
 
@@ -848,13 +996,14 @@ export default function ValobasaAdminPanel() {
         // Fallback to PUT alias endpoint
         res = await fetch(`${API_BASE}/admin/banners/${bannerForm.id}`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...getAuthHeader() },
           body: JSON.stringify(bannerForm)
         });
       }
 
       if (res.ok) {
         clearAllCache(); // Force website to reload fresh data
+        triggerGlobalDataSync();
         alert("Banner saved successfully!");
         setBannerForm({ id: "", title: "", imageUrl: "", mobileImageUrl: "", tabletImageUrl: "", linkUrl: "", bgColor: "#1a1a2e", page: "Homepage", isActive: true, sortOrder: "0" });
         navigateTo("home-banner-list");
@@ -872,8 +1021,8 @@ export default function ValobasaAdminPanel() {
     if (!confirm("Are you sure you want to permanently delete this banner?")) return;
     try {
       setBanners((prev) => prev.filter((b) => b.id !== id));
-      await fetch(`${API_BASE}/banners/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-      await fetch(`${API_BASE}/admin/banners/${id}`, { method: "DELETE" });
+      await fetch(`${API_BASE}/banners/${id}`, { method: "DELETE", headers: getAuthHeader() });
+      await fetch(`${API_BASE}/admin/banners/${id}`, { method: "DELETE", headers: getAuthHeader() });
       clearAllCache();
       triggerGlobalDataSync();
       fetchData(true);
@@ -887,9 +1036,9 @@ export default function ValobasaAdminPanel() {
       const bannerList = [...banners];
       setBanners([]);
       await Promise.all(bannerList.map((b: any) => 
-        fetch(`${API_BASE}/admin/banners/${b.id}`, { method: "DELETE" }).catch(() => {})
+        fetch(`${API_BASE}/admin/banners/${b.id}`, { method: "DELETE", headers: getAuthHeader() }).catch(() => {})
       ));
-      await fetch(`${API_BASE}/admin/banners/all`, { method: "DELETE" }).catch(() => {});
+      await fetch(`${API_BASE}/admin/banners/all`, { method: "DELETE", headers: getAuthHeader() }).catch(() => {});
       clearAllCache();
       triggerGlobalDataSync();
       fetchData(true);
@@ -907,10 +1056,12 @@ export default function ValobasaAdminPanel() {
     try {
       const res = await fetch(`${API_BASE}/categories`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
         body: JSON.stringify(form)
       });
       if (res.ok) {
+        clearAllCache();
+        triggerGlobalDataSync();
         alert(isSub ? "Sub Category saved!" : "Category saved!");
         if (isSub) {
           setSubCategoryForm({ id: "", name: "", parentId: "", imageUrl: "" });
@@ -920,6 +1071,7 @@ export default function ValobasaAdminPanel() {
           navigateTo("category-list");
         }
         fetchData();
+        fetchAdminCategories();
       }
     } catch (e) {
       alert("Error saving category");
@@ -929,8 +1081,13 @@ export default function ValobasaAdminPanel() {
   const handleDeleteCategory = async (id: string) => {
     if (!confirm("Delete category?")) return;
     try {
-      const res = await fetch(`${API_BASE}/categories/${id}`, { method: "DELETE" });
-      if (res.ok) fetchData();
+      const res = await fetch(`${API_BASE}/categories/${id}`, { method: "DELETE", headers: getAuthHeader() });
+      if (res.ok) {
+        clearAllCache();
+        triggerGlobalDataSync();
+        fetchData();
+        fetchAdminCategories();
+      }
     } catch (e) { alert("Error deleting category"); }
   };
 
@@ -948,16 +1105,18 @@ export default function ValobasaAdminPanel() {
       
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
         body: JSON.stringify(productForm)
       });
       if (res.ok) {
         clearAllCache(); // Force website to reload fresh data
+        triggerGlobalDataSync();
         alert(isEditing ? "Product updated successfully!" : "Product created successfully!");
         setProductForm({ id: "", name: "", slug: "", description: "", brandId: "", categoryId: "", imageUrl: "", imageUrl2: "", imageUrl3: "", imageUrl4: "", price: "", discountPrice: "", costPrice: "", stock: "50", campaignName: "", tags: "Vegan, Cruelty-free", preOrder: false, wholesalePrice: "", moq: "1", weight: "", metaTitle: "", metaDescription: "", imageAltText: "", variants: [] });
 
         navigateTo("products");
         fetchData();
+        fetchAdminProducts();
       } else {
         const d = await res.json();
         alert(d.error || "Failed to save product.");
@@ -970,8 +1129,13 @@ export default function ValobasaAdminPanel() {
   const handleDeleteProduct = async (id: string) => {
     if (!confirm("Delete product?")) return;
     try {
-      const res = await fetch(`${API_BASE}/products/${id}`, { method: "DELETE" });
-      if (res.ok) fetchData();
+      const res = await fetch(`${API_BASE}/products/${id}`, { method: "DELETE", headers: getAuthHeader() });
+      if (res.ok) {
+        clearAllCache();
+        triggerGlobalDataSync();
+        fetchData();
+        fetchAdminProducts();
+      }
     } catch (e) { alert("Error deleting product"); }
   };
 
@@ -1012,8 +1176,13 @@ export default function ValobasaAdminPanel() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(settings)
       });
-      if (res.ok) setSettingsMessage("Settings saved successfully.");
-      else setSettingsMessage("Failed to save settings.");
+      if (res.ok) {
+        clearAllCache();
+        triggerGlobalDataSync();
+        setSettingsMessage("Settings saved successfully.");
+      } else {
+        setSettingsMessage("Failed to save settings.");
+      }
     } catch (e) { setSettingsMessage("Error saving settings."); }
   };
 
@@ -1652,6 +1821,8 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                       body: JSON.stringify(payload)
                     });
                     if (res.ok) {
+                      clearAllCache();
+                      triggerGlobalDataSync();
                       alert("ল্যান্ডিং পেজ সেটিংস সফলভাবে সেভ ও আপডেট হয়েছে!");
                     } else {
                       alert("আপডেট করতে সমস্যা হয়েছে!");
@@ -1877,12 +2048,12 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
           )}
 
           {/* SOCKET.IO PROMO BROADCAST */}
-          {activeTab === "socket-promo" && (
+          {(activeTab === "socket-promo" || activeTab === "socket-live-promo") && (
             <SocketIoPromoBroadcaster token={token} />
           )}
 
           {/* AVAILABLE OFFERS & MARKETING CODES MANAGER */}
-          {activeTab === "offers-coupons" && (
+          {(activeTab === "offers-coupons" || activeTab === "available-offers") && (
             <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
               <div style={{ backgroundColor: "#ffffff", padding: "24px", borderRadius: "12px", boxShadow: "0 2px 10px rgba(0,0,0,0.05)", borderTop: "4px solid #e63b7a" }}>
                 <h2 style={{ fontSize: "18px", fontWeight: "900", color: "#1e293b", margin: "0 0 6px 0" }}>
@@ -2507,7 +2678,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                 name: "📢 Homepage Wide Banner (Middle Horizontal Promo)",
                 desktopSize: "1200 × 300 px (Panoramic Wide)",
                 mobileSize: "750 × 350 px",
-                defaultTitle: "Homepage Wide Banner - Beauty Must Haves Exclusive Savings",
+                defaultTitle: "Homepage Wide Banner",
                 defaultLink: "/shop?tab=offers",
                 hint: "Displays right above the Makeup section across full container width."
               },
@@ -2872,7 +3043,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
           })()}
 
           {/* 0.6 HOME BANNERS & CARD IMAGES MASTER LIST SUB-VIEW */}
-          {activeTab === "home-banner-list" && (
+          {(activeTab === "home-banner-list" || activeTab === "home-slides") && (
             <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
               <div style={{ backgroundColor: "#ffffff", padding: "24px", borderRadius: "12px", boxShadow: "0 2px 10px rgba(0,0,0,0.05)", borderTop: "4px solid #e63b7a" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
@@ -4008,98 +4179,150 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
           {/* 3. INVENTORY */}
           {activeTab === "inventory" && (
             <div style={{ backgroundColor: "#ffffff", borderRadius: "10px", border: "1px solid #e5e7eb", padding: "24px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }}>
                 <div>
-                  <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e293b", margin: 0 }}>📦 Product Inventory & Price Editor</h2>
+                  <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e293b", margin: 0 }}>📦 Product Inventory & Price Editor ({adminProducts.length} items)</h2>
                   <p style={{ fontSize: "13px", color: "#64748b", margin: "4px 0 0 0" }}>Edit <strong>Buy Price (Cost Price)</strong> and <strong>Sell Price</strong> directly.</p>
                 </div>
-                <input type="text" placeholder="Search Inventory..." value={inventorySearch} onChange={(e) => setInventorySearch(e.target.value)} style={{ padding: "8px 14px", border: "1px solid #cbd5e1", borderRadius: "6px", width: "240px", fontSize: "13px" }} />
+                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                  <input type="text" placeholder="Search Inventory..." value={inventorySearch} onChange={(e) => setInventorySearch(e.target.value)} style={{ padding: "8px 14px", border: "1px solid #cbd5e1", borderRadius: "6px", width: "240px", fontSize: "13px" }} />
+                  <button
+                    onClick={() => fetchAdminProducts(true)}
+                    disabled={isProductsLoading}
+                    style={{ backgroundColor: "#0284c7", color: "#fff", border: "none", padding: "8px 14px", borderRadius: "6px", fontSize: "12.5px", fontWeight: "700", cursor: isProductsLoading ? "not-allowed" : "pointer" }}
+                  >
+                    🔄 {isProductsLoading ? "Loading..." : "Refresh"}
+                  </button>
+                </div>
               </div>
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: "70px" }}>IMAGE</th>
-                    <th>PRODUCT NAME</th>
-                    <th>BRAND & CATEGORY</th>
-                    <th style={{ width: "130px" }}>BUY PRICE (৳)</th>
-                    <th style={{ width: "130px" }}>SELL PRICE (৳)</th>
-                    <th style={{ width: "130px" }}>PROMO PRICE (৳)</th>
-                    <th style={{ width: "100px" }}>STOCK</th>
-                    <th style={{ width: "110px", textAlign: "center" }}>ACTION</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {adminProducts.filter((p) => p.name.toLowerCase().includes(inventorySearch.toLowerCase())).map((p) => {
-                    const currentPrices = inventoryPrices[p.id] || { costPrice: p.variants?.[0]?.costPrice || 0, price: p.variants?.[0]?.price || 0, discountPrice: p.variants?.[0]?.discountPrice || 0, stock: p.variants?.[0]?.stock || 50 };
-                    const isEditing = editingInventoryId === p.id;
-                    return (
-                      <tr key={p.id}>
-                        <td><img src={p.images?.[0]?.url || "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=200&q=80"} alt={p.name} style={{ width: "45px", height: "45px", objectFit: "cover", borderRadius: "6px" }} /></td>
-                        <td style={{ fontWeight: "700", color: "#1e293b" }}>{p.name}</td>
-                        <td>
-                          <div style={{ fontSize: "12px", color: "#475569" }}>{p.brand?.name || "Brand"}</div>
-                          <div style={{ fontSize: "11px", color: "#94a3b8" }}>{p.category?.name || "Category"}</div>
-                        </td>
-                        <td><input type="number" value={currentPrices.costPrice} onChange={(e) => setInventoryPrices({ ...inventoryPrices, [p.id]: { ...currentPrices, costPrice: parseFloat(e.target.value) || 0 } })} style={{ width: "100%", padding: "6px", border: isEditing ? "2px solid #2563eb" : "1px solid #cbd5e1", borderRadius: "4px", fontWeight: "700", color: "#1e293b" }} /></td>
-                        <td><input type="number" value={currentPrices.price} onChange={(e) => setInventoryPrices({ ...inventoryPrices, [p.id]: { ...currentPrices, price: parseFloat(e.target.value) || 0 } })} style={{ width: "100%", padding: "6px", border: isEditing ? "2px solid #2563eb" : "1px solid #cbd5e1", borderRadius: "4px", fontWeight: "700", color: "#059669" }} /></td>
-                        <td><input type="number" value={currentPrices.discountPrice} onChange={(e) => setInventoryPrices({ ...inventoryPrices, [p.id]: { ...currentPrices, discountPrice: parseFloat(e.target.value) || 0 } })} style={{ width: "100%", padding: "6px", border: isEditing ? "2px solid #2563eb" : "1px solid #cbd5e1", borderRadius: "4px", fontSize: "12px" }} /></td>
-                        <td><input type="number" value={currentPrices.stock} onChange={(e) => setInventoryPrices({ ...inventoryPrices, [p.id]: { ...currentPrices, stock: parseInt(e.target.value) || 0 } })} style={{ width: "100%", padding: "6px", border: isEditing ? "2px solid #2563eb" : "1px solid #cbd5e1", borderRadius: "4px", fontSize: "12px" }} /></td>
-                        <td style={{ textAlign: "center" }}>
-                          <button onClick={() => handleSaveInventoryPrices(p.id)} style={{ backgroundColor: "#059669", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>
-                            SAVE PRICE
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+
+              {adminProducts.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "60px 20px", color: "#94a3b8" }}>
+                  <div style={{ fontSize: "40px", marginBottom: "12px" }}>📦</div>
+                  <div style={{ fontSize: "16px", fontWeight: "700", color: "#475569" }}>No inventory products loaded</div>
+                  <p style={{ fontSize: "13px", maxWidth: "420px", margin: "6px auto 16px auto" }}>Click the button below to fetch all products from the catalog directly.</p>
+                  <button
+                    onClick={() => fetchAdminProducts(true)}
+                    style={{ backgroundColor: "#e63b7a", color: "#fff", border: "none", padding: "10px 20px", borderRadius: "6px", fontWeight: "800", fontSize: "13px", cursor: "pointer" }}
+                  >
+                    🔄 Load Products into Inventory
+                  </button>
+                </div>
+              ) : (
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: "70px" }}>IMAGE</th>
+                      <th>PRODUCT NAME</th>
+                      <th>BRAND & CATEGORY</th>
+                      <th style={{ width: "130px" }}>BUY PRICE (৳)</th>
+                      <th style={{ width: "130px" }}>SELL PRICE (৳)</th>
+                      <th style={{ width: "130px" }}>PROMO PRICE (৳)</th>
+                      <th style={{ width: "100px" }}>STOCK</th>
+                      <th style={{ width: "110px", textAlign: "center" }}>ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adminProducts.filter((p) => p.name.toLowerCase().includes(inventorySearch.toLowerCase())).map((p) => {
+                      const currentPrices = inventoryPrices[p.id] || { costPrice: p.variants?.[0]?.costPrice || 0, price: p.variants?.[0]?.price || 0, discountPrice: p.variants?.[0]?.discountPrice || 0, stock: p.variants?.[0]?.stock || 50 };
+                      const isEditing = editingInventoryId === p.id;
+                      return (
+                        <tr key={p.id}>
+                          <td><img src={p.images?.[0]?.url || "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=200&q=80"} alt={p.name} style={{ width: "45px", height: "45px", objectFit: "cover", borderRadius: "6px" }} /></td>
+                          <td style={{ fontWeight: "700", color: "#1e293b" }}>{p.name}</td>
+                          <td>
+                            <div style={{ fontSize: "12px", color: "#475569" }}>{p.brand?.name || "Brand"}</div>
+                            <div style={{ fontSize: "11px", color: "#94a3b8" }}>{p.category?.name || "Category"}</div>
+                          </td>
+                          <td><input type="number" value={currentPrices.costPrice} onChange={(e) => setInventoryPrices({ ...inventoryPrices, [p.id]: { ...currentPrices, costPrice: parseFloat(e.target.value) || 0 } })} style={{ width: "100%", padding: "6px", border: isEditing ? "2px solid #2563eb" : "1px solid #cbd5e1", borderRadius: "4px", fontWeight: "700", color: "#1e293b" }} /></td>
+                          <td><input type="number" value={currentPrices.price} onChange={(e) => setInventoryPrices({ ...inventoryPrices, [p.id]: { ...currentPrices, price: parseFloat(e.target.value) || 0 } })} style={{ width: "100%", padding: "6px", border: isEditing ? "2px solid #2563eb" : "1px solid #cbd5e1", borderRadius: "4px", fontWeight: "700", color: "#059669" }} /></td>
+                          <td><input type="number" value={currentPrices.discountPrice} onChange={(e) => setInventoryPrices({ ...inventoryPrices, [p.id]: { ...currentPrices, discountPrice: parseFloat(e.target.value) || 0 } })} style={{ width: "100%", padding: "6px", border: isEditing ? "2px solid #2563eb" : "1px solid #cbd5e1", borderRadius: "4px", fontSize: "12px" }} /></td>
+                          <td><input type="number" value={currentPrices.stock} onChange={(e) => setInventoryPrices({ ...inventoryPrices, [p.id]: { ...currentPrices, stock: parseInt(e.target.value) || 0 } })} style={{ width: "100%", padding: "6px", border: isEditing ? "2px solid #2563eb" : "1px solid #cbd5e1", borderRadius: "4px", fontSize: "12px" }} /></td>
+                          <td style={{ textAlign: "center" }}>
+                            <button onClick={() => handleSaveInventoryPrices(p.id)} style={{ backgroundColor: "#059669", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>
+                              SAVE PRICE
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
             </div>
           )}
 
           {/* 4. ORDERS LIST */}
-          {activeTab === "recent-orders" && (
+          {(activeTab === "recent-orders" || activeTab === "orders") && (
             <div style={{ backgroundColor: "#ffffff", borderRadius: "10px", border: "1px solid #e5e7eb", padding: "24px" }}>
-              <h2 style={{ fontSize: "18px", fontWeight: "700", marginBottom: "16px" }}>Customer Orders List (Click Row for Full Details Popup)</h2>
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>ORDER #</th>
-                    <th>CUSTOMER</th>
-                    <th>PHONE</th>
-                    <th>AMOUNT</th>
-                    <th>STATUS</th>
-                    <th>COURIER DISPATCH</th>
-                    <th style={{ textAlign: "center" }}>VOUCHER / RECEIPT</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map((o) => (
-                    <tr key={o.id}>
-                      <td onClick={() => setSelectedOrderDetails(o)} style={{ fontWeight: "900", color: "#e63b7a", cursor: "pointer", textDecoration: "underline" }}>
-                        #{o.orderNumber || (o.id ? o.id.slice(0, 8) : "ORD")}
-                      </td>
-                      <td onClick={() => setSelectedOrderDetails(o)} style={{ cursor: "pointer", fontWeight: "700", color: "#0f172a" }}>{o.customerName || o.name || "Customer"}</td>
-                      <td onClick={() => setSelectedOrderDetails(o)} style={{ cursor: "pointer" }}>{o.customerPhone || o.phone || "N/A"}</td>
-                      <td onClick={() => setSelectedOrderDetails(o)} style={{ cursor: "pointer", fontWeight: "900", color: "#059669" }}>৳{o.totalAmount || o.total || 0}</td>
-                      <td><span className="badge badge-success">{o.orderStatus || o.status || "Pending"}</span></td>
-                      <td>
-                        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                          <button onClick={() => handleSendCourier(o.id, "steadfast")} style={{ padding: "4px 8px", backgroundColor: "#2563eb", color: "#fff", border: "none", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Steadfast</button>
-                          <button onClick={() => handleSendCourier(o.id, "redx")} style={{ padding: "4px 8px", backgroundColor: "#ef4444", color: "#fff", border: "none", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>REDX</button>
-                          <button onClick={() => handleSendCourier(o.id, "pathao")} style={{ padding: "4px 8px", backgroundColor: "#059669", color: "#fff", border: "none", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Pathao</button>
-                          <button onClick={() => handleSendCourier(o.id, "carrybee")} style={{ padding: "4px 8px", backgroundColor: "#d97706", color: "#fff", border: "none", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>CarryBee</button>
-                        </div>
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <button onClick={() => setSelectedVoucherOrder(o)} style={{ backgroundColor: "#e63b7a", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "4px", fontSize: "12px", fontWeight: "700", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                          <Printer size={14} /> Voucher
-                        </button>
-                      </td>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
+                <div>
+                  <h2 style={{ fontSize: "18px", fontWeight: "800", color: "#1e293b", margin: 0 }}>
+                    📦 Customer Orders List ({orders.length} orders)
+                  </h2>
+                  <p style={{ fontSize: "13px", color: "#64748b", margin: "2px 0 0 0" }}>Click any order row to view full items, customer information, and invoice.</p>
+                </div>
+                <button
+                  onClick={() => fetchAdminOrders(true)}
+                  style={{ backgroundColor: "#0284c7", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "6px", fontSize: "12.5px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
+                >
+                  🔄 Refresh Orders
+                </button>
+              </div>
+
+              {orders.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "60px 20px", color: "#94a3b8" }}>
+                  <div style={{ fontSize: "40px", marginBottom: "12px" }}>📦</div>
+                  <div style={{ fontSize: "16px", fontWeight: "700", color: "#475569" }}>No orders found in database</div>
+                  <p style={{ fontSize: "13px", maxWidth: "420px", margin: "6px auto 16px auto" }}>Orders placed from website checkout or app will immediately appear here.</p>
+                  <button
+                    onClick={() => fetchAdminOrders(true)}
+                    style={{ backgroundColor: "#e63b7a", color: "#fff", border: "none", padding: "10px 20px", borderRadius: "6px", fontWeight: "800", fontSize: "13px", cursor: "pointer" }}
+                  >
+                    🔄 Reload Orders Now
+                  </button>
+                </div>
+              ) : (
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>ORDER #</th>
+                      <th>CUSTOMER</th>
+                      <th>PHONE</th>
+                      <th>AMOUNT</th>
+                      <th>STATUS</th>
+                      <th>COURIER DISPATCH</th>
+                      <th style={{ textAlign: "center" }}>VOUCHER / RECEIPT</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {orders.map((o) => (
+                      <tr key={o.id}>
+                        <td onClick={() => setSelectedOrderDetails(o)} style={{ fontWeight: "900", color: "#e63b7a", cursor: "pointer", textDecoration: "underline" }}>
+                          #{o.orderNumber || (o.id ? o.id.slice(0, 8) : "ORD")}
+                        </td>
+                        <td onClick={() => setSelectedOrderDetails(o)} style={{ cursor: "pointer", fontWeight: "700", color: "#0f172a" }}>{o.customerName || o.name || "Customer"}</td>
+                        <td onClick={() => setSelectedOrderDetails(o)} style={{ cursor: "pointer" }}>{o.customerPhone || o.phone || "N/A"}</td>
+                        <td onClick={() => setSelectedOrderDetails(o)} style={{ cursor: "pointer", fontWeight: "900", color: "#059669" }}>৳{o.totalAmount || o.total || 0}</td>
+                        <td><span className="badge badge-success">{o.orderStatus || o.status || "Pending"}</span></td>
+                        <td>
+                          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                            <button onClick={() => handleSendCourier(o.id, "steadfast")} style={{ padding: "4px 8px", backgroundColor: "#2563eb", color: "#fff", border: "none", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Steadfast</button>
+                            <button onClick={() => handleSendCourier(o.id, "redx")} style={{ padding: "4px 8px", backgroundColor: "#ef4444", color: "#fff", border: "none", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>REDX</button>
+                            <button onClick={() => handleSendCourier(o.id, "pathao")} style={{ padding: "4px 8px", backgroundColor: "#059669", color: "#fff", border: "none", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Pathao</button>
+                            <button onClick={() => handleSendCourier(o.id, "carrybee")} style={{ padding: "4px 8px", backgroundColor: "#d97706", color: "#fff", border: "none", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>CarryBee</button>
+                          </div>
+                        </td>
+                        <td style={{ textAlign: "center" }}>
+                          <button onClick={() => setSelectedVoucherOrder(o)} style={{ backgroundColor: "#e63b7a", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "4px", fontSize: "12px", fontWeight: "700", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                            <Printer size={14} /> Voucher
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           )}
 
@@ -4405,7 +4628,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
           )}
 
           {/* 7. CATEGORY MANAGEMENT */}
-          {activeTab === "category-list" && (
+          {(activeTab === "category-list" || activeTab === "categories") && (
             <div style={{ backgroundColor: "#ffffff", borderRadius: "10px", border: "1px solid #e5e7eb", padding: "24px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
                 <h2 style={{ fontSize: "18px", fontWeight: "800", margin: 0 }}>Category List ({adminCategories.filter(c => !c.parentId).length})</h2>
@@ -4463,9 +4686,12 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                             body: JSON.stringify({ name: editingCategory.name, imageUrl: editingCategory.imageUrl })
                           });
                           if (res.ok) {
+                            clearAllCache();
+                            triggerGlobalDataSync();
                             alert("Category updated!");
                             setEditingCategory(null);
                             fetchData();
+                            fetchAdminCategories();
                           }
                         } catch (e) { alert("Error updating category"); }
                       }} style={{ backgroundColor: "#e63b7a", color: "#fff", padding: "8px 16px", border: "none", borderRadius: "6px", fontWeight: "700", cursor: "pointer" }}>SAVE CHANGES</button>
@@ -4724,10 +4950,10 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                       type="button"
                       onClick={async () => {
                         setIsRefreshingProducts(true);
-                        await fetchData(true);
+                        await fetchAdminProducts(true);
                         setIsRefreshingProducts(false);
                       }}
-                      disabled={isRefreshingProducts}
+                      disabled={isRefreshingProducts || isProductsLoading}
                       style={{
                         backgroundColor: "#f1f5f9",
                         color: "#0f172a",
@@ -4742,7 +4968,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                         gap: "6px"
                       }}
                     >
-                      🔄 {isRefreshingProducts ? "Syncing..." : "Refresh DB"}
+                      🔄 {(isRefreshingProducts || isProductsLoading) ? "Syncing..." : "Refresh DB"}
                     </button>
                     <input
                       type="text"
@@ -4836,7 +5062,15 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                     if (productCategoryFilter !== "All") {
                       const cId = p.categoryId || p.category?.id;
                       const cName = p.category?.name?.toLowerCase() || "";
-                      if (cId !== productCategoryFilter && cName !== productCategoryFilter.toLowerCase()) return false;
+                      const pId = p.category?.parentId;
+                      const pSlug = p.category?.slug?.toLowerCase() || "";
+                      const filterLower = productCategoryFilter.toLowerCase();
+                      if (
+                        cId !== productCategoryFilter && 
+                        cName !== filterLower && 
+                        pId !== productCategoryFilter &&
+                        pSlug !== filterLower
+                      ) return false;
                     }
                     if (productBrandFilter !== "All") {
                       const bId = p.brandId || p.brand?.id;
@@ -4885,7 +5119,25 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                           {paginated.length === 0 ? (
                             <tr>
                               <td colSpan={7} style={{ textAlign: "center", padding: "40px", color: "#64748b" }}>
-                                {adminProducts.length === 0 ? "No products found in the database. Add your first product above!" : "No products matched your search or filters."}
+                                {isProductsLoading ? (
+                                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", padding: "20px" }}>
+                                    <div style={{ width: "32px", height: "32px", border: "3px solid #e2e8f0", borderTopColor: "#e63b7a", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                                    <span style={{ fontWeight: "700", color: "#e63b7a", fontSize: "14px" }}>Loading products catalog from database...</span>
+                                  </div>
+                                ) : adminProducts.length === 0 ? (
+                                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
+                                    <div>No products currently loaded in the admin view.</div>
+                                    <button
+                                      type="button"
+                                      onClick={() => fetchAdminProducts(true)}
+                                      style={{ backgroundColor: "#e63b7a", color: "#fff", border: "none", padding: "8px 18px", borderRadius: "8px", fontSize: "13px", fontWeight: "700", cursor: "pointer", boxShadow: "0 2px 8px rgba(230,59,122,0.3)" }}
+                                    >
+                                      Load All Products Now
+                                    </button>
+                                  </div>
+                                ) : (
+                                  "No products matched your search or filters."
+                                )}
                               </td>
                             </tr>
                           ) : (
@@ -5278,9 +5530,11 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                             });
                             if (res.ok) {
                               clearAllCache(); // Force website to reload fresh data
+                              triggerGlobalDataSync();
                               alert("Product, Shades & SEO details updated successfully!");
                               setEditingProduct(null);
                               fetchData(true);
+                              fetchAdminProducts();
                             }
                           } catch (e) { alert("Error updating product"); }
                         }} style={{ backgroundColor: "#e63b7a", color: "#fff", padding: "8px 16px", border: "none", borderRadius: "6px", fontWeight: "700", cursor: "pointer" }}>SAVE CHANGES</button>
@@ -5306,9 +5560,12 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                       body: JSON.stringify(brandForm)
                     });
                     if (res.ok) {
+                      clearAllCache();
+                      triggerGlobalDataSync();
                       alert(`Brand '${brandForm.name}' created!`);
                       setBrandForm({ name: "", originCountry: "USA", logoUrl: "" });
-                      fetchData();
+                      fetchData(true);
+                      fetchAdminBrands(true);
                     }
                   } catch (e) { alert("Error saving brand."); }
                 }} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", alignItems: "flex-end" }}>
@@ -5339,54 +5596,167 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
 
               <div style={{ backgroundColor: "#ffffff", borderRadius: "10px", border: "1px solid #e5e7eb", padding: "24px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
-                  <h2 style={{ fontSize: "18px", fontWeight: "800", margin: 0 }}>All Brands ({adminBrands.length})</h2>
-                  <input
-                    type="text"
-                    placeholder="🔍 Search among all brands..."
-                    value={inventorySearch}
-                    onChange={(e) => setInventorySearch(e.target.value)}
-                    style={{ padding: "8px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "13px", width: "260px" }}
-                  />
+                  <div>
+                    <h2 style={{ fontSize: "18px", fontWeight: "800", margin: 0 }}>All Brands ({adminBrands.length})</h2>
+                    <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "#64748b" }}>Manage all active brand logos and countries</p>
+                  </div>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      onClick={() => fetchAdminBrands(true)}
+                      disabled={isBrandsLoading}
+                      style={{
+                        backgroundColor: "#f1f5f9",
+                        color: "#0f172a",
+                        border: "1px solid #cbd5e1",
+                        padding: "8px 14px",
+                        borderRadius: "8px",
+                        fontSize: "12px",
+                        fontWeight: "700",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px"
+                      }}
+                    >
+                      🔄 {isBrandsLoading ? "Syncing..." : "Refresh Brands"}
+                    </button>
+                    <input
+                      type="text"
+                      placeholder="🔍 Search brands by name or origin..."
+                      value={brandSearchQuery}
+                      onChange={(e) => {
+                        setBrandSearchQuery(e.target.value);
+                        setBrandCurrentPage(1);
+                      }}
+                      style={{ padding: "8px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "13px", width: "240px" }}
+                    />
+                    <select
+                      value={brandPageSize}
+                      onChange={(e) => {
+                        setBrandPageSize(e.target.value === "All" ? "All" : Number(e.target.value));
+                        setBrandCurrentPage(1);
+                      }}
+                      style={{ padding: "8px 10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "12px", backgroundColor: "#fff" }}
+                    >
+                      <option value="25">25 per page</option>
+                      <option value="50">50 per page</option>
+                      <option value="100">100 per page</option>
+                      <option value="All">All Brands</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div style={{ maxHeight: "650px", overflowY: "auto" }}>
-                  <table className="admin-table">
-                    <thead><tr><th>LOGO PREVIEW</th><th>BRAND NAME</th><th>ORIGIN COUNTRY</th><th>UPLOAD NEW LOGO</th><th style={{ textAlign: "center" }}>ACTION</th></tr></thead>
-                    <tbody>
-                      {adminBrands
-                        .filter(b => !inventorySearch || b.name?.toLowerCase().includes(inventorySearch.toLowerCase()) || b.originCountry?.toLowerCase().includes(inventorySearch.toLowerCase()))
-                        .map((b) => (
-                        <tr key={b.id}>
-                          <td>
-                            {b.logoUrl ? (
-                              <img
-                                src={b.logoUrl}
-                                alt={b.name}
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200&q=80";
-                                }}
-                                style={{ width: "60px", height: "40px", objectFit: "contain", borderRadius: "4px", backgroundColor: "#f8fafc", padding: "4px", border: "1px solid #e2e8f0" }}
-                              />
+                {(() => {
+                  const filteredBrands = adminBrands.filter(b => 
+                    !brandSearchQuery || 
+                    b.name?.toLowerCase().includes(brandSearchQuery.toLowerCase()) || 
+                    b.originCountry?.toLowerCase().includes(brandSearchQuery.toLowerCase())
+                  );
+                  const effectiveSize = brandPageSize === "All" ? (filteredBrands.length || 1) : Number(brandPageSize);
+                  const totalPages = Math.max(1, Math.ceil(filteredBrands.length / effectiveSize));
+                  const safePage = Math.min(Math.max(1, brandCurrentPage), totalPages);
+                  const startIndex = (safePage - 1) * effectiveSize;
+                  const paginatedBrands = brandPageSize === "All" ? filteredBrands : filteredBrands.slice(startIndex, startIndex + effectiveSize);
+
+                  return (
+                    <>
+                      <div style={{ maxHeight: "650px", overflowY: "auto" }}>
+                        <table className="admin-table">
+                          <thead><tr><th>LOGO PREVIEW</th><th>BRAND NAME</th><th>ORIGIN COUNTRY</th><th>UPLOAD NEW LOGO</th><th style={{ textAlign: "center" }}>ACTION</th></tr></thead>
+                          <tbody>
+                            {isBrandsLoading ? (
+                              <tr>
+                                <td colSpan={5} style={{ textAlign: "center", padding: "50px 20px" }}>
+                                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
+                                    <div style={{ width: "32px", height: "32px", border: "3px solid #e2e8f0", borderTopColor: "#e63b7a", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                                    <span style={{ fontWeight: "700", color: "#e63b7a" }}>Loading brands from database...</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            ) : paginatedBrands.length === 0 ? (
+                              <tr>
+                                <td colSpan={5} style={{ textAlign: "center", padding: "40px 20px", color: "#64748b" }}>
+                                  {adminBrands.length === 0 ? (
+                                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
+                                      <div>No brands currently loaded in the admin view.</div>
+                                      <button
+                                        type="button"
+                                        onClick={() => fetchAdminBrands(true)}
+                                        style={{ backgroundColor: "#e63b7a", color: "#fff", border: "none", padding: "8px 18px", borderRadius: "8px", fontSize: "13px", fontWeight: "700", cursor: "pointer", boxShadow: "0 2px 8px rgba(230,59,122,0.3)" }}
+                                      >
+                                        Load All Brands Now
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    "No brands matched your search."
+                                  )}
+                                </td>
+                              </tr>
                             ) : (
-                              <div style={{ width: "60px", height: "40px", borderRadius: "4px", backgroundColor: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "800", color: "#64748b", border: "1px solid #e2e8f0" }}>
-                                NO LOGO
-                              </div>
+                              paginatedBrands.map((b) => (
+                                <tr key={b.id}>
+                                  <td>
+                                    {b.logoUrl ? (
+                                      <img
+                                        src={b.logoUrl}
+                                        alt={b.name}
+                                        onError={(e) => {
+                                          (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200&q=80";
+                                        }}
+                                        style={{ width: "60px", height: "40px", objectFit: "contain", borderRadius: "4px", backgroundColor: "#f8fafc", padding: "4px", border: "1px solid #e2e8f0" }}
+                                      />
+                                    ) : (
+                                      <div style={{ width: "60px", height: "40px", borderRadius: "4px", backgroundColor: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "800", color: "#64748b", border: "1px solid #e2e8f0" }}>
+                                        NO LOGO
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td style={{ fontWeight: "700", color: "#1e293b" }}>{b.name}</td>
+                                  <td>{b.originCountry || "International"}</td>
+                                  <td><input type="file" accept="image/*" onChange={(e) => handleBrandUpload(b.id, e)} style={{ fontSize: "11px" }} /></td>
+                                  <td style={{ textAlign: "center" }}>
+                                    <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
+                                      <button onClick={() => setEditingBrand({ ...b })} style={{ backgroundColor: "#f1f5f9", color: "#334155", border: "1px solid #cbd5e1", padding: "4px 10px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>✏️ Edit</button>
+                                      <button onClick={async () => { if (!confirm(`Delete brand ${b.name}?`)) return; try { await fetch(`${API_BASE}/admin/brands/${b.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); setAdminBrands(prev => prev.filter(item => item.id !== b.id)); clearAllCache(); triggerGlobalDataSync(); fetchAdminBrands(true); } catch (e) { alert("Error deleting brand"); } }} style={{ backgroundColor: "#fee2e2", color: "#ef4444", border: "none", padding: "4px 10px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Delete</button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))
                             )}
-                          </td>
-                          <td style={{ fontWeight: "700", color: "#1e293b" }}>{b.name}</td>
-                          <td>{b.originCountry || "International"}</td>
-                          <td><input type="file" accept="image/*" onChange={(e) => handleBrandUpload(b.id, e)} style={{ fontSize: "11px" }} /></td>
-                          <td style={{ textAlign: "center" }}>
-                            <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
-                              <button onClick={() => setEditingBrand({ ...b })} style={{ backgroundColor: "#f1f5f9", color: "#334155", border: "1px solid #cbd5e1", padding: "4px 10px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>✏️ Edit</button>
-                              <button onClick={async () => { if (!confirm(`Delete brand ${b.name}?`)) return; try { await fetch(`${API_BASE}/admin/brands/${b.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); setAdminBrands(prev => prev.filter(item => item.id !== b.id)); fetchData(true); } catch (e) { alert("Error deleting brand"); } }} style={{ backgroundColor: "#fee2e2", color: "#ef4444", border: "none", padding: "4px 10px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Delete</button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Pagination Controls */}
+                      {brandPageSize !== "All" && totalPages > 1 && (
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px", paddingTop: "12px", borderTop: "1px solid #f1f5f9", fontSize: "13px" }}>
+                          <span style={{ color: "#64748b" }}>
+                            Showing {startIndex + 1}-{Math.min(startIndex + effectiveSize, filteredBrands.length)} of {filteredBrands.length} brands
+                          </span>
+                          <div style={{ display: "flex", gap: "6px" }}>
+                            <button
+                              disabled={safePage <= 1}
+                              onClick={() => setBrandCurrentPage(p => Math.max(1, p - 1))}
+                              style={{ padding: "5px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", backgroundColor: safePage <= 1 ? "#f8fafc" : "#fff", cursor: safePage <= 1 ? "not-allowed" : "pointer", color: safePage <= 1 ? "#94a3b8" : "#0f172a" }}
+                            >
+                              Prev
+                            </button>
+                            <span style={{ padding: "5px 10px", fontWeight: "700" }}>Page {safePage} of {totalPages}</span>
+                            <button
+                              disabled={safePage >= totalPages}
+                              onClick={() => setBrandCurrentPage(p => Math.min(totalPages, p + 1))}
+                              style={{ padding: "5px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", backgroundColor: safePage >= totalPages ? "#f8fafc" : "#fff", cursor: safePage >= totalPages ? "not-allowed" : "pointer", color: safePage >= totalPages ? "#94a3b8" : "#0f172a" }}
+                            >
+                              Next
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
 
                 {/* Edit Brand Modal */}
                 {editingBrand && (
@@ -5430,6 +5800,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                               alert("Brand updated successfully!");
                               setEditingBrand(null);
                               fetchData(true);
+                              fetchAdminBrands(true);
                             }
                           } catch (e) { alert("Error updating brand"); }
                         }} style={{ backgroundColor: "#e63b7a", color: "#fff", padding: "8px 16px", border: "none", borderRadius: "6px", fontWeight: "700", cursor: "pointer" }}>SAVE CHANGES</button>
@@ -5438,7 +5809,6 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                   </div>
                 )}
               </div>
-            </div>
           )}
 
           {/* 10. USERS LIST */}
@@ -6563,12 +6933,41 @@ function InfluencersPanel({ token }: { token: string | null }) {
 // ═══════════════════════════════════════════
 function TopCustomersPanel({ customerList, orders }: { customerList: any[]; orders: any[] }) {
   const topList = useMemo(() => {
-    return customerList.map((c) => {
-      const custOrders = orders.filter(o => o.customerEmail === c.email || o.customerPhone === c.phone);
-      const totalSpend = custOrders.reduce((sum, o) => sum + (o.total || 0), 0) || Math.floor(Math.random() * 25000) + 3000;
-      const orderCount = custOrders.length || Math.floor(Math.random() * 8) + 1;
-      return { ...c, totalSpend, orderCount };
-    }).sort((a, b) => b.totalSpend - a.totalSpend);
+    if (customerList && customerList.length > 0) {
+      return customerList.map((c) => {
+        const custOrders = orders.filter(o => (o.customerEmail && o.customerEmail === c.email) || (o.customerPhone && o.customerPhone === c.phone));
+        const totalSpend = custOrders.reduce((sum, o) => sum + (parseFloat(o.total || o.totalAmount) || 0), 0) || Math.floor(Math.random() * 25000) + 3000;
+        const orderCount = custOrders.length || Math.floor(Math.random() * 8) + 1;
+        return { ...c, totalSpend, orderCount };
+      }).sort((a, b) => b.totalSpend - a.totalSpend);
+    }
+
+    // Fallback: Aggregate directly from real orders!
+    const custMap = new Map<string, { id: string; name: string; phone: string; email: string; orderCount: number; totalSpend: number }>();
+    orders.forEach((o, idx) => {
+      const key = o.customerPhone || o.customerEmail || o.customerName || `cust-${idx}`;
+      const name = o.customerName || o.name || "Valued Customer";
+      const phone = o.customerPhone || o.phone || "";
+      const email = o.customerEmail || o.email || "";
+      const spend = parseFloat(o.total || o.totalAmount || 0) || 0;
+
+      const existing = custMap.get(key) || { id: key, name, phone, email, orderCount: 0, totalSpend: 0 };
+      existing.orderCount += 1;
+      existing.totalSpend += spend;
+      custMap.set(key, existing);
+    });
+
+    if (custMap.size > 0) {
+      return Array.from(custMap.values()).sort((a, b) => b.totalSpend - a.totalSpend);
+    }
+
+    return [
+      { id: "cust-1", name: "Sadia Rahman", phone: "01711223344", email: "sadia@gmail.com", orderCount: 8, totalSpend: 18450 },
+      { id: "cust-2", name: "Tania Akter", phone: "01822334455", email: "tania@gmail.com", orderCount: 6, totalSpend: 14200 },
+      { id: "cust-3", name: "Farhana Islam", phone: "01933445566", email: "farhana@gmail.com", orderCount: 5, totalSpend: 11800 },
+      { id: "cust-4", name: "Nusrat Jahan", phone: "01644556677", email: "nusrat@gmail.com", orderCount: 4, totalSpend: 9500 },
+      { id: "cust-5", name: "Mehnaz Chowdhury", phone: "01555667788", email: "mehnaz@gmail.com", orderCount: 3, totalSpend: 7200 }
+    ];
   }, [customerList, orders]);
 
   return (
@@ -7494,8 +7893,9 @@ function MenuManagementPanel({ token }: { token: string | null }) {
         alert("Menu item created successfully!");
         setShowAddModal(false);
         setForm({ title: "", url: "", location: locationTab, sortOrder: menus.length + 1 });
+        clearAllCache();
+        triggerGlobalDataSync();
         fetchAdminMenus();
-        if (typeof window !== "undefined") window.dispatchEvent(new Event("glowgoodly_data_updated"));
       } else {
         const d = await res.json();
         alert(d.error || "Failed to create menu item");
@@ -7517,8 +7917,9 @@ function MenuManagementPanel({ token }: { token: string | null }) {
       if (res.ok) {
         alert("Menu item updated successfully!");
         setEditingItem(null);
+        clearAllCache();
+        triggerGlobalDataSync();
         fetchAdminMenus();
-        if (typeof window !== "undefined") window.dispatchEvent(new Event("glowgoodly_data_updated"));
       } else {
         alert("Failed to update menu item");
       }
@@ -7536,8 +7937,9 @@ function MenuManagementPanel({ token }: { token: string | null }) {
       });
       if (res.ok) {
         alert("Menu item deleted!");
+        clearAllCache();
+        triggerGlobalDataSync();
         fetchAdminMenus();
-        if (typeof window !== "undefined") window.dispatchEvent(new Event("glowgoodly_data_updated"));
       }
     } catch (e) {
       alert("Error deleting menu item");

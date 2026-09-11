@@ -5,7 +5,7 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import MobileNavbar from "../../components/MobileNavbar";
 import { useParams } from "next/navigation";
-import { API_BASE } from "../../utils/api";
+import { API_BASE, fetchWithCache } from "../../utils/api";
 
 export default function CustomCmsPage() {
   const params = useParams();
@@ -17,9 +17,8 @@ export default function CustomCmsPage() {
     if (!slug) return;
     const fetchPage = async () => {
       try {
-        const res = await fetch(`${API_BASE}/pages/${slug}`, { cache: "no-store" });
-        if (res.ok) {
-          const data = await res.json();
+        const data = await fetchWithCache(`${API_BASE}/pages/${slug}`);
+        if (data && !data.error) {
           setPage(data);
         }
       } catch (err) {

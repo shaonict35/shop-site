@@ -37,7 +37,7 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
       if (val.includes("dhaka city") || val.includes("dhaka") || val.includes("inside dhaka")) return 70;
       return 130;
     };
-    const deliveryCharge = shippingFee !== undefined ? parseFloat(shippingFee) : getDeliveryCharge(zoneValue);
+    const deliveryCharge = Math.max(0, shippingFee !== undefined ? (parseFloat(shippingFee) || 0) : getDeliveryCharge(zoneValue));
 
     // Fetch all active products to resolve variantId to its product document in memory
     const snapshot = await db.collection("products").where("status", "==", "Active").get();
@@ -58,6 +58,7 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
     const productUpdates = new Map<string, { docRef: any; productData: any }>();
 
     for (const item of items) {
+      const validQty = Math.max(1, Math.min(100, parseInt(item.quantity || 1, 10) || 1));
       if (item.variantId && variantMap.has(item.variantId)) {
         const match = variantMap.get(item.variantId)!;
         const { docRef, id: prodId, productData, variant } = match;
@@ -72,33 +73,32 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
         // Deduct stock in our cloned updates object
         const vIndex = updateObj.productData.variants.findIndex((v: any) => v.id === variant.id);
         if (vIndex > -1) {
-          updateObj.productData.variants[vIndex].stock = Math.max(0, updateObj.productData.variants[vIndex].stock - item.quantity);
+          updateObj.productData.variants[vIndex].stock = Math.max(0, updateObj.productData.variants[vIndex].stock - validQty);
         }
 
-        const itemPrice = variant.discountPrice || variant.price;
-        const itemTotal = itemPrice * item.quantity;
+        const itemPrice = Math.max(0, Number(variant.discountPrice || variant.price || 0));
+        const itemTotal = itemPrice * validQty;
         subTotal += itemTotal;
 
         resolvedItems.push({
           variantId: variant.id,
           productName: productData.name,
           variantName: variant.name,
-          quantity: item.quantity,
+          quantity: validQty,
           price: itemPrice,
           total: itemTotal,
         });
       } else {
         // Direct Landing Page Item or custom offer
-        const itemPrice = parseFloat(item.price || item.unitPrice || 0);
-        const itemQty = parseInt(item.quantity || 1, 10);
-        const itemTotal = itemPrice * itemQty;
+        const itemPrice = Math.max(0, parseFloat(item.price || item.unitPrice || 0) || 0);
+        const itemTotal = itemPrice * validQty;
         subTotal += itemTotal;
 
         resolvedItems.push({
           variantId: item.id || item.variantId || `landing-${Date.now()}`,
           productName: item.title || item.productTitle || item.name || "Landing Page Offer Set",
           variantName: "Standard Bundle",
-          quantity: itemQty,
+          quantity: validQty,
           price: itemPrice,
           total: itemTotal,
         });

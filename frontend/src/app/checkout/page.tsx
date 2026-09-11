@@ -7,10 +7,12 @@ import Footer from "../../components/Footer";
 import { useApp } from "../../context/AppContext";
 import { trackInitiateCheckout } from "../../utils/pixel";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CreditCard, Truck, ShieldCheck, ArrowRight, Smartphone, AlertTriangle } from "lucide-react";
 import { API_BASE } from "../../utils/api";
 
 export default function CheckoutPage() {
+  const router = useRouter();
   const {
     cart,
     clearCart,
@@ -173,7 +175,7 @@ export default function CheckoutPage() {
 
       // Cash on Delivery (COD) -> Order complete!
       clearCart();
-      window.location.href = `/thank-you?orderNumber=${createdOrderNumber}&total=${total}&paymentMethod=COD`;
+      router.push(`/thank-you?orderNumber=${createdOrderNumber}&total=${total}&paymentMethod=COD`);
     } catch (err: any) {
       setErrorMsg("Network error. Please try placing your order again.");
     } finally {

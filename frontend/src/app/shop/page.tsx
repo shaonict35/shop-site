@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useEffect, useState, Suspense } from "react";
-import { fetchWithCache, API_BASE, getProductUrl, generateSlug } from "../../utils/api";
+import { fetchWithCache, API_BASE, getProductUrl, generateSlug, subscribeToDataSync } from "../../utils/api";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Header from "../../components/Header";
 import PromoBanner from "../../components/PromoBanner";
 import Footer from "../../components/Footer";
@@ -210,14 +210,48 @@ const productMatchesSubcategory = (p: Product, subName: string) => {
   return prodName.includes(target);
 };
 
+const getInitialCachedProducts = (): Product[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const key = `gg_cache_${API_BASE}/products?includeAll=true`;
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed?.data) && parsed.data.length > 0) {
+        return parsed.data;
+      }
+    }
+  } catch {}
+  return [];
+};
+
+const getInitialCachedBrands = (): any[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const key = `gg_cache_${API_BASE}/brands`;
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed?.data)) {
+        return parsed.data;
+      }
+    }
+  } catch {}
+  return [];
+};
+
 function ShopPageContent() {
+  const router = useRouter();
   const { addToCart, wishlist, toggleWishlist } = useApp();
 
-  const [products, setProducts] = useState<Product[]>([]);
-  const [visibleProducts, setVisibleProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialProds] = useState<Product[]>(() => getInitialCachedProducts());
+  const [initialBr] = useState<any[]>(() => getInitialCachedBrands());
 
-  const [brands, setBrands] = useState<any[]>([]);
+  const [products, setProducts] = useState<Product[]>(initialProds);
+  const [visibleProducts, setVisibleProducts] = useState<Product[]>(initialProds);
+  const [loading, setLoading] = useState(initialProds.length === 0);
+
+  const [brands, setBrands] = useState<any[]>(initialBr);
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [brandSearchQuery, setBrandSearchQuery] = useState("");
   const [showAllBrands, setShowAllBrands] = useState(false);
@@ -329,12 +363,14 @@ function ShopPageContent() {
   }, [subQuery, catQuery, brandQuery, campaignQuery, brands]);
 
   useEffect(() => {
-    const fetchInitialData = async () => {
-      setLoading(true);
+    const fetchInitialData = async (bypass: boolean = false) => {
+      if (products.length === 0 && initialProds.length === 0) {
+        setLoading(true);
+      }
       try {
         const [prodData, brandData] = await Promise.all([
-          fetchWithCache(`${API_BASE}/products?includeAll=true`),
-          fetchWithCache(`${API_BASE}/brands`),
+          fetchWithCache(`${API_BASE}/products?includeAll=true`, bypass),
+          fetchWithCache(`${API_BASE}/brands`, bypass),
         ]);
 
         const validProds = Array.isArray(prodData) ? prodData : [];
@@ -361,10 +397,11 @@ function ShopPageContent() {
         setLoading(false);
       }
     };
-    fetchInitialData();
-    const handleSync = () => fetchInitialData();
-    window.addEventListener("glowgoodly_data_updated", handleSync);
-    return () => window.removeEventListener("glowgoodly_data_updated", handleSync);
+    fetchInitialData(false);
+
+    return subscribeToDataSync(() => {
+      fetchInitialData(true);
+    });
   }, []);
 
 
@@ -497,7 +534,7 @@ function ShopPageContent() {
   const handleBuyNow = (product: Product, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     handleAddToCart(product);
-    window.location.href = "/checkout";
+    router.push("/checkout");
   };
 
   // Sidebar content (shared between desktop sidebar and mobile drawer)
