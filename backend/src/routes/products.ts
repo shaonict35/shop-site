@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import db from "../firebase";
+import { authenticateJWT, requireRole } from "../middleware/auth";
 
 const router = Router();
 
@@ -63,8 +64,8 @@ router.get("/categories", async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/categories (Create/Update category or subcategory)
-router.post("/categories", async (req: any, res: any) => {
+// POST /api/categories (Admin only - Create/Update category or subcategory)
+router.post("/categories", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: any, res: any) => {
   try {
     const { id, name, parentId, imageUrl } = req.body || {};
     if (!name) {
@@ -89,8 +90,8 @@ router.post("/categories", async (req: any, res: any) => {
   }
 });
 
-// DELETE /api/categories/:id
-router.delete("/categories/:id", async (req: any, res: any) => {
+// DELETE /api/categories/:id (Admin only)
+router.delete("/categories/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: any, res: any) => {
   try {
     const { id } = req.params;
     await db.collection("categories").doc(id).delete();
@@ -130,8 +131,8 @@ router.get("/brands", async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/brands (Add/Update Brand)
-router.post("/brands", async (req: any, res: any) => {
+// POST /api/brands (Admin only - Add/Update Brand)
+router.post("/brands", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: any, res: any) => {
   try {
     const { id, name, logoUrl, originCountry } = req.body || {};
     if (!name) return res.status(400).json({ error: "Brand name is required" });
@@ -158,8 +159,8 @@ router.post("/brands", async (req: any, res: any) => {
   }
 });
 
-// DELETE /api/brands/:id
-router.delete("/brands/:id", async (req: any, res: any) => {
+// DELETE /api/brands/:id (Admin only)
+router.delete("/brands/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: any, res: any) => {
   try {
     const { id } = req.params;
     await db.collection("brands").doc(id).delete();
@@ -438,7 +439,7 @@ router.post("/products/:id/reviews", async (req: Request, res: Response) => {
 });
 
 // POST /api/products (Admin only - Create product)
-router.post("/products", async (req: Request, res: Response) => {
+router.post("/products", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: Request, res: Response) => {
   try {
     const { name, description, brandId, categoryId, imageUrl, price, discountPrice, costPrice, stock, metaTitle, metaDescription, metaKeywords, campaignName, variants } = req.body;
     
@@ -616,10 +617,10 @@ const updateProductHandler = async (req: Request, res: Response) => {
   }
 };
 
-router.put("/products/:id", updateProductHandler);
-router.patch("/products/:id", updateProductHandler);
-router.put("/admin/products/:id", updateProductHandler);
-router.patch("/admin/products/:id", updateProductHandler);
+router.put("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, updateProductHandler);
+router.patch("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, updateProductHandler);
+router.put("/admin/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, updateProductHandler);
+router.patch("/admin/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, updateProductHandler);
 
 // DELETE /api/products/:id & /api/admin/products/:id (Admin only - Delete product)
 const deleteProductHandler = async (req: Request, res: Response) => {
@@ -639,7 +640,7 @@ const deleteProductHandler = async (req: Request, res: Response) => {
   }
 };
 
-router.delete("/products/:id", deleteProductHandler);
-router.delete("/admin/products/:id", deleteProductHandler);
+router.delete("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, deleteProductHandler);
+router.delete("/admin/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, deleteProductHandler);
 
 export default router;

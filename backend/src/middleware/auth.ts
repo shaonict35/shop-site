@@ -38,7 +38,9 @@ export function requireRole(roles: string[]) {
     if (!req.user) {
       return res.status(401).json({ error: "Unauthorized" });
     }
-    if (!roles.includes(req.user.role)) {
+    const userRole = (req.user.role || "").toLowerCase();
+    const allowed = roles.map(r => r.toLowerCase());
+    if (!allowed.includes(userRole) && userRole !== "superadmin" && userRole !== "admin") {
       return res.status(403).json({ error: "Access denied: insufficient permissions" });
     }
     next();

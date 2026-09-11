@@ -82,7 +82,7 @@ router.get("/seasonal-offer", async (req, res) => {
 });
 
 // POST /api/settings/seasonal-offer (Admin only)
-router.post("/seasonal-offer", (async (req: any, res: any) => {
+router.post("/seasonal-offer", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, (async (req: any, res: any) => {
   try {
     const offerData = req.body;
     const docRef = db.collection("settings").doc("SEASONAL_OFFER_DATA");
@@ -98,8 +98,8 @@ router.post("/seasonal-offer", (async (req: any, res: any) => {
   }
 }) as any);
 
-// GET /api/settings (Admin only)
-router.get("/", (async (req: any, res: any) => {
+// GET /api/settings (Admin only - protected)
+router.get("/", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, (async (req: any, res: any) => {
   try {
     const snapshot = await db.collection("settings").get();
     const settingsList: any[] = [];
@@ -118,8 +118,8 @@ router.get("/", (async (req: any, res: any) => {
   }
 }) as any);
 
-// POST /api/settings/bulk (Admin bulk update)
-router.post("/bulk", (async (req: any, res: any) => {
+// POST /api/settings/bulk (Admin bulk update - protected)
+router.post("/bulk", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, (async (req: any, res: any) => {
   try {
     const settings = req.body; // Expects object: { KEY: VALUE, ... }
 
@@ -142,17 +142,18 @@ router.post("/bulk", (async (req: any, res: any) => {
     }
 
     await batch.commit();
-    res.json({ message: "Settings updated successfully" });
+
+    res.json({ message: "Bulk settings updated successfully", count: Object.keys(settings).length });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 }) as any);
 
-// POST /api/settings/test-smtp (Admin only - Test Hosting SMTP Connection & Send Test Email)
-router.post("/test-smtp", (async (req: any, res: any) => {
+// POST /api/settings/test-smtp (Admin test tool - protected)
+router.post("/test-smtp", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, (async (req: any, res: any) => {
   try {
-    const { targetEmail, host, port, user, pass, fromAddress } = req.body;
-    const recipient = targetEmail || user || "support@glowgoodly.com";
+    const { host, port, user, pass, fromAddress, toEmail } = req.body || {};
+    const recipient = toEmail || user || "support@glowgoodly.com";
 
     if (!recipient) {
       return res.status(400).json({ error: "Target recipient email is required to send test email." });

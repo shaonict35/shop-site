@@ -23,6 +23,7 @@ import pagesRouter from "./routes/pages";
 import bkashRouter from "./routes/bkash";
 import db from "./firebase";
 import { autoSeedDatabase } from "./auto-seed";
+import { globalRateLimiter, authRateLimiter, orderRateLimiter, sanitizeInput, securityHeaders } from "./middleware/security";
 
 dotenv.config();
 
@@ -40,7 +41,19 @@ const io = new SocketIOServer(httpServer, {
 
 const PORT = process.env.PORT || 5000;
 
-// Gzip / Deflate Compression Middleware (80%+ reduction in payload transfer size)
+// 1. Advanced OWASP Security Headers
+app.use(securityHeaders);
+
+// 2. Global DDoS / Flooding Rate Limiter (Max 350 req/min per IP)
+app.use(globalRateLimiter);
+
+// 3. Brute Force Login / Signup Guard (Max 15 attempts / 5 mins per IP)
+app.use("/api/auth", authRateLimiter);
+
+// 4. Fake Order / Spam Purchase Guard (Max 20 orders / 10 mins per IP)
+app.use("/api/orders", orderRateLimiter);
+
+// 5. Gzip / Deflate Compression Middleware (80%+ reduction in payload transfer size)
 app.use(compression({
   level: 6,
   threshold: 512, // Compress all payloads >= 512 bytes for maximum efficiency
@@ -50,25 +63,26 @@ app.use(compression({
   }
 }));
 
-// Security & Anti-Hacking Protection Middleware
-app.use((req, res, next) => {
-  res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("X-Frame-Options", "SAMEORIGIN");
-  res.setHeader("X-XSS-Protection", "1; mode=block");
-  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  res.setHeader("Vary", "Accept-Encoding");
-  next();
-});
-
-// Explicit CORS Middleware allowing all origins for seamless client-side fetching
+// 6. Explicit CORS Middleware allowing all origins for seamless client-side fetching
 app.use(cors({
   origin: "*",
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Cache-Control"]
 }));
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
+
+// Handle JSON syntax parse errors gracefully without 500 crash
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err && (err.type === "entity.parse.failed" || err instanceof SyntaxError)) {
+    return res.status(400).json({ error: "Malformed or invalid JSON payload in request body" });
+  }
+  next(err);
+});
+
+// 7. XSS & Malicious Script Injection Sanitizer
+app.use(sanitizeInput);
 
 // Intelligent Caching Middleware for API requests
 app.use("/api", (req, res, next) => {

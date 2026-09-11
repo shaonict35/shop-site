@@ -152,7 +152,7 @@ router.get("/banners/all", getAllBannersHandler as any);
 
 
 // ─── POST /api/banners — Admin: create new banner ────────────────────────────
-router.post("/banners", async (req: Request, res: Response) => {
+router.post("/banners", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: Request, res: Response) => {
   try {
     const { title, imageUrl, mobileImageUrl, tabletImageUrl, linkUrl, bgColor, page, isActive, sortOrder } = req.body;
     if (!title || !imageUrl) {
@@ -186,7 +186,7 @@ router.post("/banners", async (req: Request, res: Response) => {
 });
 
 // ─── PATCH /api/banners/:id — Admin: update banner ───────────────────────────
-router.patch("/banners/:id", async (req: Request, res: Response) => {
+router.patch("/banners/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { title, imageUrl, mobileImageUrl, tabletImageUrl, linkUrl, bgColor, page, isActive, sortOrder } = req.body;
@@ -252,11 +252,11 @@ const updateBannerPutHandler = async (req: Request, res: Response) => {
   }
 };
 
-router.put("/admin/banners/:id", updateBannerPutHandler);
-router.put("/banners/:id", updateBannerPutHandler);
+router.put("/admin/banners/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, updateBannerPutHandler);
+router.put("/banners/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, updateBannerPutHandler);
 
 // ─── PATCH /api/admin/banners/:id — Admin: patch banner alias ─────────────────
-router.patch("/admin/banners/:id", async (req: Request, res: Response) => {
+router.patch("/admin/banners/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { title, imageUrl, mobileImageUrl, tabletImageUrl, linkUrl, bgColor, page, isActive, sortOrder } = req.body;
@@ -288,7 +288,7 @@ router.patch("/admin/banners/:id", async (req: Request, res: Response) => {
 });
 
 // ─── POST /api/admin/banners — Admin: create banner alias ─────────────────────
-router.post("/admin/banners", async (req: Request, res: Response) => {
+router.post("/admin/banners", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: Request, res: Response) => {
   try {
     const { title, imageUrl, mobileImageUrl, tabletImageUrl, linkUrl, bgColor, page, isActive, sortOrder } = req.body;
     if (!title || !imageUrl) {
@@ -347,7 +347,7 @@ const unmarkBannerAsDeleted = async (id: string) => {
 };
 
 // ─── DELETE /api/admin/banners/all — Delete all banners ─────────────────────
-router.delete("/admin/banners/all", async (req: Request, res: Response) => {
+router.delete("/admin/banners/all", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: Request, res: Response) => {
   try {
     const snapshot = await db.collection("banners").get();
     const ids: string[] = [];
@@ -363,7 +363,7 @@ router.delete("/admin/banners/all", async (req: Request, res: Response) => {
 });
 
 // ─── DELETE /api/banners/all — Delete all banners alias ─────────────────────
-router.delete("/banners/all", async (req: Request, res: Response) => {
+router.delete("/banners/all", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: Request, res: Response) => {
   try {
     const snapshot = await db.collection("banners").get();
     const ids: string[] = [];
@@ -379,7 +379,7 @@ router.delete("/banners/all", async (req: Request, res: Response) => {
 });
 
 // ─── DELETE /api/banners/:id — Admin: delete banner ──────────────────────────
-router.delete("/banners/:id", async (req: Request, res: Response) => {
+router.delete("/banners/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const docRef = db.collection("banners").doc(id as string);
@@ -393,7 +393,7 @@ router.delete("/banners/:id", async (req: Request, res: Response) => {
 });
 
 // ─── DELETE /api/admin/banners/:id — Admin alias delete banner ──────────────────
-router.delete("/admin/banners/:id", async (req: Request, res: Response) => {
+router.delete("/admin/banners/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const docRef = db.collection("banners").doc(id as string);
