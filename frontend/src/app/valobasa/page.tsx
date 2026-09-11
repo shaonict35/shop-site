@@ -163,8 +163,378 @@ export default function ValobasaAdminPanel() {
   const [couponList, setCouponList] = useState<any[]>([]);
   const [couponForm, setCouponForm] = useState({ id: "", code: "", discountType: "Percentage", discountValue: "", minOrderValue: "0", maxDiscount: "", expiryDate: "", usageLimit: "1", imageUrl: "" });
 
+  // Master Homepage Banners & Card Slots
+  const MASTER_HOMEPAGE_BANNERS = [
+    // Hero Slides Carousel (3 Slides)
+    {
+      id: "hero-slide-1",
+      title: "Hero Slide 1 - Nirvana Makeup",
+      page: "Hero Slides",
+      imageUrl: "/images/sliders/slider-1.png",
+      mobileImageUrl: "/images/sliders/slider-1.png",
+      tabletImageUrl: "/images/sliders/slider-1.png",
+      linkUrl: "/shop?brand=nirvana",
+      isActive: true,
+      sortOrder: 1
+    },
+    {
+      id: "hero-slide-2",
+      title: "Hero Slide 2 - July Jaw Droppers",
+      page: "Hero Slides",
+      imageUrl: "/images/sliders/slider-2.png",
+      mobileImageUrl: "/images/sliders/slider-2.png",
+      tabletImageUrl: "/images/sliders/slider-2.png",
+      linkUrl: "/shop?deal=jaw-droppers",
+      isActive: true,
+      sortOrder: 2
+    },
+    {
+      id: "hero-slide-3",
+      title: "Hero Slide 3 - Treasure of Glow",
+      page: "Hero Slides",
+      imageUrl: "/images/sliders/slider-3.png",
+      mobileImageUrl: "/images/sliders/slider-3.png",
+      tabletImageUrl: "/images/sliders/slider-3.png",
+      linkUrl: "/shop?deal=treasure-of-glow",
+      isActive: true,
+      sortOrder: 3
+    },
+    // Homepage Wide Banner (Original Beauty Must Haves banner)
+    {
+      id: "homepage-wide-banner",
+      title: "Beauty Must Haves Exclusive Savings",
+      page: "Homepage Wide Banner",
+      imageUrl: "/hero-slide-1.png",
+      mobileImageUrl: "/hero-slide-1.png",
+      tabletImageUrl: "/hero-slide-1.png",
+      linkUrl: "/shop",
+      isActive: true,
+      sortOrder: 4
+    },
+    // Deals You Cannot Miss (4 Cards)
+    {
+      id: "deal-card-1",
+      title: "Deal Card 1 - Ombre 30% Off",
+      page: "Deal Card 1",
+      imageUrl: "/images/deals/deal-1.png",
+      mobileImageUrl: "/images/deals/deal-1.png",
+      tabletImageUrl: "/images/deals/deal-1.png",
+      linkUrl: "/shop?deal=ombre",
+      isActive: true,
+      sortOrder: 2
+    },
+    {
+      id: "deal-card-2",
+      title: "Deal Card 2 - Marico Free Delivery",
+      page: "Deal Card 2",
+      imageUrl: "/images/deals/deal-2.png",
+      mobileImageUrl: "/images/deals/deal-2.png",
+      tabletImageUrl: "/images/deals/deal-2.png",
+      linkUrl: "/shop?deal=marico",
+      isActive: true,
+      sortOrder: 3
+    },
+    {
+      id: "deal-card-3",
+      title: "Deal Card 3 - PNS Campaign",
+      page: "Deal Card 3",
+      imageUrl: "/images/deals/deal-3.gif",
+      mobileImageUrl: "/images/deals/deal-3.gif",
+      tabletImageUrl: "/images/deals/deal-3.gif",
+      linkUrl: "/shop?deal=pns",
+      isActive: true,
+      sortOrder: 4
+    },
+    {
+      id: "deal-card-4",
+      title: "Deal Card 4 - Senora Deal",
+      page: "Deal Card 4",
+      imageUrl: "/images/deals/deal-4.jpg",
+      mobileImageUrl: "/images/deals/deal-4.jpg",
+      tabletImageUrl: "/images/deals/deal-4.jpg",
+      linkUrl: "/shop?deal=senora",
+      isActive: true,
+      sortOrder: 5
+    },
+    // Top Brands & Offers (4 Cards)
+    {
+      id: "brand-offer-1",
+      title: "Brand Offer 1 - The Ordinary",
+      page: "Brand Offer 1",
+      imageUrl: "/images/brands/brand-offer-1.png",
+      mobileImageUrl: "/images/brands/brand-offer-1.png",
+      tabletImageUrl: "/images/brands/brand-offer-1.png",
+      linkUrl: "/shop?brand=the-ordinary",
+      isActive: true,
+      sortOrder: 6
+    },
+    {
+      id: "brand-offer-2",
+      title: "Brand Offer 2 - Skin Cafe",
+      page: "Brand Offer 2",
+      imageUrl: "/images/brands/brand-offer-2.gif",
+      mobileImageUrl: "/images/brands/brand-offer-2.gif",
+      tabletImageUrl: "/images/brands/brand-offer-2.gif",
+      linkUrl: "/shop?brand=skin-cafe",
+      isActive: true,
+      sortOrder: 7
+    },
+    {
+      id: "brand-offer-5",
+      title: "Brand Offer 5 - Treasure of Glow",
+      page: "Brand Offer 5",
+      imageUrl: "/images/brands/brand-offer-5.png",
+      mobileImageUrl: "/images/brands/brand-offer-5.png",
+      tabletImageUrl: "/images/brands/brand-offer-5.png",
+      linkUrl: "/shop?brand=treasure-of-glow",
+      isActive: true,
+      sortOrder: 8
+    },
+    {
+      id: "brand-offer-6",
+      title: "Brand Offer 6 - Trimmer Offer",
+      page: "Brand Offer 6",
+      imageUrl: "/images/brands/brand-offer-6.gif",
+      mobileImageUrl: "/images/brands/brand-offer-6.gif",
+      tabletImageUrl: "/images/brands/brand-offer-6.gif",
+      linkUrl: "/shop?category=trimmer",
+      isActive: true,
+      sortOrder: 9
+    },
+    // Limited Time Offers (4 Cards)
+    {
+      id: "limited-bogo",
+      title: "BOGO Offer",
+      page: "BOGO",
+      imageUrl: "/images/deals/deal-1.png",
+      mobileImageUrl: "/images/deals/deal-1.png",
+      tabletImageUrl: "/images/deals/deal-1.png",
+      linkUrl: "/shop?campaign=BOGO",
+      isActive: true,
+      sortOrder: 10
+    },
+    {
+      id: "limited-combo",
+      title: "COMBO Offer",
+      page: "COMBO",
+      imageUrl: "/images/deals/deal-2.png",
+      mobileImageUrl: "/images/deals/deal-2.png",
+      tabletImageUrl: "/images/deals/deal-2.png",
+      linkUrl: "/shop?campaign=COMBO",
+      isActive: true,
+      sortOrder: 11
+    },
+    {
+      id: "limited-offers",
+      title: "OFFERS Mega Savings",
+      page: "OFFERS",
+      imageUrl: "/images/deals/deal-3.gif",
+      mobileImageUrl: "/images/deals/deal-3.gif",
+      tabletImageUrl: "/images/deals/deal-3.gif",
+      linkUrl: "/shop?campaign=OFFERS",
+      isActive: true,
+      sortOrder: 12
+    },
+    {
+      id: "limited-clearance",
+      title: "Clearance SALE Deals",
+      page: "Clearance SALE",
+      imageUrl: "/images/deals/deal-4.jpg",
+      mobileImageUrl: "/images/deals/deal-4.jpg",
+      tabletImageUrl: "/images/deals/deal-4.jpg",
+      linkUrl: "/shop?campaign=Clearance%20SALE",
+      isActive: true,
+      sortOrder: 13
+    },
+    // Category Cards (8 Cards)
+    {
+      id: "cat-card-makeup",
+      title: "Category Card: Makeup",
+      page: "Category: Makeup",
+      imageUrl: "",
+      linkUrl: "/shop?category=makeup",
+      isActive: true,
+      sortOrder: 14
+    },
+    {
+      id: "cat-card-skin",
+      title: "Category Card: Skin",
+      page: "Category: Skin",
+      imageUrl: "",
+      linkUrl: "/shop?category=skincare",
+      isActive: true,
+      sortOrder: 15
+    },
+    {
+      id: "cat-card-hair",
+      title: "Category Card: Hair",
+      page: "Category: Hair",
+      imageUrl: "",
+      linkUrl: "/shop?category=haircare",
+      isActive: true,
+      sortOrder: 16
+    },
+    {
+      id: "cat-card-personal-care",
+      title: "Category Card: Personal Care",
+      page: "Category: Personal Care",
+      imageUrl: "",
+      linkUrl: "/shop?category=personal-care",
+      isActive: true,
+      sortOrder: 17
+    },
+    {
+      id: "cat-card-mom-baby",
+      title: "Category Card: Mom & Baby",
+      page: "Category: Mom & Baby",
+      imageUrl: "",
+      linkUrl: "/shop?category=mom-baby",
+      isActive: true,
+      sortOrder: 18
+    },
+    {
+      id: "cat-card-fragrance",
+      title: "Category Card: Fragrance",
+      page: "Category: Fragrance",
+      imageUrl: "",
+      linkUrl: "/shop?category=fragrance",
+      isActive: true,
+      sortOrder: 19
+    },
+    {
+      id: "cat-card-undergarments",
+      title: "Category Card: Undergarments",
+      page: "Category: Undergarments",
+      imageUrl: "",
+      linkUrl: "/shop?category=undergarments",
+      isActive: true,
+      sortOrder: 20
+    },
+    {
+      id: "cat-card-combo",
+      title: "Category Card: Combo",
+      page: "Category: Combo",
+      imageUrl: "",
+      linkUrl: "/shop?category=combo",
+      isActive: true,
+      sortOrder: 21
+    },
+    // Shop By Concern Cards (10 Cards)
+    {
+      id: "concern-card-acne",
+      title: "Concern Card: Acne Treatment",
+      page: "Concern: Acne",
+      imageUrl: "",
+      linkUrl: "/shop?category=skincare&sub=Acne%20Treatment",
+      isActive: true,
+      sortOrder: 22
+    },
+    {
+      id: "concern-card-anti-aging",
+      title: "Concern Card: Anti Aging Treatment",
+      page: "Concern: Anti Aging",
+      imageUrl: "",
+      linkUrl: "/shop?category=skincare&sub=Anti%20Aging",
+      isActive: true,
+      sortOrder: 23
+    },
+    {
+      id: "concern-card-dandruff",
+      title: "Concern Card: Dandruff Solution",
+      page: "Concern: Dandruff",
+      imageUrl: "",
+      linkUrl: "/shop?category=haircare&sub=Dandruff",
+      isActive: true,
+      sortOrder: 24
+    },
+    {
+      id: "concern-card-dry-skin",
+      title: "Concern Card: Dry Skin Treatment",
+      page: "Concern: Dry Skin",
+      imageUrl: "",
+      linkUrl: "/shop?category=skincare&sub=Dry%20Skin",
+      isActive: true,
+      sortOrder: 25
+    },
+    {
+      id: "concern-card-hair-fall",
+      title: "Concern Card: Hair Fall Treatment",
+      page: "Concern: Hair Fall",
+      imageUrl: "",
+      linkUrl: "/shop?category=haircare&sub=Hair%20Fall",
+      isActive: true,
+      sortOrder: 26
+    },
+    {
+      id: "concern-card-oil-control",
+      title: "Concern Card: Oil Control Treatment",
+      page: "Concern: Oil Control",
+      imageUrl: "",
+      linkUrl: "/shop?category=skincare",
+      isActive: true,
+      sortOrder: 27
+    },
+    {
+      id: "concern-card-pore-care",
+      title: "Concern Card: Pore Care",
+      page: "Concern: Pore Care",
+      imageUrl: "",
+      linkUrl: "/shop?category=skincare&sub=Pore%20Care",
+      isActive: true,
+      sortOrder: 28
+    },
+    {
+      id: "concern-card-spot-treatment",
+      title: "Concern Card: Spot Treatment",
+      page: "Concern: Spot Treatment",
+      imageUrl: "",
+      linkUrl: "/shop?category=skincare",
+      isActive: true,
+      sortOrder: 29
+    },
+    {
+      id: "concern-card-hair-thinning",
+      title: "Concern Card: Hair Thinning Solution",
+      page: "Concern: Hair Thinning",
+      imageUrl: "",
+      linkUrl: "/shop?category=haircare",
+      isActive: true,
+      sortOrder: 30
+    },
+    {
+      id: "concern-card-sun-burn",
+      title: "Concern Card: Sun Burn Treatment",
+      page: "Concern: Sun Burn",
+      imageUrl: "",
+      linkUrl: "/shop?category=skincare",
+      isActive: true,
+      sortOrder: 31
+    }
+  ];
+
+  const mergeBannersWithMaster = (dbBanners: any[] = []) => {
+    const map = new Map();
+    MASTER_HOMEPAGE_BANNERS.forEach((item) => {
+      const key = item.page === "Hero Slides" ? item.id : item.page.toLowerCase().trim();
+      map.set(key, { ...item });
+    });
+    dbBanners.forEach((b: any) => {
+      if (!b) return;
+      const pageKey = (b.page || "").toLowerCase().trim();
+      const heroKey = b.page === "Hero Slides" ? b.id : null;
+      if (heroKey && map.has(heroKey)) {
+        map.set(heroKey, { ...map.get(heroKey), ...b });
+      } else if (pageKey && map.has(pageKey)) {
+        map.set(pageKey, { ...map.get(pageKey), ...b });
+      } else if (b.id) {
+        map.set(b.id, b);
+      }
+    });
+    return Array.from(map.values());
+  };
+
   // Banners (Desktop, Mobile, Tablet)
-  const [banners, setBanners] = useState<any[]>([]);
+  const [banners, setBanners] = useState<any[]>(() => mergeBannersWithMaster([]));
   const [bannerCategoryFilter, setBannerCategoryFilter] = useState<string>("All");
   const [bannerForm, setBannerForm] = useState({
     id: "", title: "", imageUrl: "", mobileImageUrl: "", tabletImageUrl: "",
@@ -233,11 +603,14 @@ export default function ValobasaAdminPanel() {
     NAGAD_MERCHANT_NO: "01700000000", NAGAD_PUBLIC_KEY: "",
     PUSH_PROVIDER: "HostWebPush", PUSH_VAPID_PUBLIC_KEY: "", PUSH_VAPID_PRIVATE_KEY: "",
     STORE_NAME: "GlowGoodly", STORE_EMAIL: "support@glowgoodly.com", STORE_PHONE: "01700000000",
-    STORE_ADDRESS: "Dhaka, Bangladesh", SMTP_HOST: "smtp.mailtrap.io", SMTP_PORT: "587",
-    SMTP_USER: "", SMTP_PASS: "", SMTP_FROM_EMAIL: "noreply@glowgoodly.com",
+    STORE_ADDRESS: "Dhaka, Bangladesh", SMTP_HOST: "mail.glowgoodly.com", SMTP_PORT: "465",
+    SMTP_USER: "support@glowgoodly.com", SMTP_PASS: "", SMTP_FROM_EMAIL: "GlowGoodly Official <support@glowgoodly.com>",
     SEO_ORGANIZATION_NAME: "GlowGoodly Cosmetics BD", SEO_JSON_LD_SCHEMA: ""
   });
   const [settingsMessage, setSettingsMessage] = useState("");
+  const [testEmailRecipient, setTestEmailRecipient] = useState("support@glowgoodly.com");
+  const [isTestingSmtp, setIsTestingSmtp] = useState(false);
+  const [smtpTestResult, setSmtpTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   // Live Chat
   const [chatThreads, setChatThreads] = useState<any[]>([]);
@@ -553,18 +926,16 @@ export default function ValobasaAdminPanel() {
 
   const fetchAdminBanners = async (bypass: boolean = false) => {
     try {
-      const url = `${API_BASE}/banners` + (bypass ? `?t=${Date.now()}` : "");
-      let bnData = await fetchWithCache(url, bypass);
+      const url = `${API_BASE}/banners?t=${Date.now()}`;
+      let bnData = await fetchWithCache(url, true);
       if (!bnData || !Array.isArray(bnData) || bnData.length === 0) {
-        const directRes = await fetch(`${API_BASE}/admin/banners`);
+        const directRes = await fetch(`${API_BASE}/admin/banners?t=${Date.now()}`);
         if (directRes.ok) bnData = await directRes.json();
       }
-      if (bnData && Array.isArray(bnData) && bnData.length > 0) {
-        const uniqueBanners = Array.from(new Map(bnData.map((item: any) => [item.id || Math.random().toString(), item])).values());
-        setBanners(uniqueBanners);
-      }
+      setBanners(mergeBannersWithMaster(bnData && Array.isArray(bnData) ? bnData : []));
     } catch (e) {
       console.error("Error fetching admin banners:", e);
+      setBanners(mergeBannersWithMaster([]));
     }
   };
 
@@ -658,8 +1029,7 @@ export default function ValobasaAdminPanel() {
       ]);
 
       if (bnData && Array.isArray(bnData) && bnData.length > 0) {
-        const uniqueBanners = Array.from(new Map(bnData.map((item: any) => [item.id || Math.random().toString(), item])).values());
-        setBanners(uniqueBanners);
+        setBanners(mergeBannersWithMaster(bnData));
       } else {
         fetchAdminBanners(bypass);
       }
@@ -972,6 +1342,117 @@ export default function ValobasaAdminPanel() {
       }
     } catch (e) {
       alert("Error creating staff");
+    }
+  };
+
+  // Auto-generate Mobile and Tablet sized images from Desktop Image
+  const [isResizingBanner, setIsResizingBanner] = useState(false);
+  const [autoResizeStatus, setAutoResizeStatus] = useState("");
+
+  const handleDesktopImageUpload = async (fileOrUrl: File | string, currentSlotPage?: string) => {
+    setIsResizingBanner(true);
+    setAutoResizeStatus("⚡ Auto-generating responsive Mobile & Tablet sizes from Desktop image...");
+    try {
+      const pageType = (currentSlotPage || bannerForm.page || "Hero Slides").toLowerCase();
+      
+      const renderCanvas = (img: HTMLImageElement, targetW: number, targetH: number): string => {
+        const canvas = document.createElement("canvas");
+        canvas.width = targetW;
+        canvas.height = targetH;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return img.src;
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+
+        // Center cover crop
+        const scale = Math.max(targetW / img.width, targetH / img.height);
+        const scaledW = Math.round(img.width * scale);
+        const scaledH = Math.round(img.height * scale);
+        const offsetX = Math.round((targetW - scaledW) / 2);
+        const offsetY = Math.round((targetH - scaledH) / 2);
+
+        const isPng = img.src.startsWith("data:image/png") || img.src.toLowerCase().endsWith(".png");
+        if (!isPng) {
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, targetW, targetH);
+        }
+        ctx.drawImage(img, offsetX, offsetY, scaledW, scaledH);
+        return canvas.toDataURL(isPng ? "image/png" : "image/jpeg", 0.90);
+      };
+
+      const processSrc = (src: string) => {
+        return new Promise<{ desktop: string; mobile: string; tablet: string }>((resolve) => {
+          const img = new Image();
+          if (src.startsWith("http")) {
+            img.crossOrigin = "anonymous";
+          }
+          img.onload = () => {
+            try {
+              const isHero = pageType.includes("hero") || pageType.includes("slide");
+              const isWide = pageType.includes("wide");
+
+              let desktop = src;
+              let tablet = src;
+              let mobile = src;
+
+              if (isHero) {
+                desktop = renderCanvas(img, 1920, 500);
+                tablet = renderCanvas(img, 1024, 450);
+                mobile = renderCanvas(img, 750, 750);
+              } else if (isWide) {
+                desktop = renderCanvas(img, 1200, 300);
+                tablet = renderCanvas(img, 1024, 300);
+                mobile = renderCanvas(img, 750, 350);
+              } else {
+                // Square 1:1 cards
+                desktop = renderCanvas(img, 600, 600);
+                tablet = renderCanvas(img, 600, 600);
+                mobile = renderCanvas(img, 500, 500);
+              }
+
+              resolve({ desktop, mobile, tablet });
+            } catch (err) {
+              console.warn("Canvas crop fallback:", err);
+              resolve({ desktop: src, mobile: src, tablet: src });
+            }
+          };
+          img.onerror = () => {
+            resolve({ desktop: src, mobile: src, tablet: src });
+          };
+          img.src = src;
+        });
+      };
+
+      let baseSrc = "";
+      if (typeof fileOrUrl === "string") {
+        baseSrc = fileOrUrl;
+      } else {
+        baseSrc = await new Promise<string>((res) => {
+          const reader = new FileReader();
+          reader.onload = (e) => res((e.target?.result as string) || "");
+          reader.onerror = () => res("");
+          reader.readAsDataURL(fileOrUrl);
+        });
+      }
+
+      if (baseSrc) {
+        const sizes = await processSrc(baseSrc);
+        setBannerForm((prev) => ({
+          ...prev,
+          imageUrl: sizes.desktop,
+          mobileImageUrl: sizes.mobile,
+          tabletImageUrl: sizes.tablet
+        }));
+        setAutoResizeStatus("✅ Successfully auto-generated Desktop, Tablet & Mobile sizes!");
+        setTimeout(() => setAutoResizeStatus(""), 5000);
+        return sizes;
+      }
+    } catch (err) {
+      console.error("Auto-resize error:", err);
+      setAutoResizeStatus("⚠️ Error auto-resizing image.");
+    } finally {
+      setIsResizingBanner(false);
     }
   };
 
@@ -2790,6 +3271,170 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                 defaultLink: "/shop?campaign=CLEARANCE",
                 hint: "4th card in LIMITED TIME OFFERS 4-card grid."
               },
+              // Category Cards (8 Cards)
+              {
+                id: "Category: Makeup",
+                name: "🛍️ Category Card: Makeup",
+                desktopSize: "400 × 400 px (Square 1:1)",
+                mobileSize: "400 × 400 px",
+                defaultTitle: "Category Card: Makeup",
+                defaultLink: "/shop?category=makeup",
+                hint: "Card in SHOP BEAUTY PRODUCTS BY CATEGORY section."
+              },
+              {
+                id: "Category: Skin",
+                name: "🛍️ Category Card: Skin Care",
+                desktopSize: "400 × 400 px (Square 1:1)",
+                mobileSize: "400 × 400 px",
+                defaultTitle: "Category Card: Skin",
+                defaultLink: "/shop?category=skincare",
+                hint: "Card in SHOP BEAUTY PRODUCTS BY CATEGORY section."
+              },
+              {
+                id: "Category: Hair",
+                name: "🛍️ Category Card: Hair Care",
+                desktopSize: "400 × 400 px (Square 1:1)",
+                mobileSize: "400 × 400 px",
+                defaultTitle: "Category Card: Hair",
+                defaultLink: "/shop?category=haircare",
+                hint: "Card in SHOP BEAUTY PRODUCTS BY CATEGORY section."
+              },
+              {
+                id: "Category: Personal Care",
+                name: "🛍️ Category Card: Personal Care",
+                desktopSize: "400 × 400 px (Square 1:1)",
+                mobileSize: "400 × 400 px",
+                defaultTitle: "Category Card: Personal Care",
+                defaultLink: "/shop?category=personal-care",
+                hint: "Card in SHOP BEAUTY PRODUCTS BY CATEGORY section."
+              },
+              {
+                id: "Category: Mom & Baby",
+                name: "🛍️ Category Card: Mom & Baby",
+                desktopSize: "400 × 400 px (Square 1:1)",
+                mobileSize: "400 × 400 px",
+                defaultTitle: "Category Card: Mom & Baby",
+                defaultLink: "/shop?category=mom-baby",
+                hint: "Card in SHOP BEAUTY PRODUCTS BY CATEGORY section."
+              },
+              {
+                id: "Category: Fragrance",
+                name: "🛍️ Category Card: Fragrance",
+                desktopSize: "400 × 400 px (Square 1:1)",
+                mobileSize: "400 × 400 px",
+                defaultTitle: "Category Card: Fragrance",
+                defaultLink: "/shop?category=fragrance",
+                hint: "Card in SHOP BEAUTY PRODUCTS BY CATEGORY section."
+              },
+              {
+                id: "Category: Undergarments",
+                name: "🛍️ Category Card: Undergarments",
+                desktopSize: "400 × 400 px (Square 1:1)",
+                mobileSize: "400 × 400 px",
+                defaultTitle: "Category Card: Undergarments",
+                defaultLink: "/shop?category=undergarments",
+                hint: "Card in SHOP BEAUTY PRODUCTS BY CATEGORY section."
+              },
+              {
+                id: "Category: Combo",
+                name: "🛍️ Category Card: Combo",
+                desktopSize: "400 × 400 px (Square 1:1)",
+                mobileSize: "400 × 400 px",
+                defaultTitle: "Category Card: Combo",
+                defaultLink: "/shop?category=combo",
+                hint: "Card in SHOP BEAUTY PRODUCTS BY CATEGORY section."
+              },
+              // Concern Cards (10 Cards)
+              {
+                id: "Concern: Acne",
+                name: "🌿 Concern Card: Acne Treatment",
+                desktopSize: "400 × 400 px (Square 1:1)",
+                mobileSize: "400 × 400 px",
+                defaultTitle: "Concern Card: Acne Treatment",
+                defaultLink: "/shop?category=skincare&sub=Acne%20Treatment",
+                hint: "Card in SHOP BY CONCERN section."
+              },
+              {
+                id: "Concern: Anti Aging",
+                name: "🌿 Concern Card: Anti Aging Treatment",
+                desktopSize: "400 × 400 px (Square 1:1)",
+                mobileSize: "400 × 400 px",
+                defaultTitle: "Concern Card: Anti Aging Treatment",
+                defaultLink: "/shop?category=skincare&sub=Anti%20Aging",
+                hint: "Card in SHOP BY CONCERN section."
+              },
+              {
+                id: "Concern: Dandruff",
+                name: "🌿 Concern Card: Dandruff Solution",
+                desktopSize: "400 × 400 px (Square 1:1)",
+                mobileSize: "400 × 400 px",
+                defaultTitle: "Concern Card: Dandruff Solution",
+                defaultLink: "/shop?category=haircare&sub=Dandruff",
+                hint: "Card in SHOP BY CONCERN section."
+              },
+              {
+                id: "Concern: Dry Skin",
+                name: "🌿 Concern Card: Dry Skin Treatment",
+                desktopSize: "400 × 400 px (Square 1:1)",
+                mobileSize: "400 × 400 px",
+                defaultTitle: "Concern Card: Dry Skin Treatment",
+                defaultLink: "/shop?category=skincare&sub=Dry%20Skin",
+                hint: "Card in SHOP BY CONCERN section."
+              },
+              {
+                id: "Concern: Hair Fall",
+                name: "🌿 Concern Card: Hair Fall Treatment",
+                desktopSize: "400 × 400 px (Square 1:1)",
+                mobileSize: "400 × 400 px",
+                defaultTitle: "Concern Card: Hair Fall Treatment",
+                defaultLink: "/shop?category=haircare&sub=Hair%20Fall",
+                hint: "Card in SHOP BY CONCERN section."
+              },
+              {
+                id: "Concern: Oil Control",
+                name: "🌿 Concern Card: Oil Control Treatment",
+                desktopSize: "400 × 400 px (Square 1:1)",
+                mobileSize: "400 × 400 px",
+                defaultTitle: "Concern Card: Oil Control Treatment",
+                defaultLink: "/shop?category=skincare",
+                hint: "Card in SHOP BY CONCERN section."
+              },
+              {
+                id: "Concern: Pore Care",
+                name: "🌿 Concern Card: Pore Care",
+                desktopSize: "400 × 400 px (Square 1:1)",
+                mobileSize: "400 × 400 px",
+                defaultTitle: "Concern Card: Pore Care",
+                defaultLink: "/shop?category=skincare&sub=Pore%20Care",
+                hint: "Card in SHOP BY CONCERN section."
+              },
+              {
+                id: "Concern: Spot Treatment",
+                name: "🌿 Concern Card: Spot Treatment",
+                desktopSize: "400 × 400 px (Square 1:1)",
+                mobileSize: "400 × 400 px",
+                defaultTitle: "Concern Card: Spot Treatment",
+                defaultLink: "/shop?category=skincare",
+                hint: "Card in SHOP BY CONCERN section."
+              },
+              {
+                id: "Concern: Hair Thinning",
+                name: "🌿 Concern Card: Hair Thinning Solution",
+                desktopSize: "400 × 400 px (Square 1:1)",
+                mobileSize: "400 × 400 px",
+                defaultTitle: "Concern Card: Hair Thinning Solution",
+                defaultLink: "/shop?category=haircare",
+                hint: "Card in SHOP BY CONCERN section."
+              },
+              {
+                id: "Concern: Sun Burn",
+                name: "🌿 Concern Card: Sun Burn Treatment",
+                desktopSize: "400 × 400 px (Square 1:1)",
+                mobileSize: "400 × 400 px",
+                defaultTitle: "Concern Card: Sun Burn Treatment",
+                defaultLink: "/shop?category=skincare",
+                hint: "Card in SHOP BY CONCERN section."
+              },
               {
                 id: "Popup Promo Banner",
                 name: "🔔 Floating / Entry Popup Promo Banner",
@@ -2920,23 +3565,90 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                     </div>
                   </div>
 
-                  {/* Desktop Image Section */}
+                  {/* Desktop Image Section with Auto-Resize for Mobile & Tablet */}
                   <div style={{ backgroundColor: "#f8fafc", padding: "16px", borderRadius: "10px", border: "1px solid #cbd5e1" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
                       <label style={{ fontSize: "12.5px", fontWeight: "800", color: "#0f172a" }}>
                         🖥️ DESKTOP BANNER IMAGE (Recommended: {currentSlot.desktopSize}) *
                       </label>
                       <span style={{ fontSize: "11px", backgroundColor: "#e0f2fe", color: "#0369a1", padding: "2px 8px", borderRadius: "4px", fontWeight: "800" }}>
-                        Desktop View
+                        Desktop View (Primary)
+                      </span>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
+                      <input
+                        type="text"
+                        required
+                        value={bannerForm.imageUrl}
+                        onChange={(e) => setBannerForm({ ...bannerForm, imageUrl: e.target.value })}
+                        style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13px" }}
+                        placeholder="Paste Image URL or choose file below..."
+                      />
+                      {bannerForm.imageUrl && (
+                        <button
+                          type="button"
+                          disabled={isResizingBanner}
+                          onClick={() => handleDesktopImageUpload(bannerForm.imageUrl, currentSlot.id)}
+                          style={{ backgroundColor: "#0284c7", color: "#ffffff", border: "none", padding: "8px 14px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", whiteSpace: "nowrap" }}
+                        >
+                          ⚡ Auto-Generate Mobile & Tab
+                        </button>
+                      )}
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={isResizingBanner}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            await handleDesktopImageUpload(file, currentSlot.id);
+                          }
+                        }}
+                        style={{ fontSize: "12px" }}
+                      />
+                      {isResizingBanner && (
+                        <span style={{ fontSize: "12px", color: "#0284c7", fontWeight: "700" }}>⏳ Resizing for mobile & tab...</span>
+                      )}
+                    </div>
+
+                    {autoResizeStatus && (
+                      <div style={{ margin: "8px 0", padding: "8px 12px", borderRadius: "6px", backgroundColor: "#f0fdf4", border: "1px solid #86efac", color: "#166534", fontSize: "12px", fontWeight: "700" }}>
+                        {autoResizeStatus}
+                      </div>
+                    )}
+
+                    <p style={{ margin: "4px 0 0 0", fontSize: "11px", color: "#64748b" }}>
+                      💡 <strong>Smart Auto-Resize:</strong> Desktop size image upload dile system automatic Mobile ({currentSlot.mobileSize}) and Tablet size format generate kore nicher box gulo fill kore dibe.
+                    </p>
+
+                    {bannerForm.imageUrl && (
+                      <div style={{ marginTop: "10px" }}>
+                        <div style={{ fontSize: "11px", color: "#64748b", fontWeight: "700", marginBottom: "4px" }}>🖥️ Desktop Preview:</div>
+                        <img src={bannerForm.imageUrl} alt="Desktop Preview" style={{ maxHeight: "120px", maxWidth: "100%", borderRadius: "6px", border: "1px solid #cbd5e1", display: "block", objectFit: "contain" }} />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tablet Image Section (Auto-generated from desktop) */}
+                  <div style={{ backgroundColor: "#f8fafc", padding: "16px", borderRadius: "10px", border: "1px solid #cbd5e1" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                      <label style={{ fontSize: "12.5px", fontWeight: "800", color: "#0f172a" }}>
+                        📟 TABLET BANNER IMAGE (Auto-Generated / Customizable)
+                      </label>
+                      <span style={{ fontSize: "11px", backgroundColor: "#f3e8ff", color: "#7e22ce", padding: "2px 8px", borderRadius: "4px", fontWeight: "800" }}>
+                        Tablet View (Auto)
                       </span>
                     </div>
                     <input
                       type="text"
-                      required
-                      value={bannerForm.imageUrl}
-                      onChange={(e) => setBannerForm({ ...bannerForm, imageUrl: e.target.value })}
+                      value={bannerForm.tabletImageUrl}
+                      onChange={(e) => setBannerForm({ ...bannerForm, tabletImageUrl: e.target.value })}
                       style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13px", marginBottom: "8px" }}
-                      placeholder="Paste Image URL or choose file below..."
+                      placeholder="Auto-generated from desktop, or paste custom Tablet Image URL"
                     />
                     <input
                       type="file"
@@ -2946,29 +3658,29 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                         if (file) {
                           const reader = new FileReader();
                           reader.onload = (evt) => {
-                            if (evt.target?.result) setBannerForm({ ...bannerForm, imageUrl: evt.target.result as string });
+                            if (evt.target?.result) setBannerForm({ ...bannerForm, tabletImageUrl: evt.target.result as string });
                           };
                           reader.readAsDataURL(file);
                         }
                       }}
                       style={{ fontSize: "12px" }}
                     />
-                    {bannerForm.imageUrl && (
+                    {bannerForm.tabletImageUrl && (
                       <div style={{ marginTop: "10px" }}>
-                        <div style={{ fontSize: "11px", color: "#64748b", fontWeight: "700", marginBottom: "4px" }}>Live Image Preview:</div>
-                        <img src={bannerForm.imageUrl} alt="Desktop Preview" style={{ maxHeight: "120px", maxWidth: "100%", borderRadius: "6px", border: "1px solid #cbd5e1", display: "block", objectFit: "contain" }} />
+                        <div style={{ fontSize: "11px", color: "#64748b", fontWeight: "700", marginBottom: "4px" }}>📟 Tablet Preview:</div>
+                        <img src={bannerForm.tabletImageUrl} alt="Tablet Preview" style={{ maxHeight: "120px", maxWidth: "100%", borderRadius: "6px", border: "1px solid #cbd5e1", display: "block", objectFit: "contain" }} />
                       </div>
                     )}
                   </div>
 
-                  {/* Mobile Image Section */}
+                  {/* Mobile Image Section (Auto-generated from desktop) */}
                   <div style={{ backgroundColor: "#f8fafc", padding: "16px", borderRadius: "10px", border: "1px solid #cbd5e1" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
                       <label style={{ fontSize: "12.5px", fontWeight: "800", color: "#0f172a" }}>
-                        📱 MOBILE BANNER IMAGE (Recommended: {currentSlot.mobileSize})
+                        📱 MOBILE BANNER IMAGE (Auto-Generated: {currentSlot.mobileSize})
                       </label>
                       <span style={{ fontSize: "11px", backgroundColor: "#fef3c7", color: "#b45309", padding: "2px 8px", borderRadius: "4px", fontWeight: "800" }}>
-                        Mobile View (Optional)
+                        Mobile View (Auto)
                       </span>
                     </div>
                     <input
@@ -2976,7 +3688,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                       value={bannerForm.mobileImageUrl}
                       onChange={(e) => setBannerForm({ ...bannerForm, mobileImageUrl: e.target.value })}
                       style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13px", marginBottom: "8px" }}
-                      placeholder="Mobile Image URL (if blank, desktop image is used)"
+                      placeholder="Auto-generated from desktop, or paste custom Mobile Image URL"
                     />
                     <input
                       type="file"
@@ -2995,7 +3707,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                     />
                     {bannerForm.mobileImageUrl && (
                       <div style={{ marginTop: "10px" }}>
-                        <div style={{ fontSize: "11px", color: "#64748b", fontWeight: "700", marginBottom: "4px" }}>Mobile Image Preview:</div>
+                        <div style={{ fontSize: "11px", color: "#64748b", fontWeight: "700", marginBottom: "4px" }}>📱 Mobile Preview:</div>
                         <img src={bannerForm.mobileImageUrl} alt="Mobile Preview" style={{ maxHeight: "120px", maxWidth: "100%", borderRadius: "6px", border: "1px solid #cbd5e1", display: "block", objectFit: "contain" }} />
                       </div>
                     )}
@@ -3284,36 +3996,6 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                           />
                         </div>
 
-                        {/* Desktop Image File & URL Upload */}
-                        <div style={{ backgroundColor: "#f8fafc", padding: "14px", borderRadius: "10px", border: "1px solid #cbd5e1" }}>
-                          <label style={{ display: "block", fontSize: "12.5px", fontWeight: "800", color: "#0f172a", marginBottom: "4px" }}>
-                            🖥️ DESKTOP BANNER IMAGE * (Upload File or Paste Image URL)
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            value={bannerForm.imageUrl}
-                            onChange={(e) => setBannerForm({ ...bannerForm, imageUrl: e.target.value })}
-                            style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13px", marginBottom: "8px" }}
-                            placeholder="Paste Image URL or select local file below..."
-                          />
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const reader = new FileReader();
-                                reader.onload = (evt) => {
-                                  if (evt.target?.result) setBannerForm({ ...bannerForm, imageUrl: evt.target.result as string });
-                                };
-                                reader.readAsDataURL(file);
-                              }
-                            }}
-                            style={{ fontSize: "12px" }}
-                          />
-                        </div>
-
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
                           <div>
                             <label style={{ display: "block", fontSize: "12.5px", fontWeight: "700", color: "#334155", marginBottom: "4px" }}>Target Page</label>
@@ -3328,6 +4010,10 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                               <option value="Deal Card 2">💥 Deal Card 2 (Square 1:1)</option>
                               <option value="Deal Card 3">💥 Deal Card 3 (Square 1:1)</option>
                               <option value="Deal Card 4">💥 Deal Card 4 (Square 1:1)</option>
+                              <option value="Brand Offer 1">🏷️ Brand Offer 1 - The Ordinary (Square 1:1)</option>
+                              <option value="Brand Offer 2">🏷️ Brand Offer 2 - Skin Cafe (Square 1:1)</option>
+                              <option value="Brand Offer 5">🏷️ Brand Offer 5 - Treasure of Glow (Square 1:1)</option>
+                              <option value="Brand Offer 6">🏷️ Brand Offer 6 - Trimmer Offer (Square 1:1)</option>
                               <option value="BOGO">🔥 BOGO Campaign Banner</option>
                               <option value="COMBO">🔥 COMBO Campaign Banner</option>
                               <option value="OFFERS">🔥 OFFERS Campaign Banner</option>
@@ -3388,25 +4074,92 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                           </div>
                         </div>
 
-                        {/* Desktop Image Section */}
+                        {/* Desktop Image Section with Auto-Resize for Mobile & Tablet */}
                         <div style={{ backgroundColor: "#f8fafc", padding: "14px", borderRadius: "10px", border: "1px solid #cbd5e1" }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                            <label style={{ fontSize: "12.5px", fontWeight: "800", color: "#0f172a" }}>🖥️ DESKTOP BANNER IMAGE</label>
-                            <span style={{ fontSize: "11.5px", backgroundColor: "#e0f2fe", color: "#0369a1", padding: "4px 10px", borderRadius: "6px", fontWeight: "800" }}>
-                              {bannerForm.page === "Hero Slides" ? "🎯 EXACT SIZE: 1920 × 500 px" :
-                               bannerForm.page === "Homepage Wide Banner" ? "🎯 EXACT SIZE: 1200 × 300 px" :
-                               bannerForm.page?.startsWith("Category:") || bannerForm.page?.startsWith("Concern:") ? "🎯 EXACT SIZE: 400 × 400 px" :
-                               "🎯 EXACT SIZE: 600 × 600 px"}
+                            <label style={{ fontSize: "12.5px", fontWeight: "800", color: "#0f172a" }}>🖥️ DESKTOP BANNER IMAGE *</label>
+                            <span style={{ fontSize: "11px", backgroundColor: "#e0f2fe", color: "#0369a1", padding: "3px 8px", borderRadius: "4px", fontWeight: "800" }}>
+                              {bannerForm.page === "Hero Slides" ? "🎯 1920 × 500 px" :
+                               bannerForm.page === "Homepage Wide Banner" ? "🎯 1200 × 300 px" :
+                               bannerForm.page?.startsWith("Category:") || bannerForm.page?.startsWith("Concern:") ? "🎯 400 × 400 px" :
+                               "🎯 600 × 600 px"}
                             </span>
                           </div>
-                          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+
+                          <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
                             <input
                               type="text"
                               required
                               value={bannerForm.imageUrl}
                               onChange={(e) => setBannerForm({ ...bannerForm, imageUrl: e.target.value })}
                               style={{ flex: 1, padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
-                              placeholder="Image URL or upload file..."
+                              placeholder="Image URL or upload file below..."
+                            />
+                            {bannerForm.imageUrl && (
+                              <button
+                                type="button"
+                                disabled={isResizingBanner}
+                                onClick={() => handleDesktopImageUpload(bannerForm.imageUrl, bannerForm.page)}
+                                style={{ backgroundColor: "#0284c7", color: "#ffffff", border: "none", padding: "6px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: "700", cursor: "pointer", whiteSpace: "nowrap" }}
+                              >
+                                ⚡ Auto-Generate Mobile & Tab
+                              </button>
+                            )}
+                          </div>
+
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              disabled={isResizingBanner}
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  await handleDesktopImageUpload(file, bannerForm.page);
+                                }
+                              }}
+                              style={{ fontSize: "11px" }}
+                            />
+                            {isResizingBanner && (
+                              <span style={{ fontSize: "11px", color: "#0284c7", fontWeight: "700" }}>⏳ Resizing for mobile & tab...</span>
+                            )}
+                          </div>
+
+                          {autoResizeStatus && (
+                            <div style={{ margin: "6px 0", padding: "6px 10px", borderRadius: "6px", backgroundColor: "#f0fdf4", border: "1px solid #86efac", color: "#166534", fontSize: "11.5px", fontWeight: "700" }}>
+                              {autoResizeStatus}
+                            </div>
+                          )}
+
+                          <p style={{ margin: "4px 0 0 0", fontSize: "10.5px", color: "#64748b" }}>
+                            💡 <strong>Smart Auto-Resize:</strong> Desktop image upload dile mobile and tab er size auto create hoye nicher box gulo fill hoye jabe.
+                          </p>
+
+                          {bannerForm.imageUrl && (
+                            <div style={{ marginTop: "8px" }}>
+                              <span style={{ fontSize: "10px", color: "#64748b", fontWeight: "700" }}>🖥️ Desktop Preview:</span>
+                              <img src={bannerForm.imageUrl} alt="Desktop Banner" style={{ maxHeight: "75px", maxWidth: "100%", marginTop: "4px", borderRadius: "6px", border: "1px solid #cbd5e1", display: "block", objectFit: "contain" }} />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Tablet Image Section */}
+                        <div style={{ backgroundColor: "#f8fafc", padding: "14px", borderRadius: "10px", border: "1px solid #cbd5e1" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                            <label style={{ fontSize: "12.5px", fontWeight: "800", color: "#0f172a" }}>📟 TABLET BANNER IMAGE</label>
+                            <span style={{ fontSize: "11px", backgroundColor: "#f3e8ff", color: "#7e22ce", padding: "3px 8px", borderRadius: "4px", fontWeight: "800" }}>
+                              {bannerForm.page === "Hero Slides" ? "🎯 1024 × 450 px" :
+                               bannerForm.page === "Homepage Wide Banner" ? "🎯 1024 × 300 px" :
+                               "🎯 600 × 600 px"} (Auto)
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                            <input
+                              type="text"
+                              value={bannerForm.tabletImageUrl}
+                              onChange={(e) => setBannerForm({ ...bannerForm, tabletImageUrl: e.target.value })}
+                              style={{ flex: 1, padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
+                              placeholder="Auto-generated from desktop, or paste custom Tablet Image URL..."
                             />
                             <input
                               type="file"
@@ -3416,7 +4169,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                                 if (file) {
                                   const reader = new FileReader();
                                   reader.onload = (evt) => {
-                                    if (evt.target?.result) setBannerForm({ ...bannerForm, imageUrl: evt.target.result as string });
+                                    if (evt.target?.result) setBannerForm({ ...bannerForm, tabletImageUrl: evt.target.result as string });
                                   };
                                   reader.readAsDataURL(file);
                                 }
@@ -3424,8 +4177,11 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                               style={{ fontSize: "11px" }}
                             />
                           </div>
-                          {bannerForm.imageUrl && (
-                            <img src={bannerForm.imageUrl} alt="Desktop Banner" style={{ maxHeight: "80px", marginTop: "8px", borderRadius: "6px", border: "1px solid #cbd5e1" }} />
+                          {bannerForm.tabletImageUrl && (
+                            <div style={{ marginTop: "8px" }}>
+                              <span style={{ fontSize: "10px", color: "#64748b", fontWeight: "700" }}>📟 Tablet Preview:</span>
+                              <img src={bannerForm.tabletImageUrl} alt="Tablet Banner" style={{ maxHeight: "75px", maxWidth: "100%", marginTop: "4px", borderRadius: "6px", border: "1px solid #cbd5e1", display: "block", objectFit: "contain" }} />
+                            </div>
                           )}
                         </div>
 
@@ -3433,8 +4189,10 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                         <div style={{ backgroundColor: "#f8fafc", padding: "14px", borderRadius: "10px", border: "1px solid #cbd5e1" }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
                             <label style={{ fontSize: "12.5px", fontWeight: "800", color: "#0f172a" }}>📱 MOBILE BANNER IMAGE</label>
-                            <span style={{ fontSize: "11.5px", backgroundColor: "#fef3c7", color: "#b45309", padding: "4px 10px", borderRadius: "6px", fontWeight: "800" }}>
-                              🎯 EXACT SIZE: 750 × 750 px (Square 1:1)
+                            <span style={{ fontSize: "11px", backgroundColor: "#fef3c7", color: "#b45309", padding: "3px 8px", borderRadius: "4px", fontWeight: "800" }}>
+                              {bannerForm.page === "Hero Slides" ? "🎯 750 × 750 px (Square 1:1)" :
+                               bannerForm.page === "Homepage Wide Banner" ? "🎯 750 × 350 px" :
+                               "🎯 500 × 500 px"} (Auto)
                             </span>
                           </div>
                           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
@@ -3443,7 +4201,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                               value={bannerForm.mobileImageUrl}
                               onChange={(e) => setBannerForm({ ...bannerForm, mobileImageUrl: e.target.value })}
                               style={{ flex: 1, padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
-                              placeholder="Mobile Image URL (Optional)..."
+                              placeholder="Auto-generated from desktop, or paste custom Mobile Image URL..."
                             />
                             <input
                               type="file"
@@ -3462,7 +4220,10 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                             />
                           </div>
                           {bannerForm.mobileImageUrl && (
-                            <img src={bannerForm.mobileImageUrl} alt="Mobile Banner" style={{ maxHeight: "80px", marginTop: "8px", borderRadius: "6px", border: "1px solid #cbd5e1" }} />
+                            <div style={{ marginTop: "8px" }}>
+                              <span style={{ fontSize: "10px", color: "#64748b", fontWeight: "700" }}>📱 Mobile Preview:</span>
+                              <img src={bannerForm.mobileImageUrl} alt="Mobile Banner" style={{ maxHeight: "75px", maxWidth: "100%", marginTop: "4px", borderRadius: "6px", border: "1px solid #cbd5e1", display: "block", objectFit: "contain" }} />
+                            </div>
                           )}
                         </div>
 
@@ -6396,13 +7157,143 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                 )}
 
                 {settingsSubTab === "smtp" && (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
-                    <div><label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>SMTP Host</label><input value={settings.SMTP_HOST || ""} onChange={(e) => setSettings({ ...settings, SMTP_HOST: e.target.value })} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }} /></div>
-                    <div><label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>SMTP Port</label><input value={settings.SMTP_PORT || ""} onChange={(e) => setSettings({ ...settings, SMTP_PORT: e.target.value })} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }} /></div>
-                    <div><label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>SMTP User Email</label><input value={settings.SMTP_USER || ""} onChange={(e) => setSettings({ ...settings, SMTP_USER: e.target.value })} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }} /></div>
-                    <div><label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>SMTP From Address</label><input value={settings.SMTP_FROM_EMAIL || ""} onChange={(e) => setSettings({ ...settings, SMTP_FROM_EMAIL: e.target.value })} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }} /></div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "20px", marginBottom: "20px" }}>
+                    <div style={{ backgroundColor: "#eff6ff", border: "1px solid #bfdbfe", padding: "14px 16px", borderRadius: "8px", fontSize: "12.5px", color: "#1e3a8a", lineHeight: "1.5" }}>
+                      <strong>📬 Hosting / cPanel SMTP Setup:</strong> Enter your domain mail server info (e.g. <code>mail.glowgoodly.com</code>), Port (<code>465</code> for SSL or <code>587</code> for TLS), and password. Customer order purchase invoices will be dispatched from this mailbox automatically.
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>SMTP Host (Mail Server)</label>
+                        <input
+                          placeholder="e.g. mail.glowgoodly.com"
+                          value={settings.SMTP_HOST || ""}
+                          onChange={(e) => setSettings({ ...settings, SMTP_HOST: e.target.value })}
+                          style={{ width: "100%", padding: "9px 12px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px" }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>SMTP Port</label>
+                        <input
+                          placeholder="465 (SSL) or 587 (TLS)"
+                          value={settings.SMTP_PORT || ""}
+                          onChange={(e) => setSettings({ ...settings, SMTP_PORT: e.target.value })}
+                          style={{ width: "100%", padding: "9px 12px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px" }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>SMTP User / Email Address</label>
+                        <input
+                          placeholder="support@glowgoodly.com"
+                          value={settings.SMTP_USER || ""}
+                          onChange={(e) => setSettings({ ...settings, SMTP_USER: e.target.value })}
+                          style={{ width: "100%", padding: "9px 12px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px" }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>SMTP Password</label>
+                        <input
+                          type="password"
+                          placeholder="Hosting email account password"
+                          value={settings.SMTP_PASS || ""}
+                          onChange={(e) => setSettings({ ...settings, SMTP_PASS: e.target.value })}
+                          style={{ width: "100%", padding: "9px 12px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px" }}
+                        />
+                      </div>
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Sender Name & From Address</label>
+                        <input
+                          placeholder='GlowGoodly Official <support@glowgoodly.com>'
+                          value={settings.SMTP_FROM_EMAIL || ""}
+                          onChange={(e) => setSettings({ ...settings, SMTP_FROM_EMAIL: e.target.value })}
+                          style={{ width: "100%", padding: "9px 12px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px" }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Test SMTP Email Dispatch Box */}
+                    <div style={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0", padding: "16px", borderRadius: "8px" }}>
+                      <h4 style={{ margin: "0 0 8px 0", fontSize: "13px", fontWeight: "800", color: "#0f172a" }}>
+                        🚀 Test Hosting SMTP Connection
+                      </h4>
+                      <p style={{ margin: "0 0 12px 0", fontSize: "12px", color: "#64748b" }}>
+                        Send a real test email to check if your hosting server connects, authenticates, and sends successfully.
+                      </p>
+                      <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+                        <input
+                          type="email"
+                          placeholder="Recipient email (e.g. your email)"
+                          value={testEmailRecipient}
+                          onChange={(e) => setTestEmailRecipient(e.target.value)}
+                          style={{ minWidth: "260px", flex: 1, padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px" }}
+                        />
+                        <button
+                          type="button"
+                          disabled={isTestingSmtp}
+                          onClick={async () => {
+                            if (!testEmailRecipient) {
+                              alert("Please enter a recipient email address.");
+                              return;
+                            }
+                            setIsTestingSmtp(true);
+                            setSmtpTestResult(null);
+                            try {
+                              const res = await fetch(`${API_BASE}/settings/test-smtp`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json", ...getAuthHeader() },
+                                body: JSON.stringify({
+                                  targetEmail: testEmailRecipient,
+                                  host: settings.SMTP_HOST,
+                                  port: settings.SMTP_PORT,
+                                  user: settings.SMTP_USER,
+                                  pass: settings.SMTP_PASS,
+                                  fromAddress: settings.SMTP_FROM_EMAIL
+                                })
+                              });
+                              const data = await res.json();
+                              if (res.ok && data.success) {
+                                setSmtpTestResult({ success: true, message: data.message || "Test email sent successfully!" });
+                              } else {
+                                setSmtpTestResult({ success: false, message: data.error || "SMTP test failed. Check host, port, or password." });
+                              }
+                            } catch (err: any) {
+                              setSmtpTestResult({ success: false, message: err.message || "Network error while connecting to test endpoint." });
+                            } finally {
+                              setIsTestingSmtp(false);
+                            }
+                          }}
+                          style={{
+                            backgroundColor: isTestingSmtp ? "#94a3b8" : "#2563eb",
+                            color: "#ffffff",
+                            border: "none",
+                            padding: "9px 18px",
+                            borderRadius: "6px",
+                            fontWeight: "800",
+                            fontSize: "12.5px",
+                            cursor: isTestingSmtp ? "not-allowed" : "pointer"
+                          }}
+                        >
+                          {isTestingSmtp ? "⏳ Testing Handshake..." : "⚡ Send Test Email"}
+                        </button>
+                      </div>
+                      {smtpTestResult && (
+                        <div style={{
+                          marginTop: "12px",
+                          padding: "10px 14px",
+                          borderRadius: "6px",
+                          fontSize: "12.5px",
+                          fontWeight: "700",
+                          backgroundColor: smtpTestResult.success ? "#f0fdf4" : "#fef2f2",
+                          border: `1px solid ${smtpTestResult.success ? "#86efac" : "#fca5a5"}`,
+                          color: smtpTestResult.success ? "#15803d" : "#b91c1c"
+                        }}>
+                          {smtpTestResult.message}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
+
 
                 <button type="submit" style={{ backgroundColor: "#e63b7a", color: "#fff", border: "none", padding: "12px 28px", borderRadius: "6px", fontWeight: "800", cursor: "pointer" }}>SAVE ALL STORE SETTINGS</button>
                 {settingsMessage && <p style={{ marginTop: "10px", color: settingsMessage.includes("success") ? "#059669" : "#ef4444", fontWeight: "700" }}>{settingsMessage}</p>}

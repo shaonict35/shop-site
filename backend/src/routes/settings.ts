@@ -148,4 +148,41 @@ router.post("/bulk", (async (req: any, res: any) => {
   }
 }) as any);
 
+// POST /api/settings/test-smtp (Admin only - Test Hosting SMTP Connection & Send Test Email)
+router.post("/test-smtp", (async (req: any, res: any) => {
+  try {
+    const { targetEmail, host, port, user, pass, fromAddress } = req.body;
+    const recipient = targetEmail || user || "support@glowgoodly.com";
+
+    if (!recipient) {
+      return res.status(400).json({ error: "Target recipient email is required to send test email." });
+    }
+
+    const { testSmtpConnection } = await import("../mailer");
+    
+    // Optional custom config passed from the form before saving
+    const customConfig = (host || user || pass) ? {
+      host: host?.trim(),
+      port: port ? parseInt(port, 10) : 465,
+      user: user?.trim(),
+      pass: pass?.trim(),
+      fromAddress: fromAddress?.trim() || `"GlowGoodly System Test" <${user}>`
+    } : undefined;
+
+    const result = await testSmtpConnection(recipient, customConfig);
+    res.json({
+      success: true,
+      message: `✅ SMTP connection verified and test email successfully sent to ${recipient}`,
+      details: result
+    });
+  } catch (error: any) {
+    console.error("Test SMTP failed:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to establish SMTP connection with mail server."
+    });
+  }
+}) as any);
+
 export default router;
+

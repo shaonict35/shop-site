@@ -92,8 +92,19 @@ export default function Header() {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPlaceholder, setCurrentPlaceholder] = useState("");
   const [dbProducts, setDbProducts] = useState<any[]>([]);
+  const [dbBrands, setDbBrands] = useState<any[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchWithCache(`${API_BASE}/brands`).then((data) => {
+      if (mounted && Array.isArray(data)) {
+        setDbBrands(data);
+      }
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
 
   // Optimized Header: Removed heavy full product catalog fetching on header mount
   const getBrandCount = (brandName: string) => {
@@ -156,26 +167,8 @@ export default function Header() {
   const searchRef = React.useRef<HTMLDivElement>(null);
   const [dynamicHeaderMenus, setDynamicHeaderMenus] = useState<any[]>([]);
 
-  const loadHeaderMenus = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/menus?location=Header`, { cache: "no-store" });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setDynamicHeaderMenus(data);
-        }
-      }
-    } catch (err) {
-      console.warn("Using default header menus");
-    }
-  };
+  // Purely static header navigation menus
 
-  useEffect(() => {
-    loadHeaderMenus();
-    const handleSync = () => loadHeaderMenus();
-    window.addEventListener("glowgoodly_data_updated", handleSync);
-    return () => window.removeEventListener("glowgoodly_data_updated", handleSync);
-  }, []);
 
 
   // Close suggestions on outside click
@@ -348,6 +341,11 @@ export default function Header() {
                 <span>🎁 Combos & Offers</span>
               </Link>
 
+              {/* 9. Brands */}
+              <Link href="/brands" className="mobile-menu-row-single" onClick={() => setMobileMenuOpen(false)}>
+                <span>🏷️ Authentic Brands ({dbBrands.length})</span>
+              </Link>
+
               <div className="mobile-menu-section-title" style={{ marginTop: "20px" }}>ACCOUNT & HELP</div>
               <Link href={user ? "/account" : "/login"} className="mobile-menu-row-single" onClick={() => setMobileMenuOpen(false)}>
                 <span>👤 {user ? "My Account & Orders" : "Login / Signup"}</span>
@@ -408,102 +406,30 @@ export default function Header() {
                       }}
                     >
                       {/* Sub-column 1: TOP BRANDS list */}
-                      <div style={{ flex: 1 }}>
+                      <div style={{ flex: 1, maxHeight: "420px", overflowY: "auto", paddingRight: "8px" }}>
                         <h4 style={{ fontSize: "11px", fontWeight: "900", color: "#e52860", textTransform: "uppercase", letterSpacing: "1px", borderBottom: "1.5px solid #f5f5f5", paddingBottom: "6px", marginBottom: "12px" }}>
-                          TOP BRANDS
+                          AUTHENTIC BRANDS
                         </h4>
                         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "8px", fontSize: "12px", fontWeight: "600", color: "#4a5568" }}>
-                          <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <Link href="/shop?brand=NICKA+K" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                <img src="https://logo.clearbit.com/nicka.com" alt="NICKA K" style={{ width: "22px", height: "22px", objectFit: "contain", backgroundColor: "#ffffff", border: "1px solid #edf2f7", borderRadius: "4px", padding: "1px" }} />
-                                <span>NICKA K</span>
-                              </div>
-                            </Link>
-                          </li>
-                          <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <Link href="/shop?brand=L'Oreal" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                <img src="https://logo.clearbit.com/loreal.com" alt="L'Oreal" style={{ width: "22px", height: "22px", objectFit: "contain", backgroundColor: "#ffffff", border: "1px solid #edf2f7", borderRadius: "4px", padding: "1px" }} />
-                                <span>L'Oreal</span>
-                              </div>
-                            </Link>
-                          </li>
-                          <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <Link href="/shop?brand=Flormar" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                <img src="https://logo.clearbit.com/flormar.com" alt="Flormar" style={{ width: "22px", height: "22px", objectFit: "contain", backgroundColor: "#ffffff", border: "1px solid #edf2f7", borderRadius: "4px", padding: "1px" }} />
-                                <span>Flormar</span>
-                              </div>
-                            </Link>
-                          </li>
-                          <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <Link href="/shop?brand=Topface" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                <img src="https://logo.clearbit.com/topface.com.tr" alt="Topface" style={{ width: "22px", height: "22px", objectFit: "contain", backgroundColor: "#ffffff", border: "1px solid #edf2f7", borderRadius: "4px", padding: "1px" }} />
-                                <span>Topface</span>
-                              </div>
-                            </Link>
-                          </li>
-                          <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <Link href="/shop?brand=The+Body+Shop" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                <img src="https://logo.clearbit.com/thebodyshop.com" alt="The Body Shop" style={{ width: "22px", height: "22px", objectFit: "contain", backgroundColor: "#ffffff", border: "1px solid #edf2f7", borderRadius: "4px", padding: "1px" }} />
-                                <span>The Body Shop</span>
-                              </div>
-                            </Link>
-                          </li>
-                          <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <Link href="/shop?brand=Revlon" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                <img src="https://logo.clearbit.com/revlon.com" alt="Revlon" style={{ width: "22px", height: "22px", objectFit: "contain", backgroundColor: "#ffffff", border: "1px solid #edf2f7", borderRadius: "4px", padding: "1px" }} />
-                                <span>Revlon</span>
-                              </div>
-                            </Link>
-                          </li>
-                          <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <Link href="/shop?brand=Dove" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                <img src="https://logo.clearbit.com/dove.com" alt="Dove" style={{ width: "22px", height: "22px", objectFit: "contain", backgroundColor: "#ffffff", border: "1px solid #edf2f7", borderRadius: "4px", padding: "1px" }} />
-                                <span>Dove</span>
-                              </div>
-                            </Link>
-                          </li>
-                          <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <Link href="/shop?brand=Swiss+Beauty" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                <img src="https://logo.clearbit.com/swissbeauty.in" alt="Swiss Beauty" style={{ width: "22px", height: "22px", objectFit: "contain", backgroundColor: "#ffffff", border: "1px solid #edf2f7", borderRadius: "4px", padding: "1px" }} />
-                                <span>Swiss Beauty</span>
-                              </div>
-                            </Link>
-                          </li>
-                          <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <Link href="/shop?brand=Pastel" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                <img src="https://logo.clearbit.com/pastel.com.tr" alt="Pastel" style={{ width: "22px", height: "22px", objectFit: "contain", backgroundColor: "#ffffff", border: "1px solid #edf2f7", borderRadius: "4px", padding: "1px" }} />
-                                <span>Pastel</span>
-                              </div>
-                            </Link>
-                          </li>
-                          <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <Link href="/shop?brand=Guerniss" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                <img src="https://logo.clearbit.com/guerniss.com" alt="Guerniss" style={{ width: "22px", height: "22px", objectFit: "contain", backgroundColor: "#ffffff", border: "1px solid #edf2f7", borderRadius: "4px", padding: "1px" }} />
-                                <span>Guerniss</span>
-                              </div>
-                            </Link>
-                          </li>
+                          {dbBrands.map((b) => (
+                            <li key={b.id || b.name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <Link href={`/shop?brand=${encodeURIComponent(b.name)}`} style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '2px 0' }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                  {b.logoUrl && (
+                                    <img src={b.logoUrl} alt={b.name} style={{ width: "22px", height: "22px", objectFit: "contain", backgroundColor: "#ffffff", border: "1px solid #edf2f7", borderRadius: "4px", padding: "1px" }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                                  )}
+                                  <span>{b.name}</span>
+                                </div>
+                              </Link>
+                            </li>
+                          ))}
                         </ul>
 
-                        <h4 style={{ fontSize: "11px", fontWeight: "900", color: "#e52860", textTransform: "uppercase", letterSpacing: "1px", borderBottom: "1.5px solid #f5f5f5", paddingBottom: "6px", marginTop: "18px", marginBottom: "12px" }}>
-                          ALL BRANDS
-                        </h4>
-                        <div style={{ color: "#e52860", fontWeight: "800", fontSize: "12px", marginBottom: "8px" }}>#</div>
-                        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "8px", fontSize: "12px", fontWeight: "600", color: "#4a5568" }}>
-                          <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><Link href="/shop?brand=SOME+BY+MI" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', justifyContent: 'space-between', width: '100%' }}>[SOME BY MI]</Link></li>
-                          <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><Link href="/shop?brand=3W+Clinic" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', justifyContent: 'space-between', width: '100%' }}>3W Clinic</Link></li>
-                          <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><Link href="/shop?brand=5LANC" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', justifyContent: 'space-between', width: '100%' }}>5LANC</Link></li>
-                        </ul>
+                        <div style={{ marginTop: "16px", paddingTop: "10px", borderTop: "1.5px solid #edf2f7" }}>
+                          <Link href="/brands" style={{ fontSize: "11px", fontWeight: "800", color: "#e52860", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                            ALL BRANDS DIRECTORY →
+                          </Link>
+                        </div>
                       </div>
  
                       {/* Sub-column 2: Alphabetical Index */}
@@ -522,11 +448,15 @@ export default function Header() {
                           lineHeight: "1.1"
                         }}
                       >
-                        <span>#</span>
+                        <Link href="/brands" style={{ textDecoration: 'none', color: 'inherit' }}>
+                          <span>#</span>
+                        </Link>
                         {"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((letter) => (
-                          <span key={letter} style={{ cursor: "pointer" }} onMouseEnter={(e) => e.currentTarget.style.color = "#e52860"} onMouseLeave={(e) => e.currentTarget.style.color = "#718096"}>
-                            {letter}
-                          </span>
+                          <Link key={letter} href={`/brands#brand-group-${letter}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                            <span style={{ cursor: "pointer" }} onMouseEnter={(e) => e.currentTarget.style.color = "#e52860"} onMouseLeave={(e) => e.currentTarget.style.color = "#718096"}>
+                              {letter}
+                            </span>
+                          </Link>
                         ))}
                       </div>
  
@@ -534,56 +464,64 @@ export default function Header() {
  
                     {/* Right Column: TOP BRANDS logo grid */}
                     <div style={{ flex: "2", paddingLeft: "24px", display: "flex", flexDirection: "column", alignItems: "center" }}>
-                      <h4 style={{ fontSize: "14px", fontWeight: "800", color: "#4a5568", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "25px", alignSelf: "center" }}>
-                        TOP BRANDS
-                      </h4>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", maxWidth: "800px", marginBottom: "20px" }}>
+                        <h4 style={{ fontSize: "14px", fontWeight: "800", color: "#4a5568", textTransform: "uppercase", letterSpacing: "1px", margin: 0 }}>
+                          TOP BRANDS
+                        </h4>
+                        <Link href="/brands" style={{ fontSize: "12px", fontWeight: "700", color: "#e52860", textDecoration: "none" }}>
+                          View All ({dbBrands.length}) →
+                        </Link>
+                      </div>
                       <div 
                         style={{ 
                           display: "grid", 
                           gridTemplateColumns: "repeat(4, 1fr)", 
-                          gap: "24px", 
+                          gap: "20px", 
                           width: "100%",
                           maxWidth: "800px"
                         }}
                       >
-                        <Link href="/shop?brand=M.A.C" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "70px", border: "1px solid #edf2f7", borderRadius: "6px", backgroundColor: "#ffffff" }}>
-                          <img src="https://upload.wikimedia.org/wikipedia/commons/e/e7/M.A.C._Cosmetics_logo.svg" alt="M.A.C" style={{ maxHeight: "40px", maxWidth: "85%", objectFit: "contain" }} />
-                        </Link>
-                        <Link href="/shop?brand=The+Body+Shop" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "70px", border: "1px solid #edf2f7", borderRadius: "6px", backgroundColor: "#ffffff" }}>
-                          <img src="https://upload.wikimedia.org/wikipedia/commons/e/e4/The_Body_Shop_logo.svg" alt="The Body Shop" style={{ maxHeight: "45px", maxWidth: "85%", objectFit: "contain" }} />
-                        </Link>
-                        <Link href="/shop?brand=NYX" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "70px", border: "1px solid #edf2f7", borderRadius: "6px", backgroundColor: "#ffffff" }}>
-                          <img src="https://upload.wikimedia.org/wikipedia/commons/0/07/NYX_Professional_Makeup_logo.svg" alt="NYX" style={{ maxHeight: "42px", maxWidth: "85%", objectFit: "contain" }} />
-                        </Link>
-                        <Link href="/shop?brand=Wardah" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "70px", border: "1px solid #edf2f7", borderRadius: "6px", backgroundColor: "#ffffff" }}>
-                          <img src="https://logo.clearbit.com/wardahbeauty.com" alt="Wardah" style={{ maxHeight: "40px", maxWidth: "85%", objectFit: "contain" }} />
-                        </Link>
-                        
-                        <Link href="/shop?brand=Maybelline" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "70px", border: "1px solid #edf2f7", borderRadius: "6px", backgroundColor: "#ffffff" }}>
-                          <img src="https://upload.wikimedia.org/wikipedia/commons/8/8e/Maybelline-Logo.svg" alt="Maybelline" style={{ maxHeight: "35px", maxWidth: "85%", objectFit: "contain" }} />
-                        </Link>
-                        <Link href="/shop?brand=Revlon" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "70px", border: "1px solid #edf2f7", borderRadius: "6px", backgroundColor: "#ffffff" }}>
-                          <img src="https://upload.wikimedia.org/wikipedia/commons/b/ba/Revlon_logo.svg" alt="Revlon" style={{ maxHeight: "40px", maxWidth: "85%", objectFit: "contain" }} />
-                        </Link>
-                        <Link href="/shop?brand=Wet+n+Wild" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "70px", border: "1px solid #edf2f7", borderRadius: "6px", backgroundColor: "#ffffff" }}>
-                          <img src="https://upload.wikimedia.org/wikipedia/commons/4/4b/Wet_n_Wild_logo.svg" alt="Wet n Wild" style={{ maxHeight: "42px", maxWidth: "85%", objectFit: "contain" }} />
-                        </Link>
-                        <Link href="/shop?brand=Flormar" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "70px", border: "1px solid #edf2f7", borderRadius: "6px", backgroundColor: "#ffffff" }}>
-                          <img src="https://logo.clearbit.com/flormar.com" alt="Flormar" style={{ maxHeight: "40px", maxWidth: "85%", objectFit: "contain" }} />
-                        </Link>
- 
-                        <Link href="/shop?brand=Colourpop" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "70px", border: "1px solid #edf2f7", borderRadius: "6px", backgroundColor: "#ffffff" }}>
-                          <img src="https://logo.clearbit.com/colourpop.com" alt="Colourpop" style={{ maxHeight: "38px", maxWidth: "85%", objectFit: "contain" }} />
-                        </Link>
-                        <Link href="/shop?brand=Skin+Cafe" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "70px", border: "1px solid #edf2f7", borderRadius: "6px", backgroundColor: "#ffffff" }}>
-                          <img src="https://logo.clearbit.com/skincafebd.com" alt="Skin Cafe" style={{ maxHeight: "42px", maxWidth: "85%", objectFit: "contain" }} />
-                        </Link>
-                        <Link href="/shop?brand=L.A.+Girl" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "70px", border: "1px solid #edf2f7", borderRadius: "6px", backgroundColor: "#ffffff" }}>
-                          <img src="https://logo.clearbit.com/lagirlusa.com" alt="L.A. Girl" style={{ maxHeight: "36px", maxWidth: "85%", objectFit: "contain" }} />
-                        </Link>
-                        <Link href="/shop?brand=e.l.f." style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "70px", border: "1px solid #edf2f7", borderRadius: "6px", backgroundColor: "#ffffff" }}>
-                          <img src="https://upload.wikimedia.org/wikipedia/commons/a/ab/Elf_Cosmetics_logo.svg" alt="e.l.f." style={{ maxHeight: "40px", maxWidth: "85%", objectFit: "contain" }} />
-                        </Link>
+                        {dbBrands.slice(0, 12).map((b) => (
+                          <Link 
+                            key={b.id || b.name}
+                            href={`/shop?brand=${encodeURIComponent(b.name)}`} 
+                            style={{ 
+                              display: "flex", 
+                              flexDirection: "column",
+                              alignItems: "center", 
+                              justifyContent: "center", 
+                              height: "76px", 
+                              border: "1px solid #edf2f7", 
+                              borderRadius: "8px", 
+                              backgroundColor: "#ffffff",
+                              padding: "8px 12px",
+                              textDecoration: "none",
+                              transition: "all 0.2s ease"
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = "#e52860";
+                              e.currentTarget.style.boxShadow = "0 4px 12px rgba(229,40,96,0.08)";
+                              e.currentTarget.style.transform = "translateY(-2px)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = "#edf2f7";
+                              e.currentTarget.style.boxShadow = "none";
+                              e.currentTarget.style.transform = "translateY(0)";
+                            }}
+                          >
+                            {b.logoUrl ? (
+                              <img 
+                                src={b.logoUrl} 
+                                alt={b.name} 
+                                style={{ maxHeight: "38px", maxWidth: "88%", objectFit: "contain" }} 
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              />
+                            ) : null}
+                            <span style={{ fontSize: "11px", fontWeight: "700", color: "#4a5568", textAlign: "center", marginTop: "4px" }}>
+                              {b.name}
+                            </span>
+                          </Link>
+                        ))}
                       </div>
                     </div>
 

@@ -22,20 +22,21 @@ async function clearBanners() {
     }
 
     // 2. Clear via Prisma Setting table directly
-    const snapshot = await prisma.setting.findMany();
-    const existing = await prisma.setting.findUnique({ where: { key: "DELETED_BANNERS" } });
+    const result = await prisma.promoBanner.deleteMany();
+    console.log(`Deleted ${result.count} promo banners directly from database table.`);
 
-    // Mark all existing banner IDs as deleted
-    const allIds = ["all-cleared-flag"];
+    // Reset DELETED_BANNERS setting
     await prisma.setting.upsert({
       where: { key: "DELETED_BANNERS" },
-      update: { value: JSON.stringify({ ids: allIds }) },
-      create: { key: "DELETED_BANNERS", value: JSON.stringify({ ids: allIds }) }
+      update: { value: JSON.stringify({ ids: [] }) },
+      create: { key: "DELETED_BANNERS", value: JSON.stringify({ ids: [] }) }
     });
 
-    console.log("✅ Successfully cleared all promotional banners from database!");
+    // Re-seed clean master banners
+    require('./seed-clean-banners.js');
+    console.log("✅ Successfully reset all promotional banners to clean master slots!");
   } catch (err) {
-    console.error("Error clearing banners:", err.message || err);
+    console.error("Error resetting banners:", err.message || err);
   } finally {
     await prisma.$disconnect();
     console.log("Prisma disconnected.");

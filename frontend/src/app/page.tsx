@@ -25,47 +25,59 @@ interface Product {
 }
 
 const DEFAULT_BEAUTY_CATEGORIES = [
-  { id: "cat-makeup", name: "Makeup", slug: "makeup", image: "/cosmetics_circle_illustration.png" },
-  { id: "cat-skincare", name: "Skin Care", slug: "skincare", image: "/cosmetics_circle_illustration.png" },
-  { id: "cat-haircare", name: "Hair Care", slug: "haircare", image: "/cosmetics_circle_illustration.png" },
-  { id: "cat-personal-care", name: "Personal Care", slug: "personal-care", image: "/cosmetics_circle_illustration.png" },
-  { id: "cat-mom-baby", name: "Mom & Baby", slug: "mom-baby", image: "/cosmetics_circle_illustration.png" },
-  { id: "cat-fragrance", name: "Fragrance", slug: "fragrance", image: "/cosmetics_circle_illustration.png" },
-  { id: "cat-undergarments", name: "Undergarments", slug: "undergarments", image: "/cosmetics_circle_illustration.png" },
-  { id: "cat-kbeauty", name: "K-Beauty", slug: "k-beauty", image: "/cosmetics_circle_illustration.png" }
+  { id: "cat-makeup", name: "Makeup", slug: "makeup", image: "" },
+  { id: "cat-skincare", name: "Skin Care", slug: "skincare", image: "" },
+  { id: "cat-haircare", name: "Hair Care", slug: "haircare", image: "" },
+  { id: "cat-personal-care", name: "Personal Care", slug: "personal-care", image: "" },
+  { id: "cat-mom-baby", name: "Mom & Baby", slug: "mom-baby", image: "" },
+  { id: "cat-fragrance", name: "Fragrance", slug: "fragrance", image: "" },
+  { id: "cat-undergarments", name: "Undergarments", slug: "undergarments", image: "" },
+  { id: "cat-kbeauty", name: "K-Beauty", slug: "k-beauty", image: "" }
 ];
 
 const DEFAULT_HERO_SLIDES = [
   {
-    title: "100% Authentic Beauty & Cosmetics",
-    desc: "Luxury skincare, makeup, and premium personal care products in Bangladesh.",
-    bg: "linear-gradient(135deg, #fff0f5 0%, #ffe4ec 100%)",
+    id: "hero-slide-1",
+    title: "Nirvana #1 Makeup Brand from Bangladesh",
+    desc: "Unleash your true color with authentic Nirvana collection.",
+    bg: "linear-gradient(135deg, #111827 0%, #1f2937 100%)",
     img: "/images/sliders/slider-1.png",
     mobileImg: "/images/sliders/slider-1.png",
     tabletImg: "/images/sliders/slider-1.png",
-    link: "/shop"
+    link: "/shop?brand=nirvana"
   },
   {
-    title: "Trending K-Beauty & Skincare Essentials",
-    desc: "Hydrate, brighten, and nourish your skin with authentic curated Korean beauty items.",
-    bg: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)",
+    id: "hero-slide-2",
+    title: "July Jaw Droppers - Up to 45% Off",
+    desc: "Unilever presents mega discounts on Pond's, Lux, Vaseline & Closeup.",
+    bg: "linear-gradient(135deg, #e9d5ff 0%, #f3e8ff 100%)",
     img: "/images/sliders/slider-2.png",
     mobileImg: "/images/sliders/slider-2.png",
     tabletImg: "/images/sliders/slider-2.png",
-    link: "/category/skincare"
+    link: "/shop?deal=jaw-droppers"
   },
   {
-    title: "Special Mega Deals & Fragrance Collection",
-    desc: "Get fast express delivery across all 64 districts in Bangladesh with easy payment.",
-    bg: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
+    id: "hero-slide-3",
+    title: "Treasure of Glow - Free Delivery",
+    desc: "Free delivery on orders of 1999+ and up to 35% off on CeraVe, St. Ives & Dove.",
+    bg: "linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)",
     img: "/images/sliders/slider-3.png",
     mobileImg: "/images/sliders/slider-3.png",
     tabletImg: "/images/sliders/slider-3.png",
-    link: "/shop"
+    link: "/shop?deal=treasure-of-glow"
   }
 ];
 
 const DEFAULT_HOMEPAGE_BANNERS = [
+  // Homepage Wide Banner (Original Beauty Must Haves banner)
+  {
+    id: "default-wide-banner",
+    title: "Beauty Must Haves Exclusive Savings",
+    page: "Homepage Wide Banner",
+    imageUrl: "/hero-slide-1.png",
+    linkUrl: "/shop",
+    isActive: true
+  },
   // Deals You Cannot Miss (4 Cards)
   {
     id: "default-deal-1",
@@ -131,6 +143,39 @@ const DEFAULT_HOMEPAGE_BANNERS = [
     imageUrl: "/images/brands/brand-offer-6.gif",
     linkUrl: "/shop?category=trimmer",
     isActive: true
+  },
+  // Limited Time Offers (4 Cards)
+  {
+    id: "default-bogo",
+    title: "BOGO Offer",
+    page: "BOGO",
+    imageUrl: "/images/deals/deal-1.png",
+    linkUrl: "/shop?campaign=BOGO",
+    isActive: true
+  },
+  {
+    id: "default-combo",
+    title: "COMBO Offer",
+    page: "COMBO",
+    imageUrl: "/images/deals/deal-2.png",
+    linkUrl: "/shop?campaign=COMBO",
+    isActive: true
+  },
+  {
+    id: "default-offers",
+    title: "OFFERS Mega Savings",
+    page: "OFFERS",
+    imageUrl: "/images/deals/deal-3.gif",
+    linkUrl: "/shop?campaign=OFFERS",
+    isActive: true
+  },
+  {
+    id: "default-clearance",
+    title: "Clearance SALE Deals",
+    page: "Clearance SALE",
+    imageUrl: "/images/deals/deal-4.jpg",
+    linkUrl: "/shop?campaign=Clearance%20SALE",
+    isActive: true
   }
 ];
 
@@ -147,14 +192,17 @@ export default function Home() {
     const term = (identifier || "").toLowerCase().trim();
     const found = homepageBanners.find((b: any) => {
       const p = (b.page || "").toLowerCase().trim();
-      const t = (b.title || "").toLowerCase().trim();
       const id = (b.id || "").toLowerCase().trim();
-      return p === term || p.includes(term) || t.includes(term) || id === term;
+      return p === term || id === term || (term.length > 5 && p.includes(term));
     });
     const rawImg = found ? (found.imageUrl || found.image) : "";
-    const isValidImg = Boolean(rawImg && (rawImg.startsWith("http") || rawImg.startsWith("/") || rawImg.startsWith("data:")));
+    const isHeroSliderImg = Boolean(rawImg && rawImg.includes("/images/sliders/"));
+    const isIconSection = term.startsWith("category:") || term.startsWith("concern:");
+    const isValidImg = Boolean(rawImg && (rawImg.startsWith("http") || rawImg.startsWith("/") || rawImg.startsWith("data:")) && !(isIconSection && isHeroSliderImg));
     return {
       img: isValidImg ? rawImg : fallbackImg,
+      mobileImg: (found && found.mobileImageUrl) ? found.mobileImageUrl : (isValidImg ? rawImg : fallbackImg),
+      tabletImg: (found && found.tabletImageUrl) ? found.tabletImageUrl : (isValidImg ? rawImg : fallbackImg),
       title: (found && found.title) ? found.title : fallbackTitle,
       link: (found && found.linkUrl) ? found.linkUrl : fallbackLink
     };
@@ -226,58 +274,13 @@ export default function Home() {
 
     const fetchMetadata = async (bypass: boolean = false) => {
       try {
-        const [catData, brandData, bannerData, notifRes] = await Promise.all([
-          fetchWithCache(`${API_BASE}/categories`, bypass),
-          fetchWithCache(`${API_BASE}/brands`, bypass),
-          fetchWithCache(`${API_BASE}/banners`, bypass),
-          fetchWithCache(`${API_BASE}/notifications/active`, bypass)
-        ]);
-        setCategories(Array.isArray(catData) && catData.length > 0 ? catData : DEFAULT_BEAUTY_CATEGORIES);
-        setBrands(Array.isArray(brandData) ? brandData : []);
-        if (bannerData && Array.isArray(bannerData) && bannerData.length > 0) {
-          setHomepageBanners((prev) => {
-            const merged = [...DEFAULT_HOMEPAGE_BANNERS];
-            bannerData.forEach((b: any) => {
-              const idx = merged.findIndex((m: any) => m.page === b.page || m.id === b.id);
-              if (idx >= 0) {
-                merged[idx] = { ...merged[idx], ...b };
-              } else {
-                merged.push(b);
-              }
-            });
-            return merged;
-          });
-          const activeBanners = bannerData.filter((b: any) => b.isActive !== false);
-          const heroBanners = activeBanners.filter((b: any) => 
-            b.page === "Hero Slides" || 
-            b.page === "Hero Slides Carousel" || 
-            (b.page && b.page.toLowerCase().trim() === "hero")
-          );
+        // Keep Categories, Hero Slides, and Banners on static fixed designs
+        setCategories(DEFAULT_BEAUTY_CATEGORIES);
+        setDynamicSlides(DEFAULT_HERO_SLIDES);
+        setHomepageBanners(DEFAULT_HOMEPAGE_BANNERS);
 
-          if (heroBanners.length > 0) {
-            const validSlides = heroBanners
-              .filter((b: any) => b.imageUrl && (b.imageUrl.startsWith("http") || b.imageUrl.startsWith("/") || b.imageUrl.startsWith("data:")))
-              .map((b: any) => ({
-                title: b.title,
-                desc: b.description || "Exclusive Collection at GlowGoodly",
-                bg: b.bgColor || "linear-gradient(135deg, #e63b7a 0%, #ff758c 100%)",
-                img: b.imageUrl,
-                mobileImg: b.mobileImageUrl || b.imageUrl,
-                tabletImg: b.tabletImageUrl || b.imageUrl,
-                link: b.linkUrl || "/shop"
-              }));
-            if (validSlides.length > 0) {
-              setDynamicSlides(validSlides);
-            } else {
-              setDynamicSlides(DEFAULT_HERO_SLIDES);
-            }
-          } else {
-            setDynamicSlides(DEFAULT_HERO_SLIDES);
-          }
-        } else {
-          setDynamicSlides(DEFAULT_HERO_SLIDES);
-        }
-
+        // Optional non-intrusive notification banner check
+        const notifRes = await fetchWithCache(`${API_BASE}/notifications/active`, bypass).catch(() => null);
         if (notifRes && notifRes.isActive) {
           const closedId = localStorage.getItem("glowgoodly_last_notification_closed");
           if (closedId !== notifRes.id) {
@@ -286,7 +289,7 @@ export default function Home() {
           }
         }
       } catch (e) {
-        console.error("Error loading categories/brands/notifications", e);
+        console.error("Error setting metadata", e);
       } finally {
         setBannersLoaded(true);
       }
@@ -377,55 +380,117 @@ export default function Home() {
         const currentSlide = activeSlidesList[safeSlideIdx] || activeSlidesList[0];
         if (!currentSlide || !currentSlide.img) return null;
         return (
-        <section
-          style={{
-            width: "100%",
-            position: "relative",
-            overflow: "hidden",
-            backgroundColor: "#fcf8fa",
-          }}
-        >
-        <div style={{ position: "relative", width: "100%", display: "block" }}>
-          {currentSlide?.link?.startsWith("http") ? (
-            <a
-              href={currentSlide?.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ display: "block", width: "100%", cursor: "pointer" }}
-            >
-              <picture style={{ display: "block", width: "100%" }}>
-                {currentSlide?.mobileImg && (
-                  <source media="(max-width: 640px)" srcSet={currentSlide?.mobileImg} />
-                )}
-                {currentSlide?.tabletImg && (
-                  <source media="(max-width: 1024px)" srcSet={currentSlide?.tabletImg} />
-                )}
-                <img
-                  src={currentSlide?.img}
-                  alt={currentSlide?.title || "Hero Slider"}
+          <section
+            style={{
+              width: "100%",
+              position: "relative",
+              overflow: "hidden",
+              backgroundColor: "#fcf8fa",
+            }}
+          >
+            <div style={{ position: "relative", width: "100%", display: "block" }}>
+              {currentSlide?.link?.startsWith("http") ? (
+                <a
+                  href={currentSlide?.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ display: "block", width: "100%", cursor: "pointer" }}
+                >
+                  <picture style={{ display: "block", width: "100%" }}>
+                    {currentSlide?.mobileImg && (
+                      <source media="(max-width: 640px)" srcSet={currentSlide?.mobileImg} />
+                    )}
+                    {currentSlide?.tabletImg && (
+                      <source media="(max-width: 1024px)" srcSet={currentSlide?.tabletImg} />
+                    )}
+                    <img
+                      src={currentSlide?.img}
+                      alt={currentSlide?.title || "Hero Slider"}
+                      style={{
+                        width: "100%",
+                        height: "auto",
+                        display: "block",
+                      }}
+                    />
+                  </picture>
+                </a>
+              ) : (
+                <Link
+                  href={currentSlide?.link || "/shop"}
+                  style={{ display: "block", width: "100%", cursor: "pointer" }}
+                >
+                  <picture style={{ display: "block", width: "100%" }}>
+                    {currentSlide?.mobileImg && (
+                      <source media="(max-width: 640px)" srcSet={currentSlide?.mobileImg} />
+                    )}
+                    {currentSlide?.tabletImg && (
+                      <source media="(max-width: 1024px)" srcSet={currentSlide?.tabletImg} />
+                    )}
+                    <img
+                      src={currentSlide?.img}
+                      alt={currentSlide?.title || "Hero Slider"}
+                      style={{
+                        width: "100%",
+                        height: "auto",
+                        display: "block",
+                      }}
+                    />
+                  </picture>
+                </Link>
+              )}
+
+              {/* Dots Indicator */}
+              {activeSlidesList.length > 1 && (
+                <div
                   style={{
-                    width: "100%",
-                    height: "auto",
-                    display: "block",
+                    position: "absolute",
+                    bottom: "15px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    display: "flex",
+                    gap: "8px",
+                    zIndex: 3,
                   }}
-                />
-              </picture>
-            </a>
-          ) : (
-            <Link
-              href={currentSlide?.link || "/shop"}
-              style={{ display: "block", width: "100%", cursor: "pointer" }}
-            >
+                >
+                  {activeSlidesList.map((_, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => setActiveSlide(idx)}
+                      style={{
+                        width: "10px",
+                        height: "10px",
+                        borderRadius: "50%",
+                        backgroundColor: safeSlideIdx === idx ? "#e63b7a" : "rgba(255, 255, 255, 0.6)",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        );
+      })()}
+
+      <main className="container" style={{ paddingBottom: "40px", paddingTop: "20px" }}>
+
+        {/* Wide horizontal promo banner ad with Mobile & Tablet responsiveness */}
+        {(() => {
+          const wideBanner = getBannerForPage("Homepage Wide Banner", "/hero-slide-1.png", "Beauty Must Haves Exclusive Savings", "/shop");
+          return (
+            <Link href={wideBanner.link} style={{ margin: "10px 0 35px 0", borderRadius: "8px", overflow: "hidden", cursor: "pointer", display: "block" }} className="promo-card-hover">
               <picture style={{ display: "block", width: "100%" }}>
-                {currentSlide?.mobileImg && (
-                  <source media="(max-width: 640px)" srcSet={currentSlide?.mobileImg} />
+                {wideBanner.mobileImg && (
+                  <source media="(max-width: 640px)" srcSet={wideBanner.mobileImg} />
                 )}
-                {currentSlide?.tabletImg && (
-                  <source media="(max-width: 1024px)" srcSet={currentSlide?.tabletImg} />
+                {wideBanner.tabletImg && (
+                  <source media="(max-width: 1024px)" srcSet={wideBanner.tabletImg} />
                 )}
                 <img
-                  src={currentSlide?.img}
-                  alt={currentSlide?.title || "Hero Slider"}
+                  src={wideBanner.img}
+                  alt={wideBanner.title}
                   style={{
                     width: "100%",
                     height: "auto",
@@ -434,55 +499,8 @@ export default function Home() {
                 />
               </picture>
             </Link>
-          )}
-
-          {/* Dots Indicator */}
-          <div
-            style={{
-              position: "absolute",
-              bottom: "15px",
-              left: "50%",
-              transform: "translateX(-50%)",
-              display: "flex",
-              gap: "8px",
-              zIndex: 3,
-            }}
-          >
-            {activeSlidesList.map((_, idx) => (
-              <div
-                key={idx}
-                onClick={() => setActiveSlide(idx)}
-                style={{
-                  width: "10px",
-                  height: "10px",
-                  borderRadius: "50%",
-                  backgroundColor: safeSlideIdx === idx ? "#e63b7a" : "rgba(255, 255, 255, 0.6)",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                }}
-              />
-            ))}
-          </div>
-        </div>
-      </section>
-        );
-      })()}
-
-      <main className="container" style={{ paddingBottom: "40px", paddingTop: "20px" }}>
-
-        {/* Wide horizontal promo banner ad */}
-        <Link href={getBannerForPage("Homepage Wide Banner", "", "").link} style={{ margin: "10px 0 35px 0", borderRadius: "8px", overflow: "hidden", cursor: "pointer", display: "block" }} className="promo-card-hover">
-          <img
-            src={getBannerForPage("Homepage Wide Banner", "/beauty_banner.png", "").img}
-            alt={getBannerForPage("Homepage Wide Banner", "", "Beauty Must Haves Exclusive Savings").title}
-            style={{
-              width: "100%",
-              height: "auto",
-              display: "block",
-            }}
-          />
-        </Link>
+          );
+        })()}
 
         {/* Loading Products Indicator */}
         {loading && products.length === 0 && (
@@ -946,28 +964,46 @@ export default function Home() {
           </h2>
           <div className="categories-grid">
             {[
-              { name: "Makeup", defaultImg: "/cosmetics_circle_illustration.png", link: "/shop?category=makeup" },
-              { name: "Skin", defaultImg: "/cosmetics_circle_illustration.png", link: "/shop?category=skincare" },
-              { name: "Hair", defaultImg: "/cosmetics_circle_illustration.png", link: "/shop?category=haircare" },
-              { name: "Personal Care", defaultImg: "/cosmetics_circle_illustration.png", link: "/shop?category=personal-care" },
-              { name: "Mom & Baby", defaultImg: "/cosmetics_circle_illustration.png", link: "/shop?category=mom-baby" },
-              { name: "Fragrance", defaultImg: "/cosmetics_circle_illustration.png", link: "/shop?category=fragrance" },
-              { name: "Undergarments", defaultImg: "/cosmetics_circle_illustration.png", link: "/shop?category=undergarments" },
-              { name: "Combo", defaultImg: "/cosmetics_circle_illustration.png", link: "/shop?category=combo" }
+              { name: "Makeup", icon: "💄", color: "#fdf2f8", border: "#fbcfe8", link: "/shop?category=makeup" },
+              { name: "Skin", icon: "✨", color: "#f0fdf4", border: "#bbf7d0", link: "/shop?category=skincare" },
+              { name: "Hair", icon: "💇‍♀️", color: "#eff6ff", border: "#bfdbfe", link: "/shop?category=haircare" },
+              { name: "Personal Care", icon: "🧴", color: "#faf5ff", border: "#e9d5ff", link: "/shop?category=personal-care" },
+              { name: "Mom & Baby", icon: "🍼", color: "#fffbeb", border: "#fde68a", link: "/shop?category=mom-baby" },
+              { name: "Fragrance", icon: "🌸", color: "#fff1f2", border: "#fecdd3", link: "/shop?category=fragrance" },
+              { name: "Undergarments", icon: "👙", color: "#f5f3ff", border: "#ddd6fe", link: "/shop?category=undergarments" },
+              { name: "Combo", icon: "🎁", color: "#fefce8", border: "#fef08a", link: "/shop?category=combo" }
             ].map((cat: any) => {
-              const bannerInfo = getBannerForPage(`Category: ${cat.name}`, cat.defaultImg, cat.name, cat.link);
+              const bannerInfo = getBannerForPage(`Category: ${cat.name}`, "", cat.name, cat.link);
               return (
                 <Link 
                   key={cat.name} 
                   href={bannerInfo.link} 
-                  style={{ display: "block", borderRadius: "8px", overflow: "hidden", cursor: "pointer", textDecoration: "none" }} 
+                  style={{ display: "block", borderRadius: "10px", overflow: "hidden", cursor: "pointer", textDecoration: "none" }} 
                   className="promo-card-hover"
                 >
-                  <img 
-                    src={bannerInfo.img} 
-                    alt={cat.name} 
-                    style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} 
-                  />
+                  {bannerInfo.img ? (
+                    <img 
+                      src={bannerInfo.img} 
+                      alt={cat.name} 
+                      style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block", borderRadius: "10px" }} 
+                    />
+                  ) : (
+                    <div style={{
+                      aspectRatio: "1 / 1",
+                      backgroundColor: cat.color,
+                      border: `1.5px solid ${cat.border}`,
+                      borderRadius: "10px",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: "10px",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.03)"
+                    }}>
+                      <span style={{ fontSize: "26px", marginBottom: "4px" }}>{cat.icon}</span>
+                      <span style={{ fontSize: "12px", fontWeight: "800", color: "#0f172a", textAlign: "center", lineHeight: "1.2" }}>{cat.name}</span>
+                    </div>
+                  )}
                 </Link>
               );
             })}
@@ -1062,46 +1098,52 @@ export default function Home() {
             SHOP BY CONCERN
           </h2>
           <div className="concerns-grid">
-            {/* Concern Card 1: ACNE */}
-            <Link href={getBannerForPage("Concern: Acne", "", "", "/shop?category=skincare&sub=Acne%20Treatment").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("Concern: Acne", "/cosmetics_circle_illustration.png", "").img} alt="Acne Treatment" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
-            </Link>
-            {/* Concern Card 2: ANTI AGING */}
-            <Link href={getBannerForPage("Concern: Anti Aging", "", "", "/shop?category=skincare&sub=Anti%20Aging").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("Concern: Anti Aging", "/cosmetics_circle_illustration.png", "").img} alt="Anti Aging Treatment" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
-            </Link>
-            {/* Concern Card 3: DANDRUFF */}
-            <Link href={getBannerForPage("Concern: Dandruff", "", "", "/shop?category=haircare&sub=Dandruff").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("Concern: Dandruff", "/cosmetics_circle_illustration.png", "").img} alt="Dandruff Solution" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
-            </Link>
-            {/* Concern Card 4: DRY SKIN */}
-            <Link href={getBannerForPage("Concern: Dry Skin", "", "", "/shop?category=skincare&sub=Dry%20Skin").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("Concern: Dry Skin", "/cosmetics_circle_illustration.png", "").img} alt="Dry Skin Treatment" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
-            </Link>
-            {/* Concern Card 5: HAIR FALL */}
-            <Link href={getBannerForPage("Concern: Hair Fall", "", "", "/shop?category=haircare&sub=Hair%20Fall").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover concern-card-extra">
-              <img src={getBannerForPage("Concern: Hair Fall", "/cosmetics_circle_illustration.png", "").img} alt="Hair Fall Treatment" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
-            </Link>
-            {/* Concern Card 6: OIL CONTROL */}
-            <Link href={getBannerForPage("Concern: Oil Control", "", "", "/shop?category=skincare").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover concern-card-extra">
-              <img src={getBannerForPage("Concern: Oil Control", "/cosmetics_circle_illustration.png", "").img} alt="Oil Control Treatment" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
-            </Link>
-            {/* Concern Card 7: PORE CARE */}
-            <Link href={getBannerForPage("Concern: Pore Care", "", "", "/shop?category=skincare&sub=Pore%20Care").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover concern-card-extra">
-              <img src={getBannerForPage("Concern: Pore Care", "/cosmetics_circle_illustration.png", "").img} alt="Pore Care" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
-            </Link>
-            {/* Concern Card 8: SPOT TREATMENT */}
-            <Link href={getBannerForPage("Concern: Spot Treatment", "", "", "/shop?category=skincare").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover concern-card-extra">
-              <img src={getBannerForPage("Concern: Spot Treatment", "/cosmetics_circle_illustration.png", "").img} alt="Spot Treatment" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
-            </Link>
-            {/* Concern Card 9: HAIR THINNING */}
-            <Link href={getBannerForPage("Concern: Hair Thinning", "", "", "/shop?category=haircare").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover concern-card-extra">
-              <img src={getBannerForPage("Concern: Hair Thinning", "/cosmetics_circle_illustration.png", "").img} alt="Hair Thinning Solution" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
-            </Link>
-            {/* Concern Card 10: SUN BURN */}
-            <Link href={getBannerForPage("Concern: Sun Burn", "", "", "/shop?category=skincare").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover concern-card-extra">
-              <img src={getBannerForPage("Concern: Sun Burn", "/cosmetics_circle_illustration.png", "").img} alt="Sun Burn Treatment" style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }} />
-            </Link>
+            {[
+              { id: "Concern: Acne", title: "Acne Treatment", icon: "🌿", color: "#ecfdf5", border: "#a7f3d0", link: "/shop?category=skincare&sub=Acne%20Treatment", extra: false },
+              { id: "Concern: Anti Aging", title: "Anti Aging Treatment", icon: "✨", color: "#fffbeb", border: "#fde68a", link: "/shop?category=skincare&sub=Anti%20Aging", extra: false },
+              { id: "Concern: Dandruff", title: "Dandruff Solution", icon: "💧", color: "#eff6ff", border: "#bfdbfe", link: "/shop?category=haircare&sub=Dandruff", extra: false },
+              { id: "Concern: Dry Skin", title: "Dry Skin Treatment", icon: "🧴", color: "#fef2f2", border: "#fecaca", link: "/shop?category=skincare&sub=Dry%20Skin", extra: false },
+              { id: "Concern: Hair Fall", title: "Hair Fall Treatment", icon: "💇‍♀️", color: "#faf5ff", border: "#e9d5ff", link: "/shop?category=haircare&sub=Hair%20Fall", extra: true },
+              { id: "Concern: Oil Control", title: "Oil Control Treatment", icon: "🍃", color: "#f0fdf4", border: "#bbf7d0", link: "/shop?category=skincare", extra: true },
+              { id: "Concern: Pore Care", title: "Pore Care", icon: "🫧", color: "#f0f9ff", border: "#bae6fd", link: "/shop?category=skincare&sub=Pore%20Care", extra: true },
+              { id: "Concern: Spot Treatment", title: "Spot Treatment", icon: "🎯", color: "#fdf4ff", border: "#f5d0fe", link: "/shop?category=skincare", extra: true },
+              { id: "Concern: Hair Thinning", title: "Hair Thinning Solution", icon: "🌾", color: "#fff7ed", border: "#fed7aa", link: "/shop?category=haircare", extra: true },
+              { id: "Concern: Sun Burn", title: "Sun Burn Treatment", icon: "☀️", color: "#fff1f2", border: "#fecdd3", link: "/shop?category=skincare", extra: true }
+            ].map((concern) => {
+              const banner = getBannerForPage(concern.id, "", concern.title, concern.link);
+              return (
+                <Link
+                  key={concern.id}
+                  href={banner.link}
+                  style={{ display: "block", overflow: "hidden", borderRadius: "10px", textDecoration: "none" }}
+                  className={`promo-card-hover ${concern.extra ? "concern-card-extra" : ""}`}
+                >
+                  {banner.img ? (
+                    <img
+                      src={banner.img}
+                      alt={concern.title}
+                      style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block", borderRadius: "10px" }}
+                    />
+                  ) : (
+                    <div style={{
+                      aspectRatio: "1 / 1",
+                      backgroundColor: concern.color,
+                      border: `1.5px solid ${concern.border}`,
+                      borderRadius: "10px",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: "10px",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.03)"
+                    }}>
+                      <span style={{ fontSize: "24px", marginBottom: "4px" }}>{concern.icon}</span>
+                      <span style={{ fontSize: "11px", fontWeight: "800", color: "#1e293b", textAlign: "center", lineHeight: "1.2" }}>{concern.title}</span>
+                    </div>
+                  )}
+                </Link>
+              );
+            })}
           </div>
         </section>
 

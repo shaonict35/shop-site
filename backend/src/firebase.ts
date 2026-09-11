@@ -528,20 +528,29 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
     if (data.orderItems && Array.isArray(data.orderItems)) {
       await prisma.orderItem.deleteMany({ where: { orderId: id } });
       for (const item of data.orderItems) {
+        let validVariantId: string | null = null;
+        if (item.variantId) {
+          const exists = await prisma.variant.findUnique({ where: { id: item.variantId } });
+          if (exists) {
+            validVariantId = item.variantId;
+          }
+        }
+
         await prisma.orderItem.create({
           data: {
             orderId: id,
-            variantId: item.variantId || null,
-            productName: item.productName,
-            variantName: item.variantName,
-            quantity: Number(item.quantity),
-            price: Number(item.price),
-            total: Number(item.total),
+            variantId: validVariantId,
+            productName: item.productName || "Product Item",
+            variantName: item.variantName || "Standard",
+            quantity: Number(item.quantity || 1),
+            price: Number(item.price || 0),
+            total: Number(item.total || 0),
           }
         });
       }
     }
   } else if (colName === "products") {
+
     // 1. Ensure valid Brand in MySQL to satisfy foreign key
     const finalBrandId = data.brandId || "brand-default";
     try {

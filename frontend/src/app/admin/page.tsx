@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import SocketIoPromoBroadcaster from "../../components/SocketIoPromoBroadcaster";
 
-export const DEFAULT_FRONTEND_BANNERS = [
+const DEFAULT_FRONTEND_BANNERS = [
   // Hero Sliders (Frontend Defaults)
   {
     id: "default-hero-1",

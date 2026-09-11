@@ -54,11 +54,15 @@ async function ensureInitialBanners() {
 
       // Universal sanitize for any lingering external broken banner image
       if (data.imageUrl && data.imageUrl.includes("shajgoj")) {
-        await doc.ref.update({
-          imageUrl: "/images/sliders/slider-1.png",
-          mobileImageUrl: "/images/sliders/slider-1.png",
-          tabletImageUrl: "/images/sliders/slider-1.png"
-        });
+        if (data.page === "Hero Slides" || data.page === "Hero Slides Carousel") {
+          await doc.ref.update({
+            imageUrl: "/images/sliders/slider-1.png",
+            mobileImageUrl: "/images/sliders/slider-1.png",
+            tabletImageUrl: "/images/sliders/slider-1.png"
+          });
+        } else {
+          await doc.ref.delete();
+        }
       }
     }
   } catch (err) {
@@ -81,8 +85,9 @@ function cleanBannerData(data: any): any {
     else if (cleaned.page === "Deal Card 1") cleaned.imageUrl = "/images/deals/deal-1.png";
     else if (cleaned.page === "Deal Card 2") cleaned.imageUrl = "/images/deals/deal-2.png";
     else if (cleaned.page === "Deal Card 3") cleaned.imageUrl = "/images/deals/deal-3.gif";
-    else if (cleaned.page === "Deal Card 4") cleaned.imageUrl = "/images/deals/deal-4.jpg";
-    else cleaned.imageUrl = "/images/sliders/slider-1.png";
+    else if (cleaned.page?.startsWith("Category:") || cleaned.page?.startsWith("Concern:")) cleaned.imageUrl = "";
+    else if (cleaned.page === "Hero Slides" || cleaned.page === "Hero Slides Carousel") cleaned.imageUrl = "/images/sliders/slider-1.png";
+    else cleaned.imageUrl = "";
   }
   if (!cleaned.mobileImageUrl || cleaned.mobileImageUrl.includes("shajgoj")) {
     cleaned.mobileImageUrl = cleaned.imageUrl;
@@ -172,6 +177,7 @@ router.post("/banners", async (req: Request, res: Response) => {
     };
     
     await docRef.set(banner);
+    await unmarkBannerAsDeleted(docRef.id);
     res.status(201).json(banner);
   } catch (err) {
     console.error(err);
@@ -205,6 +211,7 @@ router.patch("/banners/:id", async (req: Request, res: Response) => {
     };
 
     await docRef.set(updated, { merge: true });
+    await unmarkBannerAsDeleted(id as string);
     res.json({ id, ...updated });
   } catch (err) {
     console.error(err);
@@ -238,6 +245,7 @@ const updateBannerPutHandler = async (req: Request, res: Response) => {
     };
 
     await docRef.set(updated, { merge: true });
+    await unmarkBannerAsDeleted(id as string);
     res.json({ id, ...updated });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -323,6 +331,18 @@ const markBannerAsDeleted = async (id: string) => {
     }
   } catch (e) {
     console.error("Error updating DELETED_BANNERS setting:", e);
+  }
+};
+
+const unmarkBannerAsDeleted = async (id: string) => {
+  try {
+    const deletedDoc = await db.collection("settings").doc("DELETED_BANNERS").get();
+    if (deletedDoc.exists && deletedDoc.data()?.ids) {
+      const currentIds: string[] = deletedDoc.data().ids.filter((deletedId: string) => deletedId !== id && deletedId !== "all-cleared-flag");
+      await db.collection("settings").doc("DELETED_BANNERS").set({ key: "DELETED_BANNERS", ids: currentIds, updatedAt: new Date().toISOString() });
+    }
+  } catch (e) {
+    console.error("Error unmarking banner from DELETED_BANNERS:", e);
   }
 };
 

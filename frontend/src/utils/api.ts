@@ -3,10 +3,6 @@ const cache: Record<string, { data: any; expiry: number }> = {};
 
 // Base API URL calculation supporting full URLs, paths, and trailing slash normalization
 const getBaseApiUrl = () => {
-  if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.trim()) {
-    const raw = process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, "");
-    return raw.endsWith("/api") ? raw : `${raw}/api`;
-  }
   if (typeof window !== "undefined") {
     const host = window.location.hostname;
     if (host === "localhost" || host === "127.0.0.1" || host.includes("192.168.")) {
@@ -16,6 +12,10 @@ const getBaseApiUrl = () => {
       return "https://api.glowgoodly.com/api";
     }
     return `${window.location.origin}/api`;
+  }
+  if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.trim()) {
+    const raw = process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, "");
+    return raw.endsWith("/api") ? raw : `${raw}/api`;
   }
   return "http://localhost:5000/api";
 };

@@ -39,7 +39,6 @@ export default function BrandsPage() {
     "Olay": "/images/brands/olay.svg",
     "Calvin Klein": "/images/brands/calvin-klein.svg",
     "Gillette": "/images/brands/gillette.svg",
-    "Huggies": "/images/brands/huggies.svg",
     "Farlin": "/images/brands/farlin.svg",
     "Secret": "/images/brands/secret.svg",
     "Skin Cafe": "/images/brands/skin-cafe.svg",
@@ -169,7 +168,7 @@ export default function BrandsPage() {
                 {/* Brands Logo Grid */}
                 <div className="brand-logo-grid">
                   {groupedBrands[letter].map((b) => {
-                    const logo = brandLogosMap[b.name] || b.logoUrl || `/images/brands/${generateSlug(b.name)}.svg`;
+                    const logo = b.logoUrl || brandLogosMap[b.name] || `/images/brands/${generateSlug(b.name)}.svg`;
                     const brandTarget = b.slug || generateSlug(b.name) || b.id;
                     return (
                       <Link
