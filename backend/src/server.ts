@@ -28,6 +28,7 @@ dotenv.config();
 
 const app = express();
 app.set("trust proxy", 1);
+app.set("etag", "strong"); // Enable HTTP ETag for 304 Not Modified instant bandwidth-free caching
 
 const httpServer = createServer(app);
 const io = new SocketIOServer(httpServer, {
@@ -42,7 +43,7 @@ const PORT = process.env.PORT || 5000;
 // Gzip / Deflate Compression Middleware (80%+ reduction in payload transfer size)
 app.use(compression({
   level: 6,
-  threshold: 1024,
+  threshold: 512, // Compress all payloads >= 512 bytes for maximum efficiency
   filter: (req, res) => {
     if (req.headers["x-no-compression"]) return false;
     return compression.filter(req, res);
@@ -56,6 +57,7 @@ app.use((req, res, next) => {
   res.setHeader("X-XSS-Protection", "1; mode=block");
   res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Vary", "Accept-Encoding");
   next();
 });
 

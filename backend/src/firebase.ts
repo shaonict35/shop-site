@@ -51,6 +51,18 @@ class MockDocRef {
   }
 }
 
+// Prisma Query Cache for high-speed repeated database reads on hostings
+const prismaQueryCache = new Map<string, { data: any[]; expiry: number }>();
+const PRISMA_CACHE_TTL = 120 * 1000; // 2 minutes in-memory cache
+
+export function invalidatePrismaCache(colName?: string) {
+  if (colName) {
+    prismaQueryCache.delete(colName);
+  } else {
+    prismaQueryCache.clear();
+  }
+}
+
 class MockCollection {
   private colName: string;
   private filters: any[] = [];
@@ -72,10 +84,14 @@ class MockCollection {
 
   async get() {
     let data: any[] = [];
-    if (this.colName === "products") {
-      const items = await prisma.product.findMany({
-        include: { brand: true, category: { include: { parent: true } }, variants: true, images: true }
-      });
+    const cached = prismaQueryCache.get(this.colName);
+    if (cached && cached.expiry > Date.now() && this.filters.length === 0) {
+      data = cached.data;
+    } else {
+      if (this.colName === "products") {
+        const items = await prisma.product.findMany({
+          include: { brand: true, category: { include: { parent: true } }, variants: true, images: true }
+        });
       const DEFAULT_FALLBACK_IMAGES = [
         "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&auto=format&fit=crop&q=80",
         "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=800&auto=format&fit=crop&q=80",
@@ -287,6 +303,10 @@ class MockCollection {
       }
     }
 
+      // Store in memory cache for 2 minutes
+      prismaQueryCache.set(this.colName, { data: [...data], expiry: Date.now() + PRISMA_CACHE_TTL });
+    }
+
     for (const f of this.filters) {
       data = data.filter(item => {
         const val = item[f.field];
@@ -349,6 +369,7 @@ class MockBatch {
 }
 
 async function mockSetPrisma(colName: string, id: string, data: any, options?: any) {
+  invalidatePrismaCache(colName);
   if (colName === "banners") {
     try {
       const safeImageUrl = data.imageUrl;
@@ -785,6 +806,7 @@ async function mockUpdatePrisma(colName: string, id: string, data: any) {
 }
 
 async function mockDeletePrisma(colName: string, id: string) {
+  invalidatePrismaCache(colName);
   try {
     if (colName === "banners") {
       await prisma.promoBanner.deleteMany({ where: { id } });
