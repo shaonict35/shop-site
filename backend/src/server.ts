@@ -72,24 +72,25 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // Intelligent Caching Middleware for API requests
 app.use("/api", (req, res, next) => {
-  const isMutationOrPrivate = 
-    req.method !== "GET" || 
+  const isReadMethod = req.method === "GET" || req.method === "HEAD";
+  const isPrivateOrBypass = 
+    !isReadMethod ||
     req.path.startsWith("/auth") || 
     req.path.startsWith("/admin") || 
     req.path.startsWith("/orders") || 
     req.path.startsWith("/chat") ||
     req.path.startsWith("/bkash") ||
     req.query.bypass === "true" ||
-    req.query.t;
+    Boolean(req.query.t);
 
-  if (isMutationOrPrivate) {
+  if (isPrivateOrBypass) {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");
     res.setHeader("Surrogate-Control", "no-store");
   } else {
-    // Fast 5-second client micro-cache with revalidation: immediate updates across browsers while retaining instant browsing
-    res.setHeader("Cache-Control", "public, max-age=5, stale-while-revalidate=10, must-revalidate");
+    // High-performance cache: 60s browser, 5m CDN/proxy (LiteSpeed/Nginx), 10m stale-while-revalidate
+    res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=600");
   }
   next();
 });
