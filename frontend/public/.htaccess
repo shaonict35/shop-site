@@ -1,4 +1,6 @@
+Options -Indexes -MultiViews
 DirectoryIndex index.html index.php
+DirectorySlash Off
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
@@ -12,7 +14,11 @@ DirectoryIndex index.html index.php
   RewriteRule ^admin/?$ /404.html [L,R=301]
   RewriteRule ^valobasa/?$ /valobasa.html [L]
 
-  # 3. Clean Route Rewrites to HTML Files (Shop, Brands, Cart, etc.)
+  # 3. Clean Policy & Standard Pages: Map directly to .html (e.g. /about or /about/ -> /about.html)
+  RewriteCond %{DOCUMENT_ROOT}/$1.html -f
+  RewriteRule ^([^/]+)/?$ /$1.html [L]
+
+  # 4. Clean Route Rewrites to HTML Files (Shop, Brands, Cart, etc.)
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{DOCUMENT_ROOT}/product/$1.html -f
   RewriteRule ^product/([^/]+)/?$ /product/$1.html [L]
@@ -33,11 +39,11 @@ DirectoryIndex index.html index.php
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule ^landing/([^/]+)/?$ /landing/seasonal-offer.html [L]
 
-  # 4. Clean URLs: Map page names to .html files first (e.g. /shop -> shop.html, /valobasa -> valobasa.html)
+  # 5. Clean URLs: Map page names to .html files first (e.g. /shop -> shop.html, /valobasa -> valobasa.html)
   RewriteCond %{DOCUMENT_ROOT}/$1.html -f
   RewriteRule ^([^\.]+)$ /$1.html [L]
 
-  # 5. Check if directory has an index.html
+  # 6. Check if directory has an index.html
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteCond %{REQUEST_FILENAME}/index.html -f
   RewriteRule ^(.*)$ $1/index.html [L]
