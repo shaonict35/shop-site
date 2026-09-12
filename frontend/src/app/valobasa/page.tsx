@@ -779,6 +779,10 @@ export default function ValobasaAdminPanel() {
       setLoginError("Email and Password are required.");
       return;
     }
+    if (!captchaToken) {
+      setLoginError("Please complete the security captcha verification.");
+      return;
+    }
     try {
       let res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",

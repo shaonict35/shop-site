@@ -45,6 +45,10 @@ export default function LoginPage() {
       setErrorMsg("অনুগ্রহ করে আপনার পাসওয়ার্ড লিখুন।");
       return;
     }
+    if (!captchaToken) {
+      setErrorMsg("অনুগ্রহ করে সিকিউরিটি ক্যাপচা ভেরিফিকেশন সম্পন্ন করুন।");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -83,6 +87,10 @@ export default function LoginPage() {
 
     if (!name.trim() || !phone.trim() || !password) {
       setErrorMsg("পূর্ণ নাম, মোবাইল নাম্বার এবং পাসওয়ার্ড প্রয়োজন।");
+      return;
+    }
+    if (!captchaToken) {
+      setErrorMsg("অনুগ্রহ করে সিকিউরিটি ক্যাপচা ভেরিফিকেশন সম্পন্ন করুন।");
       return;
     }
 

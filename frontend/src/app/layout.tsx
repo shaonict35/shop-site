@@ -56,9 +56,16 @@ export const metadata: Metadata = {
     images: ["https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=1200&h=630&fit=crop"],
   },
   icons: {
-    icon: "/user-glow-logo.png",
-    shortcut: "/user-glow-logo.png",
-    apple: "/user-glow-logo.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
+      { url: "/icon.png", type: "image/png", sizes: "192x192" },
+      { url: "/user-glow-logo.png", type: "image/png", sizes: "512x512" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: [
+      { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
   robots: {
     index: true,
@@ -129,6 +136,12 @@ export default function RootLayout({
         <link rel="preconnect" href="https://www.clarity.ms" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://images.unsplash.com" />
         <link rel="dns-prefetch" href="https://www.clarity.ms" />
+
+        {/* Favicon & Touch Icons */}
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/icon.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-icon.png" />
 
         {/* Google Schema.org JSON-LD Structured Data */}
         <script

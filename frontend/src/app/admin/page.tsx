@@ -828,6 +828,11 @@ export default function AdminPage() {
     e.preventDefault();
     setLoginError("");
 
+    if (!captchaToken) {
+      setLoginError("Please complete the security captcha verification.");
+      return;
+    }
+
     try {
       const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",

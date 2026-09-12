@@ -10,10 +10,19 @@ const JWT_SECRET = process.env.JWT_SECRET || "glowgoodly_secret_jwt_key_123456";
 // POST /api/auth/register
 router.post("/register", async (req: any, res: Response) => {
   try {
-    const { name, email, password, phone, address, city, area } = req.body;
+    const { name, email, password, phone, address, city, area, recaptchaToken } = req.body;
+    const clientIp = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "ip-unknown";
 
     if (!name || !phone || !password) {
       return res.status(400).json({ error: "Name, phone number, and password are required for signup" });
+    }
+
+    // Security Captcha Verification
+    if (recaptchaToken) {
+      const isCaptchaValid = await verifyGoogleRecaptcha(recaptchaToken, String(clientIp));
+      if (!isCaptchaValid) {
+        return res.status(400).json({ error: "Security check failed. Please complete captcha verification." });
+      }
     }
 
     // Check if phone number is already registered (Single signup per number)
@@ -98,7 +107,7 @@ function clearFailedLogin(key: string) {
 }
 
 async function verifyGoogleRecaptcha(token?: string, remoteIp?: string): Promise<boolean> {
-  if (!token) return true;
+  if (!token) return false;
   const str = String(token).trim();
   if (str.length < 3) return false;
 
