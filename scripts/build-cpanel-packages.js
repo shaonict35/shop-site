@@ -79,6 +79,29 @@ if (fs.existsSync(frontendZipPath)) {
 
 if (fs.existsSync(outDir)) {
   execSync(`powershell -Command "$items = (Get-ChildItem -LiteralPath '${outDir}' -Force).FullName; Compress-Archive -LiteralPath $items -DestinationPath '${frontendZipPath}' -Force"`, { stdio: 'inherit' });
+} else {
+  console.log('ℹ️ Static "out" directory not found. Packaging as Next.js SSR App for cPanel Node.js Selector...');
+  const frontendStageDir = path.join(deployDir, 'frontend_staging');
+  if (fs.existsSync(frontendStageDir)) fs.rmSync(frontendStageDir, { recursive: true, force: true });
+  fs.mkdirSync(frontendStageDir, { recursive: true });
+
+  copyDir(path.join(rootDir, 'frontend', '.next'), path.join(frontendStageDir, '.next'));
+  if (fs.existsSync(path.join(rootDir, 'frontend', 'public'))) {
+    copyDir(path.join(rootDir, 'frontend', 'public'), path.join(frontendStageDir, 'public'));
+  }
+  fs.copyFileSync(path.join(rootDir, 'frontend', 'package.json'), path.join(frontendStageDir, 'package.json'));
+  if (fs.existsSync(path.join(rootDir, 'frontend', 'package-lock.json'))) {
+    fs.copyFileSync(path.join(rootDir, 'frontend', 'package-lock.json'), path.join(frontendStageDir, 'package-lock.json'));
+  }
+  if (fs.existsSync(path.join(rootDir, 'frontend', 'server.js'))) {
+    fs.copyFileSync(path.join(rootDir, 'frontend', 'server.js'), path.join(frontendStageDir, 'server.js'));
+  }
+  if (fs.existsSync(path.join(rootDir, 'frontend', 'next.config.ts'))) {
+    fs.copyFileSync(path.join(rootDir, 'frontend', 'next.config.ts'), path.join(frontendStageDir, 'next.config.ts'));
+  }
+
+  execSync(`powershell -Command "$items = (Get-ChildItem -LiteralPath '${frontendStageDir}' -Force).FullName; Compress-Archive -LiteralPath $items -DestinationPath '${frontendZipPath}' -Force"`, { stdio: 'inherit' });
+  fs.rmSync(frontendStageDir, { recursive: true, force: true });
 }
 
 console.log('\n🎉 PACKAGING COMPLETE! Ready for cPanel deployment:');

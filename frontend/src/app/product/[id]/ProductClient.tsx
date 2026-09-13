@@ -420,7 +420,7 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
 
       <main className="container" style={{ padding: "30px 20px 60px 20px" }}>
         
-        {/* Shajgoj-style Breadcrumbs Bar (Matches Image 2 & Image 4) */}
+        {/* Breadcrumbs Navigation Bar */}
         <div style={{ backgroundColor: "#f8fafc", padding: "12px 18px", borderRadius: "10px", border: "1px solid #e2e8f0", fontSize: "13.5px", fontWeight: "600", color: "#64748b", marginBottom: "28px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
           <Link href="/" style={{ color: "#475569", textDecoration: "none" }}>Home</Link>
           <span>›</span>

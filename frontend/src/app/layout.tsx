@@ -87,7 +87,7 @@ const storeSchemaJsonLd = {
       "@id": "https://shop.glowgoodly.com/#store",
       "name": "GlowGoodly Bangladesh",
       "url": "https://shop.glowgoodly.com",
-      "logo": "https://shop.glowgoodly.com/cosmetics_circle_illustration.png",
+      "logo": "https://shop.glowgoodly.com/icon.png",
       "description": "Premium 100% authentic cosmetics, skincare, and hair care store in Bangladesh.",
       "telephone": "+8801700000000",
       "priceRange": "BDT 150 - 15000",
