@@ -157,80 +157,63 @@ export default function Footer() {
               </div>
             </div>
 
-            {/* Dynamic Database Footer Columns */}
-            {footerMenus.length > 0 ? (
-              (() => {
-                const sectionsMap: Record<string, any[]> = {};
-                footerMenus.forEach(item => {
-                  const sec = item.section || "Quick Links";
-                  if (sec.toUpperCase() !== "GLOWGOODLY") {
-                    if (!sectionsMap[sec]) sectionsMap[sec] = [];
-                    sectionsMap[sec].push(item);
-                  }
-                });
-                return Object.entries(sectionsMap).map(([secTitle, items]) => (
-                  <div key={secTitle} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                    <h4 style={{ fontSize: "12px", fontWeight: "800", color: "#e52860", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                      {secTitle}
-                    </h4>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontWeight: "700" }}>
-                      {items.map((m: any) => (
-                        <Link
-                          key={m.id || m.title}
-                          href={m.url || "#"}
-                          style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }}
-                          onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}
-                        >
-                          {m.title}
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                ));
-              })()
-            ) : (
-              <>
-                {/* Column 2: Top Categories */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <h4 style={{ fontSize: "12px", fontWeight: "800", color: "#e52860", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                    Top Categories
-                  </h4>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontWeight: "700" }}>
-                    <Link href="/shop?category=makeup" style={{ color: "#ffffff", textDecoration: "none" }}>MAKEUP</Link>
-                    <Link href="/shop?category=skincare" style={{ color: "#ffffff", textDecoration: "none" }}>SKIN</Link>
-                    <Link href="/shop?category=haircare" style={{ color: "#ffffff", textDecoration: "none" }}>HAIR</Link>
-                    <Link href="/shop?category=personal-care" style={{ color: "#ffffff", textDecoration: "none" }}>PERSONAL CARE</Link>
-                    <Link href="/shop?category=mom-baby" style={{ color: "#ffffff", textDecoration: "none" }}>MOM & BABY</Link>
-                  </div>
-                </div>
+            {/* Column 2: Top Categories */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <h4 style={{ fontSize: "12px", fontWeight: "800", color: "#e52860", textTransform: "uppercase", letterSpacing: "0.5px", cursor: "default", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#ff6ba8")} onMouseLeave={(e) => (e.currentTarget.style.color = "#e52860")}>
+                Top Categories
+              </h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontWeight: "700" }}>
+                <Link href="/shop?category=makeup" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>MAKEUP</Link>
+                <Link href="/shop?category=skincare" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>SKIN</Link>
+                <Link href="/shop?category=makeup" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>EYE CARE</Link>
+                <Link href="/shop?category=haircare" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>HAIR</Link>
+                <Link href="/shop?category=personal-care" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>PERSONAL CARE</Link>
+                <Link href="/shop?category=natural" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>NATURAL</Link>
+                <Link href="/shop?category=mom-baby" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>MOM & BABY</Link>
+              </div>
+            </div>
 
-                {/* Column 3: Quick Links */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <h4 style={{ fontSize: "12px", fontWeight: "800", color: "#e52860", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                    Quick Links
-                  </h4>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontWeight: "700" }}>
-                    <Link href="/shop?tab=offers" style={{ color: "#ffffff", textDecoration: "none" }}>OFFERS</Link>
-                    <Link href="/shop?category=men" style={{ color: "#ffffff", textDecoration: "none" }}>MENS PRODUCTS</Link>
-                    <Link href="/shop?sort=newest" style={{ color: "#ffffff", textDecoration: "none" }}>NEW ARRIVAL</Link>
-                  </div>
-                </div>
+            {/* Column 3: Quick Links */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <h4 style={{ fontSize: "12px", fontWeight: "800", color: "#e52860", textTransform: "uppercase", letterSpacing: "0.5px", cursor: "default", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#ff6ba8")} onMouseLeave={(e) => (e.currentTarget.style.color = "#e52860")}>
+                Quick Links
+              </h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontWeight: "700" }}>
+                <Link href="/shop?tab=offers" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>OFFERS</Link>
+                <Link href="/shop?category=men" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>MENS PRODUCTS</Link>
+                <Link href="/shop?category=skincare" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>SKIN CONCERNS</Link>
+                <Link href="/shop?sort=newest" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>NEW ARRIVAL</Link>
+                <Link href="/shop?category=makeup" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>MAKEUP</Link>
+              </div>
+            </div>
 
-                {/* Column 4: Help */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <h4 style={{ fontSize: "12px", fontWeight: "800", color: "#e52860", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                    Help & Support
-                  </h4>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontWeight: "700" }}>
-                    <Link href="/contact" style={{ color: "#ffffff", textDecoration: "none" }}>CONTACT US</Link>
-                    <Link href="/faq" style={{ color: "#ffffff", textDecoration: "none" }}>FAQS</Link>
-                    <Link href="/shipping-delivery" style={{ color: "#ffffff", textDecoration: "none" }}>SHIPPING & DELIVERY</Link>
-                    <Link href="/terms" style={{ color: "#ffffff", textDecoration: "none" }}>TERMS & CONDITIONS</Link>
-                  </div>
-                </div>
-              </>
-            )}
+            {/* Column 4: All About Beauty */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <h4 style={{ fontSize: "12px", fontWeight: "800", color: "#e52860", textTransform: "uppercase", letterSpacing: "0.5px", cursor: "default", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#ff6ba8")} onMouseLeave={(e) => (e.currentTarget.style.color = "#e52860")}>
+                All About Beauty
+              </h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontWeight: "700" }}>
+                <Link href={siteSettings?.ROUTINE_LINK || "/routine"} style={{ color: "#ffffff", textDecoration: "none", textTransform: "uppercase", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>KNOW YOUR ROUTINE</Link>
+                <Link href={siteSettings?.HAIR_CARE_101_LINK || "/hair-care-101"} style={{ color: "#ffffff", textDecoration: "none", textTransform: "uppercase", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>HAIR CARE 101</Link>
+                <Link href={siteSettings?.SKIN_CARE_101_LINK || "/skin-care-101"} style={{ color: "#ffffff", textDecoration: "none", textTransform: "uppercase", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>SKIN CARE 101</Link>
+                <Link href={siteSettings?.MAKEUP_101_LINK || "/makeup-101"} style={{ color: "#ffffff", textDecoration: "none", textTransform: "uppercase", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>MAKEUP 101</Link>
+              </div>
+            </div>
+
+            {/* Column 5: Help */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <h4 style={{ fontSize: "12px", fontWeight: "800", color: "#e52860", textTransform: "uppercase", letterSpacing: "0.5px", cursor: "default", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#ff6ba8")} onMouseLeave={(e) => (e.currentTarget.style.color = "#e52860")}>
+                Help
+              </h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontWeight: "700" }}>
+                <Link href="/contact" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>CONTACT US</Link>
+                <Link href="/points" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>POINTS</Link>
+                <Link href="/faq" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>FAQS</Link>
+                <Link href="/shipping-delivery" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>SHIPPING & DELIVERY</Link>
+                <Link href="/terms" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>TERMS & CONDITIONS</Link>
+                <Link href="/refund-policy" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>REFUND & RETURN POLICY</Link>
+                <Link href="/privacy-policy" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>PRIVACY POLICY</Link>
+              </div>
 
               <div style={{ marginTop: "15px" }}>
                 <h4 style={{ fontSize: "11px", fontWeight: "800", color: "#ffffff", textTransform: "uppercase", marginBottom: "10px" }}>
@@ -258,6 +241,7 @@ export default function Footer() {
                 </div>
               </div>
             </div>
+          </div>
 
           <hr style={{ border: "none", borderTop: "1px solid #1a2333", margin: "25px 0" }} />
 
