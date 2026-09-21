@@ -45,6 +45,22 @@ router.put("/reviews/:id/approve", authenticateJWT as any, requireRole(["SuperAd
   }
 });
 
+// DELETE /api/admin/reviews/:id (Admin only - Reject/Delete review)
+router.delete("/reviews/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const docRef = db.collection("reviews").doc(id as string);
+    const doc = await docRef.get();
+    if (!doc.exists) {
+      return res.status(404).json({ error: "Review not found" });
+    }
+    await docRef.delete();
+    res.json({ message: "Review deleted successfully" });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/admin/dashboard-stats (Admin only)
 router.get("/dashboard-stats", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Salesman"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {

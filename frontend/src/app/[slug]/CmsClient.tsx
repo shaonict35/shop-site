@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import MobileNavbar from "../../components/MobileNavbar";
+import GlowLoader from "../../components/GlowLoader";
 import { useParams } from "next/navigation";
 import { API_BASE, fetchWithCache } from "../../utils/api";
 
@@ -57,9 +58,7 @@ export default function CustomCmsPage() {
       {/* Main Page Middle Content */}
       <main className="container" style={{ padding: "40px 20px 80px 20px", minHeight: "50vh" }}>
         {loading ? (
-          <div style={{ textAlign: "center", padding: "60px 0", color: "#e63b7a", fontWeight: "800" }}>
-            Loading page content...
-          </div>
+          <GlowLoader text="Loading Content..." subtext="GlowGoodly Official Page Information" />
         ) : page && page.contentHtml ? (
           <div
             style={{

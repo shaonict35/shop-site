@@ -21,7 +21,7 @@ router.get("/public", async (req, res) => {
       "MAKEUP_101_LINK"
     ];
     const snapshot = await db.collection("settings").get();
-    
+
     const settingsList: any[] = [];
     snapshot.forEach(doc => {
       const data = doc.data();
@@ -29,12 +29,12 @@ router.get("/public", async (req, res) => {
         settingsList.push(data);
       }
     });
-    
+
     const publicSettings = settingsList.reduce((acc: any, s) => {
       acc[s.key] = s.value;
       return acc;
     }, {});
-    
+
     res.json(publicSettings);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -46,7 +46,7 @@ router.get("/seasonal-offer", async (req, res) => {
   try {
     const docRef = db.collection("settings").doc("SEASONAL_OFFER_DATA");
     const doc = await docRef.get();
-    
+
     if (doc.exists) {
       let parsed = doc.data()?.value ? JSON.parse(doc.data()?.value) : doc.data();
       if (parsed) {
@@ -57,25 +57,7 @@ router.get("/seasonal-offer", async (req, res) => {
       return res.json(parsed);
     }
 
-    const defaultOffer = {
-      title: "বিশেষ অফারে অরিজিনাল বিউটি কম্বো প্যাকেজ!",
-      subtitle: "সীমিত সময়ের জন্য ছাড়! ১০০% অরিজিনাল প্রোডাক্ট দ্রুত ক্যাশ অন ডেলিভারিতে পান।",
-      videoUrl: "",
-      productTitle: "প্রিমিয়াম বিউটি ও স্কিনকেয়ার গ্লো সেট",
-      productPrice: "1250",
-      originalPrice: "1850",
-      productImages: [
-        "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&auto=format&fit=crop&q=80"
-      ],
-      description: "আমাদের এই বিশেষ প্যাকেজে রয়েছে ত্বকের যত্ন ও উজ্জ্বলতার জন্য প্রয়োজনীয় প্রিমিয়াম উপাদান। নিয়মিত ব্যবহারে পাবেন দাগহীন, উজ্জ্বল ও সতেজ ত্বক।",
-      bulletPoints: "১০০% অরিজিনাল প্রোডাক্ট|ত্বক হবে সতেজ ও উজ্জ্বল|কোনো সাইড ইফেক্ট নেই|সারাদেশে ক্যাশ অন ডেলিভারি",
-      insideDhakaShipping: "70",
-      subAreaShipping: "100",
-      outsideDhakaShipping: "130",
-      isActive: true
-    };
-
-    res.json(defaultOffer);
+    return res.status(404).json({ error: "Seasonal offer not found in database" });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -106,7 +88,7 @@ router.get("/", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "A
     snapshot.forEach(doc => {
       settingsList.push(doc.data());
     });
-    
+
     // Transform array to key-value object
     const settingsObj = settingsList.reduce((acc: any, s) => {
       acc[s.key] = s.value;
@@ -128,7 +110,7 @@ router.post("/bulk", authenticateJWT as any, requireRole(["SuperAdmin", "Manager
     }
 
     const batch = db.batch();
-    
+
     for (const [key, value] of Object.entries(settings)) {
       // Find doc where key == key, or use doc(key) as doc ID to make it super simple and automatic!
       // In NoSQL Firestore, we can use the KEY itself (e.g. "META_PIXEL_ID") as the Document ID!
@@ -160,7 +142,7 @@ router.post("/test-smtp", authenticateJWT as any, requireRole(["SuperAdmin", "Ma
     }
 
     const { testSmtpConnection } = await import("../mailer");
-    
+
     // Optional custom config passed from the form before saving
     const customConfig = (host || user || pass) ? {
       host: host?.trim(),

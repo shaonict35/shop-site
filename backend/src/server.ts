@@ -87,11 +87,11 @@ app.use(sanitizeInput);
 // Intelligent Caching Middleware for API requests
 app.use("/api", (req, res, next) => {
   const isReadMethod = req.method === "GET" || req.method === "HEAD";
-  const isPrivateOrBypass = 
+  const isPrivateOrBypass =
     !isReadMethod ||
-    req.path.startsWith("/auth") || 
-    req.path.startsWith("/admin") || 
-    req.path.startsWith("/orders") || 
+    req.path.startsWith("/auth") ||
+    req.path.startsWith("/admin") ||
+    req.path.startsWith("/orders") ||
     req.path.startsWith("/chat") ||
     req.path.startsWith("/bkash") ||
     req.query.bypass === "true" ||
@@ -320,6 +320,100 @@ app.use("/api", feedsRouter);
 app.use("/api", enterpriseRouter);
 app.use("/api", menuRouter);
 app.use("/api", pagesRouter);
+
+// ─── Public Blog Articles API (100% Database-Driven) ───
+app.get("/api/blogs", async (req: express.Request, res: express.Response) => {
+  try {
+    const snapshot = await db.collection("blogs").get();
+    const blogs: any[] = [];
+    snapshot.forEach(doc => {
+      blogs.push({ id: doc.id, ...doc.data() });
+    });
+    blogs.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    res.json(blogs);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── Public Coupon Validation API (100% Database-Driven) ───
+app.get("/api/coupons/validate", async (req: express.Request, res: express.Response) => {
+  try {
+    const rawCode = (req.query.code as string || "").trim().toUpperCase();
+    const subtotal = parseFloat(req.query.subtotal as string || "0");
+
+    if (!rawCode) {
+      return res.status(400).json({ valid: false, error: "Coupon code is required" });
+    }
+
+    const snapshot = await db.collection("coupons").get();
+    let cData: any = null;
+    snapshot.forEach(doc => {
+      const d = doc.data() as any;
+      if (doc.id.toUpperCase() === rawCode || (d.code && d.code.toUpperCase() === rawCode)) {
+        cData = { id: doc.id, ...d };
+      }
+    });
+
+    if (!cData) {
+      return res.status(404).json({ valid: false, error: "Invalid or expired coupon code" });
+    }
+    if (!cData || cData.isActive === false) {
+      return res.status(400).json({ valid: false, error: "Coupon is inactive" });
+    }
+
+    if (cData.expiresAt && new Date(cData.expiresAt).getTime() < Date.now()) {
+      return res.status(400).json({ valid: false, error: "Coupon has expired" });
+    }
+
+    const minSpend = Number(cData.minOrder || cData.minOrderValue || 0);
+    if (minSpend > 0 && subtotal < minSpend) {
+      return res.status(400).json({ valid: false, error: `Minimum order amount of ৳${minSpend} required` });
+    }
+
+    let calculatedDiscount = 0;
+    const discVal = Number(cData.discount || cData.discountValue || 0);
+    if (cData.discountType === "PERCENTAGE" || cData.discountType === "Percentage") {
+      calculatedDiscount = Math.round((subtotal * discVal) / 100);
+    } else {
+      calculatedDiscount = discVal;
+    }
+
+    return res.json({
+      valid: true,
+      code: rawCode,
+      discount: calculatedDiscount,
+      discountType: cData.discountType || "Fixed",
+      message: `Coupon ${rawCode} applied: ৳${calculatedDiscount} discount!`
+    });
+  } catch (error: any) {
+    res.status(500).json({ valid: false, error: error.message });
+  }
+});
+
+// ─── Public Active Coupons API (100% Database-Driven) ───
+app.get("/api/coupons/public", async (req: express.Request, res: express.Response) => {
+  try {
+    const snapshot = await db.collection("coupons").get();
+    const list: any[] = [];
+    snapshot.forEach(doc => {
+      const data = doc.data() as any;
+      if (data && data.isActive !== false) {
+        list.push({
+          id: doc.id,
+          code: data.code || doc.id,
+          title: data.title || `${data.code || doc.id} Coupon`,
+          subtitle: data.subtitle || (data.discountType === "PERCENTAGE" || data.discountType === "Percentage" ? `${data.discount || data.discountValue}% Off` : `৳${data.discount || data.discountValue} Off`),
+          discount: data.discount || data.discountValue,
+          discountType: data.discountType
+        });
+      }
+    });
+    res.json(list);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Backend Root Landing Page Endpoint (Shajgoj Landing UI with GlowGoodly Branding)
 app.get("/", (req, res) => {

@@ -90,6 +90,32 @@ router.post("/categories", authenticateJWT as any, requireRole(["SuperAdmin", "M
   }
 });
 
+// PUT /api/categories/:id (Admin only - Update category)
+router.put("/categories/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: any, res: any) => {
+  try {
+    const { name, parentId, imageUrl } = req.body || {};
+    const docId = req.params.id;
+    const docRef = db.collection("categories").doc(docId);
+    const existingSnap = await docRef.get();
+    const existing = existingSnap.exists ? existingSnap.data() : {};
+    const cleanName = name || existing.name;
+    const data = {
+      ...existing,
+      id: docId,
+      name: cleanName,
+      slug: cleanName ? generateSlug(cleanName) : existing.slug,
+      parentId: parentId !== undefined ? parentId : (existing.parentId || null),
+      imageUrl: imageUrl !== undefined ? imageUrl : (existing.imageUrl || ""),
+      updatedAt: new Date().toISOString()
+    };
+    await docRef.set(data, { merge: true });
+    categoriesCache.data = null;
+    res.json({ message: "Category updated successfully", category: data });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // DELETE /api/categories/:id (Admin only)
 router.delete("/categories/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: any, res: any) => {
   try {
@@ -441,10 +467,25 @@ router.post("/products/:id/reviews", async (req: Request, res: Response) => {
 // POST /api/products (Admin only - Create product)
 router.post("/products", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: Request, res: Response) => {
   try {
-    const { name, description, brandId, categoryId, imageUrl, price, discountPrice, costPrice, stock, metaTitle, metaDescription, metaKeywords, campaignName, variants } = req.body;
+    const { name, description, imageUrl, price, discountPrice, costPrice, stock, metaTitle, metaDescription, metaKeywords, campaignName, variants } = req.body;
+    let brandId = req.body.brandId;
+    let categoryId = req.body.categoryId;
     
-    if (!name || !brandId || !categoryId) {
-      return res.status(400).json({ error: "Name, brandId, and categoryId are required" });
+    if (!name) {
+      return res.status(400).json({ error: "Product name is required" });
+    }
+
+    if (!brandId) {
+      const brandSnapshot = await db.collection("brands").limit(1).get();
+      if (!brandSnapshot.empty) {
+        brandId = brandSnapshot.docs[0].id;
+      }
+    }
+    if (!categoryId) {
+      const catSnapshot = await db.collection("categories").limit(1).get();
+      if (!catSnapshot.empty) {
+        categoryId = catSnapshot.docs[0].id;
+      }
     }
 
     let variantCreateList = [];
@@ -551,18 +592,33 @@ const updateProductHandler = async (req: Request, res: Response) => {
 
     let updatedVariants = currentProduct.variants || [];
     if (variants && Array.isArray(variants)) {
-      updatedVariants = variants.map((v: any) => ({
-        id: v.id || `var-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-        name: v.name || "Default",
-        price: v.price !== undefined ? parseFloat(v.price) : 0,
-        discountPrice: v.discountPrice ? parseFloat(v.discountPrice) : null,
-        costPrice: v.costPrice ? parseFloat(v.costPrice) : null,
-        stock: v.stock !== undefined ? parseInt(v.stock) : 50,
-        shadeColor: v.shadeColor || null,
-        sizeValue: v.sizeValue || null,
-        imageUrl: v.imageUrl || null,
-        sku: v.sku || `SKU-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`
-      }));
+      if (variants.length === 0) {
+        updatedVariants = [{
+          id: currentProduct.variants?.[0]?.id || `var-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          name: "Default",
+          price: price !== undefined ? parseFloat(price) : (currentProduct.price || 0),
+          discountPrice: discountPrice !== undefined ? (discountPrice ? parseFloat(discountPrice) : null) : (currentProduct.discountPrice || null),
+          costPrice: costPrice !== undefined ? (costPrice ? parseFloat(costPrice) : null) : (currentProduct.costPrice || null),
+          stock: stock !== undefined ? parseInt(stock) : (currentProduct.stock || 50),
+          shadeColor: null,
+          sizeValue: null,
+          imageUrl: imageUrl || currentProduct.imageUrl || null,
+          sku: currentProduct.variants?.[0]?.sku || `SKU-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`
+        }];
+      } else {
+        updatedVariants = variants.map((v: any) => ({
+          id: v.id || `var-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          name: v.name || "Default",
+          price: v.price !== undefined ? parseFloat(v.price) : 0,
+          discountPrice: v.discountPrice ? parseFloat(v.discountPrice) : null,
+          costPrice: v.costPrice ? parseFloat(v.costPrice) : null,
+          stock: v.stock !== undefined ? parseInt(v.stock) : 50,
+          shadeColor: v.shadeColor || null,
+          sizeValue: v.sizeValue || null,
+          imageUrl: v.imageUrl || null,
+          sku: v.sku || `SKU-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`
+        }));
+      }
     } else if (price) {
       if (updatedVariants.length > 0) {
         updatedVariants[0].price = parseFloat(price);
@@ -606,6 +662,9 @@ const updateProductHandler = async (req: Request, res: Response) => {
       campaignName: campaignName !== undefined ? campaignName : currentProduct.campaignName,
       images: updatedImages,
       variants: updatedVariants,
+      price: updatedVariants[0]?.price || 0,
+      discountPrice: updatedVariants[0]?.discountPrice || null,
+      stock: updatedVariants[0]?.stock || 0,
       updatedAt: new Date().toISOString(),
     };
 

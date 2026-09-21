@@ -85,9 +85,8 @@ function cleanBannerData(data: any): any {
     else if (cleaned.page === "Deal Card 1") cleaned.imageUrl = "/images/deals/deal-1.png";
     else if (cleaned.page === "Deal Card 2") cleaned.imageUrl = "/images/deals/deal-2.png";
     else if (cleaned.page === "Deal Card 3") cleaned.imageUrl = "/images/deals/deal-3.gif";
-    else if (cleaned.page?.startsWith("Category:") || cleaned.page?.startsWith("Concern:")) cleaned.imageUrl = "";
     else if (cleaned.page === "Hero Slides" || cleaned.page === "Hero Slides Carousel") cleaned.imageUrl = "/images/sliders/slider-1.png";
-    else cleaned.imageUrl = "";
+    else if (!cleaned.page?.startsWith("Category:") && !cleaned.page?.startsWith("Concern:")) cleaned.imageUrl = "";
   }
   if (!cleaned.mobileImageUrl || cleaned.mobileImageUrl.includes("shajgoj")) {
     cleaned.mobileImageUrl = cleaned.imageUrl;

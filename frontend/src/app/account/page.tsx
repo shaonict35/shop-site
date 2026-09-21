@@ -5,6 +5,7 @@ import Link from "next/link";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import MobileNavbar from "../../components/MobileNavbar";
+import GlowLoader from "../../components/GlowLoader";
 import { useApp } from "../../context/AppContext";
 import { API_BASE } from "../../utils/api";
 
@@ -368,9 +369,7 @@ export default function CustomerAccountPage() {
                 </h2>
 
                 {loading ? (
-                  <div style={{ padding: "40px", textAlign: "center", color: "#e52860", fontWeight: "800" }}>
-                    Loading order history...
-                  </div>
+                  <GlowLoader text="Loading Order History..." subtext="Retrieving your orders & live courier tracking" />
                 ) : orders.length === 0 ? (
                   <div style={{ backgroundColor: "#ffffff", padding: "40px", borderRadius: "12px", border: "1px solid #edf2f7", textAlign: "center" }}>
                     <p style={{ fontSize: "15px", color: "#718096", fontWeight: "600", marginBottom: "15px" }}>You haven't placed any orders yet.</p>

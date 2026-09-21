@@ -24,169 +24,14 @@ interface Product {
   variants: { id: string; name: string; price: number; discountPrice: number | null; stock: number; shadeColor: string | null; size?: string | null }[];
 }
 
-const DEFAULT_BEAUTY_CATEGORIES = [
-  { id: "cat-makeup", name: "Makeup", slug: "makeup", image: "" },
-  { id: "cat-skincare", name: "Skin Care", slug: "skincare", image: "" },
-  { id: "cat-haircare", name: "Hair Care", slug: "haircare", image: "" },
-  { id: "cat-personal-care", name: "Personal Care", slug: "personal-care", image: "" },
-  { id: "cat-mom-baby", name: "Mom & Baby", slug: "mom-baby", image: "" },
-  { id: "cat-fragrance", name: "Fragrance", slug: "fragrance", image: "" },
-  { id: "cat-undergarments", name: "Undergarments", slug: "undergarments", image: "" },
-  { id: "cat-kbeauty", name: "K-Beauty", slug: "k-beauty", image: "" }
-];
-
-const DEFAULT_HERO_SLIDES = [
-  {
-    id: "hero-slide-1",
-    title: "Nirvana #1 Makeup Brand from Bangladesh",
-    desc: "Unleash your true color with authentic Nirvana collection.",
-    bg: "linear-gradient(135deg, #111827 0%, #1f2937 100%)",
-    img: "/images/sliders/slider-1.png",
-    mobileImg: "/images/sliders/slider-1.png",
-    tabletImg: "/images/sliders/slider-1.png",
-    link: "/shop?brand=nirvana"
-  },
-  {
-    id: "hero-slide-2",
-    title: "July Jaw Droppers - Up to 45% Off",
-    desc: "Unilever presents mega discounts on Pond's, Lux, Vaseline & Closeup.",
-    bg: "linear-gradient(135deg, #e9d5ff 0%, #f3e8ff 100%)",
-    img: "/images/sliders/slider-2.png",
-    mobileImg: "/images/sliders/slider-2.png",
-    tabletImg: "/images/sliders/slider-2.png",
-    link: "/shop?deal=jaw-droppers"
-  },
-  {
-    id: "hero-slide-3",
-    title: "Treasure of Glow - Free Delivery",
-    desc: "Free delivery on orders of 1999+ and up to 35% off on CeraVe, St. Ives & Dove.",
-    bg: "linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)",
-    img: "/images/sliders/slider-3.png",
-    mobileImg: "/images/sliders/slider-3.png",
-    tabletImg: "/images/sliders/slider-3.png",
-    link: "/shop?deal=treasure-of-glow"
-  }
-];
-
-const DEFAULT_HOMEPAGE_BANNERS = [
-  // Homepage Wide Banner (Original Beauty Must Haves banner)
-  {
-    id: "default-wide-banner",
-    title: "Beauty Must Haves Exclusive Savings",
-    page: "Homepage Wide Banner",
-    imageUrl: "/hero-slide-1.png",
-    linkUrl: "/shop",
-    isActive: true
-  },
-  // Deals You Cannot Miss (4 Cards)
-  {
-    id: "default-deal-1",
-    title: "Deal Card 1 - Ombre 30% Off",
-    page: "Deal Card 1",
-    imageUrl: "/images/deals/deal-1.png",
-    linkUrl: "/shop?deal=ombre",
-    isActive: true
-  },
-  {
-    id: "default-deal-2",
-    title: "Deal Card 2 - Marico Free Delivery",
-    page: "Deal Card 2",
-    imageUrl: "/images/deals/deal-2.png",
-    linkUrl: "/shop?deal=marico",
-    isActive: true
-  },
-  {
-    id: "default-deal-3",
-    title: "Deal Card 3 - PNS Campaign",
-    page: "Deal Card 3",
-    imageUrl: "/images/deals/deal-3.gif",
-    linkUrl: "/shop?deal=pns",
-    isActive: true
-  },
-  {
-    id: "default-deal-4",
-    title: "Deal Card 4 - Senora Deal",
-    page: "Deal Card 4",
-    imageUrl: "/images/deals/deal-4.jpg",
-    linkUrl: "/shop?deal=senora",
-    isActive: true
-  },
-  // Top Brands & Offers (4 Cards)
-  {
-    id: "default-brand-1",
-    title: "Brand Offer 1 - The Ordinary",
-    page: "Brand Offer 1",
-    imageUrl: "/images/brands/brand-offer-1.png",
-    linkUrl: "/shop?brand=the-ordinary",
-    isActive: true
-  },
-  {
-    id: "default-brand-2",
-    title: "Brand Offer 2 - Skin Cafe",
-    page: "Brand Offer 2",
-    imageUrl: "/images/brands/brand-offer-2.gif",
-    linkUrl: "/shop?brand=skin-cafe",
-    isActive: true
-  },
-  {
-    id: "default-brand-5",
-    title: "Brand Offer 5 - Treasure of Glow",
-    page: "Brand Offer 5",
-    imageUrl: "/images/brands/brand-offer-5.png",
-    linkUrl: "/shop?brand=treasure-of-glow",
-    isActive: true
-  },
-  {
-    id: "default-brand-6",
-    title: "Brand Offer 6 - Trimmer Offer",
-    page: "Brand Offer 6",
-    imageUrl: "/images/brands/brand-offer-6.gif",
-    linkUrl: "/shop?category=trimmer",
-    isActive: true
-  },
-  // Limited Time Offers (4 Cards)
-  {
-    id: "default-bogo",
-    title: "BOGO Offer",
-    page: "BOGO",
-    imageUrl: "/images/deals/deal-1.png",
-    linkUrl: "/shop?campaign=BOGO",
-    isActive: true
-  },
-  {
-    id: "default-combo",
-    title: "COMBO Offer",
-    page: "COMBO",
-    imageUrl: "/images/deals/deal-2.png",
-    linkUrl: "/shop?campaign=COMBO",
-    isActive: true
-  },
-  {
-    id: "default-offers",
-    title: "OFFERS Mega Savings",
-    page: "OFFERS",
-    imageUrl: "/images/deals/deal-3.gif",
-    linkUrl: "/shop?campaign=OFFERS",
-    isActive: true
-  },
-  {
-    id: "default-clearance",
-    title: "Clearance SALE Deals",
-    page: "Clearance SALE",
-    imageUrl: "/images/deals/deal-4.jpg",
-    linkUrl: "/shop?campaign=Clearance%20SALE",
-    isActive: true
-  }
-];
-
 export default function Home() {
   const { addToCart, wishlist, toggleWishlist } = useApp();
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<any[]>(DEFAULT_BEAUTY_CATEGORIES);
+  const [categories, setCategories] = useState<any[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [dynamicSlides, setDynamicSlides] = useState<any[]>(DEFAULT_HERO_SLIDES);
-  const [homepageBanners, setHomepageBanners] = useState<any[]>(DEFAULT_HOMEPAGE_BANNERS);
+  const [dynamicSlides, setDynamicSlides] = useState<any[]>([]);
+  const [homepageBanners, setHomepageBanners] = useState<any[]>([]);
 
   const getBannerForPage = (identifier: string, fallbackImg: string, fallbackTitle: string, fallbackLink: string = "#") => {
     const term = (identifier || "").toLowerCase().trim();
@@ -274,10 +119,34 @@ export default function Home() {
 
     const fetchMetadata = async (bypass: boolean = false) => {
       try {
-        // Keep Categories, Hero Slides, and Banners on static fixed designs
-        setCategories(DEFAULT_BEAUTY_CATEGORIES);
-        setDynamicSlides(DEFAULT_HERO_SLIDES);
-        setHomepageBanners(DEFAULT_HOMEPAGE_BANNERS);
+        // Fetch real categories and promotional banners dynamically from backend database
+        const [categoriesRes, bannersRes] = await Promise.all([
+          fetchWithCache(`${API_BASE}/categories`, bypass).catch(() => null),
+          fetchWithCache(`${API_BASE}/banners?t=${Date.now()}`, true).catch(() => null),
+        ]);
+
+        if (Array.isArray(categoriesRes) && categoriesRes.length > 0) {
+          setCategories(categoriesRes);
+        }
+        if (Array.isArray(bannersRes) && bannersRes.length > 0) {
+          setHomepageBanners(bannersRes);
+          // Extract dynamic hero slides from banners where page is Hero Slides or hero
+          const heroBanners = bannersRes.filter((b: any) => 
+            b.page?.toLowerCase().includes("hero") || b.title?.toLowerCase().includes("hero")
+          );
+          if (heroBanners.length > 0) {
+            setDynamicSlides(heroBanners.map((b: any, idx: number) => ({
+              id: b.id || `hero-${idx}`,
+              title: b.title || "",
+              desc: b.description || b.subTitle || "",
+              bg: b.backgroundColor || "linear-gradient(135deg, #111827 0%, #1f2937 100%)",
+              img: b.imageUrl || b.image || "",
+              mobileImg: b.mobileImageUrl || b.imageUrl || b.image || "",
+              tabletImg: b.tabletImageUrl || b.imageUrl || b.image || "",
+              link: b.linkUrl || b.link || "/shop"
+            })));
+          }
+        }
 
         // Optional non-intrusive notification banner check
         const notifRes = await fetchWithCache(`${API_BASE}/notifications/active`, bypass).catch(() => null);
@@ -328,19 +197,20 @@ export default function Home() {
 
 
   const handleAddToCart = (product: Product) => {
-    const primaryVariant = product.variants[0];
-    if (!primaryVariant) return;
-
-    const primaryImage = product.images.find((img) => img.isPrimary)?.url || product.images[0]?.url || "";
+    const primaryVariant = product.variants?.[0];
+    const primaryImage = product.images?.find((img) => img.isPrimary)?.url || product.images?.[0]?.url || "";
+    const effectivePrice = primaryVariant 
+      ? (primaryVariant.discountPrice || primaryVariant.price)
+      : ((product as any).price || 0);
 
     addToCart({
-      id: primaryVariant.id,
+      id: primaryVariant?.id || product.id,
       productId: product.id,
       name: product.name,
-      variantName: primaryVariant.name,
+      variantName: primaryVariant?.name || "Standard",
       image: primaryImage,
-      price: primaryVariant.discountPrice || primaryVariant.price,
-      stock: primaryVariant.stock,
+      price: effectivePrice,
+      stock: primaryVariant?.stock ?? 50,
     });
   };
 
@@ -958,57 +828,75 @@ export default function Home() {
         })()}
 
         {/* SHOP BEAUTY PRODUCTS BY CATEGORY Section */}
-        <section style={{ margin: "40px 0" }}>
-          <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "20px", color: "#000" }}>
-            SHOP BEAUTY PRODUCTS BY CATEGORY
-          </h2>
-          <div className="categories-grid">
-            {[
-              { name: "Makeup", icon: "💄", color: "#fdf2f8", border: "#fbcfe8", link: "/shop?category=makeup" },
-              { name: "Skin", icon: "✨", color: "#f0fdf4", border: "#bbf7d0", link: "/shop?category=skincare" },
-              { name: "Hair", icon: "💇‍♀️", color: "#eff6ff", border: "#bfdbfe", link: "/shop?category=haircare" },
-              { name: "Personal Care", icon: "🧴", color: "#faf5ff", border: "#e9d5ff", link: "/shop?category=personal-care" },
-              { name: "Mom & Baby", icon: "🍼", color: "#fffbeb", border: "#fde68a", link: "/shop?category=mom-baby" },
-              { name: "Fragrance", icon: "🌸", color: "#fff1f2", border: "#fecdd3", link: "/shop?category=fragrance" },
-              { name: "Undergarments", icon: "👙", color: "#f5f3ff", border: "#ddd6fe", link: "/shop?category=undergarments" },
-              { name: "Combo", icon: "🎁", color: "#fefce8", border: "#fef08a", link: "/shop?category=combo" }
-            ].map((cat: any) => {
-              const bannerInfo = getBannerForPage(`Category: ${cat.name}`, "", cat.name, cat.link);
-              return (
-                <Link 
-                  key={cat.name} 
-                  href={bannerInfo.link} 
-                  style={{ display: "block", borderRadius: "10px", overflow: "hidden", cursor: "pointer", textDecoration: "none" }} 
-                  className="promo-card-hover"
-                >
-                  {bannerInfo.img ? (
-                    <img 
-                      src={bannerInfo.img} 
-                      alt={cat.name} 
-                      style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block", borderRadius: "10px" }} 
-                    />
-                  ) : (
-                    <div style={{
-                      aspectRatio: "1 / 1",
-                      backgroundColor: cat.color,
-                      border: `1.5px solid ${cat.border}`,
-                      borderRadius: "10px",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: "10px",
-                      boxShadow: "0 2px 6px rgba(0,0,0,0.03)"
-                    }}>
-                      <span style={{ fontSize: "26px", marginBottom: "4px" }}>{cat.icon}</span>
-                      <span style={{ fontSize: "12px", fontWeight: "800", color: "#0f172a", textAlign: "center", lineHeight: "1.2" }}>{cat.name}</span>
-                    </div>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        </section>
+        {(() => {
+          const defaultCategories = [
+            { name: "Makeup", slug: "makeup" },
+            { name: "Skin", slug: "skin" },
+            { name: "Hair", slug: "hair" },
+            { name: "Personal Care", slug: "personal-care" },
+            { name: "Mom & Baby", slug: "mom-baby" },
+            { name: "Fragrance", slug: "fragrance" },
+            { name: "Undergarments", slug: "undergarments" },
+            { name: "Combo", slug: "combo" }
+          ];
+
+          const displayCats = defaultCategories.map(item => {
+            const fromDb = categories.find((c: any) => c.name?.toLowerCase().trim() === item.name.toLowerCase() || c.slug === item.slug);
+            return {
+              id: fromDb?.id || `cat-${item.slug}`,
+              name: fromDb?.name || item.name,
+              slug: fromDb?.slug || item.slug,
+              imageUrl: fromDb?.imageUrl || fromDb?.image || ""
+            };
+          });
+
+          return (
+            <section style={{ margin: "40px 0" }}>
+              <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "20px", color: "#000" }}>
+                SHOP BEAUTY PRODUCTS BY CATEGORY
+              </h2>
+              <div className="categories-grid">
+                {displayCats.map((cat: any) => {
+                  const catLink = `/shop?category=${encodeURIComponent(cat.slug)}`;
+                  const bannerInfo = getBannerForPage(`Category: ${cat.name}`, cat.imageUrl, cat.name, catLink);
+                  const catImg = bannerInfo.img || cat.imageUrl;
+                  return (
+                    <Link 
+                      key={cat.id || cat.name} 
+                      href={bannerInfo.link || catLink} 
+                      style={{ display: "block", borderRadius: "10px", overflow: "hidden", cursor: "pointer", textDecoration: "none" }} 
+                      className="promo-card-hover"
+                    >
+                      {catImg ? (
+                        <img 
+                          src={catImg} 
+                          alt={cat.name} 
+                          style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block", borderRadius: "10px" }} 
+                        />
+                      ) : (
+                        <div style={{
+                          aspectRatio: "1 / 1",
+                          backgroundColor: "#fdf2f8",
+                          border: "1.5px solid #fbcfe8",
+                          borderRadius: "10px",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          padding: "10px",
+                          boxShadow: "0 2px 6px rgba(0,0,0,0.03)"
+                        }}>
+                          <span style={{ fontSize: "26px", marginBottom: "4px" }}>✨</span>
+                          <span style={{ fontSize: "12px", fontWeight: "800", color: "#0f172a", textAlign: "center", lineHeight: "1.2" }}>{cat.name}</span>
+                        </div>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })()}
 
         {/* CLEARANCE SALE Section */}
         {(() => {

@@ -106,6 +106,22 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
   const [rating, setRating] = useState("5");
   const [comment, setComment] = useState("");
   const [reviewMessage, setReviewMessage] = useState("");
+  const [publicOffers, setPublicOffers] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchWithCache(`${API_BASE}/coupons/public`)
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setPublicOffers(data.map((c: any) => ({
+            id: c.id || c.code,
+            title: c.description || (c.code ? `Promo Code ${c.code}` : "Exclusive Offer"),
+            subtitle: c.minOrder ? `Min order ৳${c.minOrder}` : "Special discount",
+            code: c.code
+          })));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!productId) return;
@@ -541,8 +557,10 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
                 {product.name}
               </h1>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px" }}>
-                <span style={{ color: "var(--secondary)", fontWeight: "700" }}>★★★★★ 4.8</span>
-                <span style={{ color: "var(--gray-500)", fontSize: "13px", fontWeight: "600" }}>| {product.reviews?.length || 0} Approved Reviews</span>
+                <span style={{ color: "var(--secondary)", fontWeight: "700" }}>
+                  ★ {product.reviews && product.reviews.length > 0 ? (product.reviews.reduce((acc: number, r: any) => acc + r.rating, 0) / product.reviews.length).toFixed(1) : "5.0"}
+                </span>
+                <span style={{ color: "var(--gray-500)", fontSize: "13px", fontWeight: "600" }}>| {product.reviews?.length || 0} Customer Reviews</span>
               </div>
             </div>
 
@@ -853,22 +871,7 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
               onTouchEnd={() => setIsOffersPaused(false)}
               style={{ display: "flex", gap: "12px", overflowX: "auto", scrollSnapType: "x mandatory", paddingBottom: "4px", scrollbarWidth: "none" }}
             >
-              {(() => {
-                let offers = [
-                  { id: "off-1", title: "Free Shipping Offer", subtitle: "Free delivery over ৳699", code: "FREESHIP699" },
-                  { id: "off-2", title: "Welcome Customer Discount", subtitle: "Flat ৳150 BDT Off", code: "GLOW15" },
-                  { id: "off-3", title: "10% Marketing Coupon", subtitle: "Extra 10% Off on Cart", code: "GLOW10" }
-                ];
-                if (typeof window !== "undefined") {
-                  const saved = localStorage.getItem("glowgoodly_available_offers");
-                  if (saved) {
-                    try {
-                      const parsed = JSON.parse(saved);
-                      if (Array.isArray(parsed) && parsed.length > 0) offers = parsed;
-                    } catch (e) { }
-                  }
-                }
-                return offers.map((off) => (
+              {publicOffers.map((off) => (
                   <div
                     key={off.id}
                     style={{
@@ -900,8 +903,7 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
                       Code: <span style={{ backgroundColor: "#fff0f5", border: "1px solid #fbcfe8", padding: "1px 5px", borderRadius: "4px", textTransform: "uppercase" }}>{off.code}</span>
                     </div>
                   </div>
-                ));
-              })()}
+                ))}
             </div>
           </div>
         </div>

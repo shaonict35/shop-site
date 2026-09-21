@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import MobileNavbar from "../../components/MobileNavbar";
+import GlowLoader from "../../components/GlowLoader";
 
 function ThankYouContent() {
   const searchParams = useSearchParams();
@@ -121,9 +122,7 @@ export default function ThankYouPage() {
     <>
       <Header />
       <Suspense fallback={
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "70vh", fontSize: "16px", fontWeight: "700", color: "#e52860" }}>
-          Loading order details...
-        </div>
+        <GlowLoader fullScreen text="Finalizing Order Summary..." subtext="Accessing your verified luxury order receipt" />
       }>
         <ThankYouContent />
       </Suspense>

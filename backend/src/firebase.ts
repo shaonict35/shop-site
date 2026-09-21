@@ -234,6 +234,7 @@ class MockCollection {
         paymentStatus: o.paymentStatus,
         paymentMethod: o.paymentMethod,
         orderStatus: o.orderStatus,
+        status: o.orderStatus,
         notes: o.notes,
         trackingLink: o.trackingLink,
         salesmanId: o.salesmanId,
@@ -286,6 +287,26 @@ class MockCollection {
       } catch (err) {
         // Fallback to in-memory
       }
+    } else if (this.colName === "coupons") {
+      try {
+        const couponSetting = await prisma.setting.findUnique({ where: { key: "COUPONS_STORED_DATA" } });
+        if (couponSetting && couponSetting.value) {
+          const parsed = JSON.parse(couponSetting.value);
+          if (Array.isArray(parsed)) {
+            data = parsed;
+          }
+        }
+      } catch (err) {}
+    } else if (this.colName === "blogs") {
+      try {
+        const blogSetting = await prisma.setting.findUnique({ where: { key: "BLOGS_STORED_DATA" } });
+        if (blogSetting && blogSetting.value) {
+          const parsed = JSON.parse(blogSetting.value);
+          if (Array.isArray(parsed)) {
+            data = parsed;
+          }
+        }
+      } catch (err) {}
     }
     
     // Always merge inMemoryCollections to support dynamic memory items
@@ -519,6 +540,64 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
         status: data.status || "Active",
       }
     });
+  } else if (colName === "coupons") {
+    try {
+      const code = (data.code || id).toUpperCase();
+      await prisma.coupon.upsert({
+        where: { code },
+        update: {
+          discountType: data.discountType || "Fixed",
+          discountValue: Number(data.discount || data.discountValue || 0),
+          minOrderValue: Number(data.minOrder || data.minOrderValue || 0),
+          expiryDate: data.expiresAt ? new Date(data.expiresAt) : (data.expiryDate ? new Date(data.expiryDate) : new Date(Date.now() + 365 * 86400000)),
+          usageLimit: Number(data.usageLimit || 100),
+        },
+        create: {
+          id,
+          code,
+          discountType: data.discountType || "Fixed",
+          discountValue: Number(data.discount || data.discountValue || 0),
+          minOrderValue: Number(data.minOrder || data.minOrderValue || 0),
+          expiryDate: data.expiresAt ? new Date(data.expiresAt) : (data.expiryDate ? new Date(data.expiryDate) : new Date(Date.now() + 365 * 86400000)),
+          usageLimit: Number(data.usageLimit || 100),
+        }
+      });
+    } catch (e) {}
+
+    try {
+      let existingCoupons: any[] = [];
+      const couponSetting = await prisma.setting.findUnique({ where: { key: "COUPONS_STORED_DATA" } });
+      if (couponSetting && couponSetting.value) {
+        try { existingCoupons = JSON.parse(couponSetting.value); } catch {}
+      }
+      const code = (data.code || id).toUpperCase();
+      const idx = existingCoupons.findIndex(c => c.id === id || (c.code && c.code.toUpperCase() === code));
+      const couponItem = { id, ...data, code };
+      if (idx >= 0) existingCoupons[idx] = couponItem;
+      else existingCoupons.unshift(couponItem);
+      await prisma.setting.upsert({
+        where: { key: "COUPONS_STORED_DATA" },
+        update: { value: JSON.stringify(existingCoupons) },
+        create: { key: "COUPONS_STORED_DATA", value: JSON.stringify(existingCoupons) }
+      });
+    } catch (e) {}
+  } else if (colName === "blogs") {
+    try {
+      let existingBlogs: any[] = [];
+      const blogSetting = await prisma.setting.findUnique({ where: { key: "BLOGS_STORED_DATA" } });
+      if (blogSetting && blogSetting.value) {
+        try { existingBlogs = JSON.parse(blogSetting.value); } catch {}
+      }
+      const idx = existingBlogs.findIndex(b => b.id === id);
+      const blogItem = { id, ...data, updatedAt: new Date().toISOString() };
+      if (idx >= 0) existingBlogs[idx] = blogItem;
+      else existingBlogs.unshift(blogItem);
+      await prisma.setting.upsert({
+        where: { key: "BLOGS_STORED_DATA" },
+        update: { value: JSON.stringify(existingBlogs) },
+        create: { key: "BLOGS_STORED_DATA", value: JSON.stringify(existingBlogs) }
+      });
+    } catch (e) {}
   } else if (colName === "orders") {
     await prisma.order.upsert({
       where: { id },
@@ -721,6 +800,60 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
       }
       inMemoryCollections.get(colName)!.set(id, { id, ...data });
     }
+  } else if (colName === "coupons") {
+    try {
+      const stored = await prisma.setting.findUnique({ where: { key: "COUPONS_STORED_DATA" } });
+      let list: any[] = [];
+      if (stored && stored.value) {
+        try { list = JSON.parse(stored.value); } catch {}
+      }
+      const existingIdx = list.findIndex((c: any) => c.id === id || c.code === (data.code || id));
+      const couponRecord = { id, ...data };
+      if (existingIdx >= 0) {
+        list[existingIdx] = { ...list[existingIdx], ...couponRecord };
+      } else {
+        list.push(couponRecord);
+      }
+      await prisma.setting.upsert({
+        where: { key: "COUPONS_STORED_DATA" },
+        update: { value: JSON.stringify(list) },
+        create: { key: "COUPONS_STORED_DATA", value: JSON.stringify(list) }
+      });
+    } catch (e) {
+      console.warn("Prisma coupons setting note:", e);
+    } finally {
+      if (!inMemoryCollections.has(colName)) {
+        inMemoryCollections.set(colName, new Map());
+      }
+      inMemoryCollections.get(colName)!.set(id, { id, ...data });
+    }
+  } else if (colName === "blogs") {
+    try {
+      const stored = await prisma.setting.findUnique({ where: { key: "BLOGS_STORED_DATA" } });
+      let list: any[] = [];
+      if (stored && stored.value) {
+        try { list = JSON.parse(stored.value); } catch {}
+      }
+      const existingIdx = list.findIndex((b: any) => b.id === id);
+      const blogRecord = { id, ...data };
+      if (existingIdx >= 0) {
+        list[existingIdx] = { ...list[existingIdx], ...blogRecord };
+      } else {
+        list.push(blogRecord);
+      }
+      await prisma.setting.upsert({
+        where: { key: "BLOGS_STORED_DATA" },
+        update: { value: JSON.stringify(list) },
+        create: { key: "BLOGS_STORED_DATA", value: JSON.stringify(list) }
+      });
+    } catch (e) {
+      console.warn("Prisma blogs setting note:", e);
+    } finally {
+      if (!inMemoryCollections.has(colName)) {
+        inMemoryCollections.set(colName, new Map());
+      }
+      inMemoryCollections.get(colName)!.set(id, { id, ...data });
+    }
   } else {
     if (!inMemoryCollections.has(colName)) {
       inMemoryCollections.set(colName, new Map());
@@ -768,7 +901,23 @@ async function mockUpdatePrisma(colName: string, id: string, data: any) {
   } else if (colName === "users") {
     await prisma.user.update({ where: { id }, data: flatData });
   } else if (colName === "orders") {
-    await prisma.order.update({ where: { id }, data: flatData });
+    const allowedKeys = [
+      "orderNumber", "customerId", "customerName", "customerEmail",
+      "customerPhone", "address", "zone", "deliveryCharge", "subTotal",
+      "discount", "total", "paymentStatus", "paymentMethod", "orderStatus",
+      "notes", "trackingLink", "salesmanId", "updatedAt"
+    ];
+    const safeData: any = {};
+    for (const key of allowedKeys) {
+      if (flatData[key] !== undefined) safeData[key] = flatData[key];
+    }
+    if (flatData.status && !safeData.orderStatus) {
+      safeData.orderStatus = flatData.status;
+    }
+    if (safeData.updatedAt && typeof safeData.updatedAt === "string") {
+      safeData.updatedAt = new Date(safeData.updatedAt);
+    }
+    await prisma.order.update({ where: { id }, data: safeData });
   } else if (colName === "menu_items" || colName === "menus" || colName === "MenuItem") {
     try {
       await prisma.menuItem.update({
@@ -833,6 +982,29 @@ async function mockDeletePrisma(colName: string, id: string) {
       await prisma.menuItem.deleteMany({ where: { id } });
     } else if (colName === "cms_pages" || colName === "pages" || colName === "CmsPage") {
       await prisma.cmsPage.deleteMany({ where: { id } });
+    } else if (colName === "coupons") {
+      try {
+        await prisma.coupon.deleteMany({ where: { OR: [{ id }, { code: id }, { code: id.toUpperCase() }] } });
+      } catch (e) {}
+      const couponSetting = await prisma.setting.findUnique({ where: { key: "COUPONS_STORED_DATA" } });
+      if (couponSetting && couponSetting.value) {
+        const existingCoupons = JSON.parse(couponSetting.value).filter((c: any) => c.id !== id && c.code?.toUpperCase() !== id.toUpperCase());
+        await prisma.setting.upsert({
+          where: { key: "COUPONS_STORED_DATA" },
+          update: { value: JSON.stringify(existingCoupons) },
+          create: { key: "COUPONS_STORED_DATA", value: JSON.stringify(existingCoupons) }
+        });
+      }
+    } else if (colName === "blogs") {
+      const blogSetting = await prisma.setting.findUnique({ where: { key: "BLOGS_STORED_DATA" } });
+      if (blogSetting && blogSetting.value) {
+        const existingBlogs = JSON.parse(blogSetting.value).filter((b: any) => b.id !== id);
+        await prisma.setting.upsert({
+          where: { key: "BLOGS_STORED_DATA" },
+          update: { value: JSON.stringify(existingBlogs) },
+          create: { key: "BLOGS_STORED_DATA", value: JSON.stringify(existingBlogs) }
+        });
+      }
     }
   } catch (e) {
     console.warn(`Prisma delete fallback note for ${colName} (${id}):`, e);

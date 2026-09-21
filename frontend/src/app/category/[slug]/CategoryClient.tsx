@@ -30,118 +30,7 @@ interface Product {
   variants: Variant[];
 }
 
-const ALL_CATEGORIES = [
-  {
-    name: "Makeup",
-    slug: "makeup",
-    subs: [
-      "Face Primer", "Concealer", "Foundation", "Compact Powder", "Contour", "Loose Powder", "Blush", "BB & CC Cream", "Highlighter", "Makeup Remover",
-      "Kajal", "Eyeliner", "Mascara", "Eye Shadow", "Eyebrow Gel", "Eye Primer", "False Eyelashes",
-      "Lipstick", "Liquid Lipstick", "Lip Crayon", "Lip Gloss", "Lip Liner", "Lip Plumper", "Lip Balm", "Lip Stain",
-      "Nail Polish", "Nail Art", "Nail Polish Sets", "Nail Care", "Nail Polish Remover",
-      "Face Brush", "Blush Brush", "Brush Sets", "Eye Brush", "Eyelash Curler", "Makeup Pouch"
-    ]
-  },
-  {
-    name: "Skin",
-    slug: "skincare",
-    subs: [
-      "Face Wash", "Cleansing Oil", "Micellar Water", "Face Scrub", "Cleansing Balm",
-      "Day Cream", "Night Cream", "Face Gel", "Body Lotion", "Body Butter",
-      "Face Serum", "Sheet Mask", "Face Toner", "Sunscreen", "Acne Patch",
-      "Acne Treatment", "Anti Aging", "Dry Skin", "Brightening", "Pore Care"
-    ]
-  },
-  {
-    name: "Hair",
-    slug: "haircare",
-    subs: [
-      "Shampoo", "Dry Shampoo", "Clarifying Shampoo", "Co-wash",
-      "Conditioner", "Leave-In Conditioner", "Hair Mask", "Hair Cream",
-      "Coconut Oil", "Argan Oil", "Castor Oil", "Onion Hair Oil", "Herbal Oil",
-      "Hair Fall", "Dandruff", "Dry & Frizzy Hair", "Damaged Hair Recovery"
-    ]
-  },
-  {
-    name: "Personal Care",
-    slug: "personal-care",
-    subs: [
-      "Body Wash", "Shower Gel", "Soap Bar", "Body Scrub", "Bath Salts",
-      "Body Lotion", "Body Cream", "Body Oil", "Foot Care", "Hand Cream",
-      "Deodorants", "Body Spray", "Oral Care", "Feminine Hygiene", "Hand Sanitizer"
-    ]
-  },
-  {
-    name: "Mom & Baby",
-    slug: "mom-baby",
-    subs: [
-      "Baby Skin", "Baby Hair", "Baby Bath", "Mom Care",
-      "Baby Wash", "Baby Shampoo", "Baby Lotion", "Baby Oil", "Baby Powder",
-      "Baby Wipes", "Baby Diapers", "Nappy Cream", "Baby Detergent",
-      "Stretch Mark Cream", "Maternity Pads", "Nursing Care", "Mom Supplements"
-    ]
-  },
-  {
-    name: "Fragrance",
-    slug: "fragrance",
-    subs: [
-      "Women Fragrance", "Men Fragrance", "Unisex", "Body Mist",
-      "Eau De Parfum", "Eau De Toilette", "Gift Sets",
-      "Cologne", "Mens EDP", "Body Spray", "Aftershave",
-      "Floral notes", "Woody notes", "Citrus notes", "Spicy notes"
-    ]
-  },
-  {
-    name: "Undergarments",
-    slug: "undergarments",
-    subs: [
-      "Bra", "Panty", "Shapewear",
-      "T-Shirt Bra", "Sports Bra", "Lace Bra", "Strapless Bra", "Push Up Bra",
-      "Cotton Panty", "Hipster", "Bikini", "Seamless Panty", "Panty Packs",
-      "Tummy Shaper", "Thigh Shaper", "Body Shaper Briefs"
-    ]
-  },
-  {
-    name: "Combo",
-    slug: "combo",
-    subs: [
-      "Skin Combos", "Makeup Combos", "Hair Combos",
-      "Acne Clearance Combo", "Brightening Kit", "Anti-Aging Regimen",
-      "Everyday Makeup Kit", "Bridal Glow Combo", "Party Glam Kit",
-      "Hair Fall Defense Trio", "Dandruff Solution Combo", "Smooth & Shine Kit"
-    ]
-  },
-  {
-    name: "Jewellery",
-    slug: "jewellery",
-    subs: [
-      "Earrings", "Necklace", "Bracelet", "Ring",
-      "Jhumkas", "Studs", "Hoop Earrings", "Drop Earrings", "Ear Cuffs",
-      "Chokers", "Pendant Necklaces", "Pearl Necklaces", "Layered Chains",
-      "Bangles", "Charm Bracelets", "Adjustable Rings", "Finger Rings"
-    ]
-  },
-  {
-    name: "Clearance Sale",
-    slug: "clearance-sale",
-    subs: [
-      "Makeup Deals", "Skincare Deals", "Haircare Deals",
-      "Lipsticks under 499", "Palettes at 40% Off", "Face products deals",
-      "Serums Flat 30% Off", "Cleansers B1G1", "Sheet masks packs",
-      "Hair Oils Flat 20% Off", "Hair Masques Deals", "Shampoo Combs Packs"
-    ]
-  },
-  {
-    name: "Men",
-    slug: "men",
-    subs: [
-      "Grooming", "Hygiene", "Skincare",
-      "Mens Face Wash", "Shaving Gel & Foam", "Beard Oil & Cream", "Aftershave Balm",
-      "Anti Hair Fall Shampoo", "Anti Dandruff Shampoo", "Hair Styling Wax", "Hair Styling Gel",
-      "Mens Deodorants", "Mens Body Spray", "Mens Cologne", "Mens Body Wash"
-    ]
-  }
-];
+
 
 function CategoryPageContent() {
   const params = useParams();
@@ -215,6 +104,16 @@ function CategoryPageContent() {
     }
   }, [slug]);
 
+  const [dbCategories, setDbCategories] = useState<any[]>([]);
+
+  const categoryList = React.useMemo(() => {
+    return dbCategories.map((c: any) => ({
+      name: c.name,
+      slug: c.slug || c.name.toLowerCase().replace(/\s+/g, '-'),
+      subs: (c.subCategories || []).map((s: any) => s.name)
+    }));
+  }, [dbCategories]);
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -226,9 +125,14 @@ function CategoryPageContent() {
           else if (slug.toLowerCase() === "hair") catQuery = "Haircare";
           url += `categoryName=${encodeURIComponent(catQuery)}&`;
         }
-        const [res, brandRes] = await Promise.all([fetch(url), fetch(`${API_BASE}/brands`)]);
+        const [res, brandRes, catRes] = await Promise.all([
+          fetch(url),
+          fetch(`${API_BASE}/brands`),
+          fetch(`${API_BASE}/categories`)
+        ]);
         if (res.ok) { const data = await res.json(); setProducts(data); setVisibleProducts(data); }
         if (brandRes.ok) setBrands(await brandRes.json());
+        if (catRes.ok) setDbCategories(await catRes.json());
       } catch (e) {
         console.error("Error fetching category products", e);
       } finally {
@@ -248,17 +152,31 @@ function CategoryPageContent() {
       });
     }
     if (selectedBrands.length > 0) filtered = filtered.filter((p) => selectedBrands.includes(p.brand.name));
-    if (searchVal.trim()) filtered = filtered.filter((p) => p.name.toLowerCase().includes(searchVal.toLowerCase()) || p.brand.name.toLowerCase().includes(searchVal.toLowerCase()));
-    filtered = filtered.filter((p) => { const v = p.variants[0]; if (!v) return false; return (v.discountPrice || v.price) <= priceRange; });
-    if (sortVal === "price_asc") filtered.sort((a, b) => (a.variants[0]?.discountPrice || a.variants[0]?.price || 0) - (b.variants[0]?.discountPrice || b.variants[0]?.price || 0));
-    if (sortVal === "price_desc") filtered.sort((a, b) => (b.variants[0]?.discountPrice || b.variants[0]?.price || 0) - (a.variants[0]?.discountPrice || a.variants[0]?.price || 0));
+    filtered = filtered.filter((p) => { 
+      const v = p.variants && p.variants.length > 0 ? p.variants[0] : null; 
+      const effPrice = v ? (v.discountPrice || v.price || 0) : (p.discountPrice || p.price || 0);
+      return effPrice <= priceRange; 
+    });
+    if (sortVal === "price_asc") {
+      filtered.sort((a, b) => {
+        const pa = a.variants?.[0]?.discountPrice || a.variants?.[0]?.price || a.discountPrice || a.price || 0;
+        const pb = b.variants?.[0]?.discountPrice || b.variants?.[0]?.price || b.discountPrice || b.price || 0;
+        return pa - pb;
+      });
+    }
+    if (sortVal === "price_desc") {
+      filtered.sort((a, b) => {
+        const pa = a.variants?.[0]?.discountPrice || a.variants?.[0]?.price || a.discountPrice || a.price || 0;
+        const pb = b.variants?.[0]?.discountPrice || b.variants?.[0]?.price || b.discountPrice || b.price || 0;
+        return pb - pa;
+      });
+    }
     setVisibleProducts(filtered);
   }, [searchVal, priceRange, sortVal, products, activeSubcategory, selectedBrands]);
 
   const handleAddToCart = (product: Product) => {
-    const v = product.variants[0];
-    if (!v) return;
-    const img = product.images.find((i) => i.isPrimary)?.url || product.images[0]?.url || "";
+    const v = product.variants?.[0] || { id: `def-${product.id}`, name: "Default", price: product.price || 0, discountPrice: product.discountPrice || null, stock: 10 };
+    const img = product.images?.find((i) => i.isPrimary)?.url || product.images?.[0]?.url || product.imageUrl || "";
     addToCart({ id: v.id, productId: product.id, name: product.name, variantName: v.name, image: img, price: v.discountPrice || v.price, stock: v.stock });
   };
 
@@ -311,8 +229,8 @@ function CategoryPageContent() {
               <h3 style={{ fontSize: "12.5px", fontWeight: "900", color: "#0e1e38", textTransform: "uppercase", letterSpacing: "0.8px", borderBottom: "2px solid #f5f5f5", paddingBottom: "10px", margin: "0 0 12px 0" }}>
                 Product Categories
               </h3>
-              <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
-                {ALL_CATEGORIES.map((cat, idx) => {
+              <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                {categoryList.map((cat, idx) => {
                   const isCurrentCat = activeCatName.toLowerCase() === cat.name.toLowerCase() || slug === cat.slug;
                   const catCount = getCategoryCount(cat.name);
                   return (

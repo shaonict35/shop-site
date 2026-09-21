@@ -5,6 +5,7 @@ import Link from "next/link";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import MobileNavbar from "../../components/MobileNavbar";
+import GlowLoader from "../../components/GlowLoader";
 import { useApp } from "../../context/AppContext";
 import { API_BASE, getProductUrl } from "../../utils/api";
 
@@ -102,9 +103,7 @@ export default function WishlistPage() {
         </div>
 
         {loading ? (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "300px", fontSize: "16px", fontWeight: "800", color: "#e52860" }}>
-            Loading your favorites...
-          </div>
+          <GlowLoader text="Loading Your Wishlist..." subtext="Accessing your saved luxury favorites" />
         ) : products.length === 0 ? (
           <div style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #edf2f7", padding: "60px 20px", textAlign: "center", maxWidth: "550px", margin: "0 auto", boxShadow: "0 4px 15px rgba(0,0,0,0.02)" }}>
             <div style={{ backgroundColor: "#fff5f8", width: "80px", height: "80px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#e52860", margin: "0 auto 20px auto" }}>

@@ -2291,7 +2291,7 @@ button, input, select, textarea {
 .admin-nav-item:hover, .admin-nav-item.active {
   background-color: rgba(255,255,255,0.05);
   color: #fff;
-  border-left-color: #00c6ff;
+  border-left-color: #e2136e;
 }
 
 .admin-nav-item svg {

@@ -6,6 +6,7 @@ import Header from "../../components/Header";
 import PromoBanner from "../../components/PromoBanner";
 import Footer from "../../components/Footer";
 import MobileNavbar from "../../components/MobileNavbar";
+import GlowLoader from "../../components/GlowLoader";
 import { fetchWithCache, API_BASE, generateSlug, subscribeToDataSync } from "../../utils/api";
 
 interface Brand {
@@ -148,9 +149,7 @@ export default function BrandsPage() {
         </div>
 
         {loading ? (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "300px", fontSize: "16px", fontWeight: "700", color: "#e52860" }}>
-            Loading cosmetic brands...
-          </div>
+          <GlowLoader text="Loading Cosmetic Brands..." subtext="Direct Authorized Global Brand Partnerships" />
         ) : filteredBrands.length === 0 ? (
           <div style={{ textAlign: "center", padding: "60px 0", color: "#718096", fontSize: "15px", fontWeight: "700" }}>
             No brands found matching your search.

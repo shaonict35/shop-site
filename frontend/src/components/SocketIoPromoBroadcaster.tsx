@@ -95,12 +95,17 @@ export default function SocketIoPromoBroadcaster({ token }: { token: string | nu
     setLoading(true);
     setStatusMsg("");
 
+    const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("gg_token") || localStorage.getItem("glowgoodly_token") || "") : "");
+    const authHeaders: Record<string, string> = (activeToken && activeToken !== "null" && activeToken !== "undefined")
+      ? { Authorization: `Bearer ${activeToken}` }
+      : {};
+
     try {
       const res = await fetch(`${API_BASE}/admin/broadcast-promo`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
+          ...authHeaders
         },
         body: JSON.stringify({
           title,
@@ -134,12 +139,17 @@ export default function SocketIoPromoBroadcaster({ token }: { token: string | nu
     setLoading(true);
     setStatusMsg(`Sending broadcast for "${item.title}"...`);
 
+    const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("gg_token") || localStorage.getItem("glowgoodly_token") || "") : "");
+    const authHeaders: Record<string, string> = (activeToken && activeToken !== "null" && activeToken !== "undefined")
+      ? { Authorization: `Bearer ${activeToken}` }
+      : {};
+
     try {
       const res = await fetch(`${API_BASE}/admin/broadcast-promo`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
+          ...authHeaders
         },
         body: JSON.stringify(item)
       });

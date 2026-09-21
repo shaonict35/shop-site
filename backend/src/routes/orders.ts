@@ -95,9 +95,9 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
         subTotal += itemTotal;
 
         resolvedItems.push({
-          variantId: item.id || item.variantId || `landing-${Date.now()}`,
-          productName: item.title || item.productTitle || item.name || "Landing Page Offer Set",
-          variantName: "Standard Bundle",
+          variantId: item.id || item.variantId || `item-${Date.now()}`,
+          productName: item.productName || item.name || item.title || item.productTitle || "Product Item",
+          variantName: item.variantName || "Standard",
           quantity: validQty,
           price: itemPrice,
           total: itemTotal,
@@ -296,7 +296,7 @@ router.put("/:id/status", authenticateJWT as any, requireRole(["SuperAdmin", "Ma
     const order = doc.data() as any;
 
     // Prepare updates
-    const updates: any = { orderStatus: status, updatedAt: new Date().toISOString() };
+    const updates: any = { status, orderStatus: status, updatedAt: new Date().toISOString() };
     if (notes) updates.notes = notes;
 
     // Simulate Courier integration when moving to "Shipped"

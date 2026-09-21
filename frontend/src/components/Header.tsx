@@ -92,6 +92,7 @@ export default function Header() {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPlaceholder, setCurrentPlaceholder] = useState("");
   const [dbProducts, setDbProducts] = useState<any[]>([]);
+  const [dbCategories, setDbCategories] = useState<any[]>([]);
   const [dbBrands, setDbBrands] = useState<any[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
@@ -103,6 +104,13 @@ export default function Header() {
         setDbBrands(data);
       }
     }).catch(() => {});
+
+    fetchWithCache(`${API_BASE}/categories`).then((data) => {
+      if (mounted && Array.isArray(data)) {
+        setDbCategories(data);
+      }
+    }).catch(() => {});
+
     return () => { mounted = false; };
   }, []);
 
@@ -265,81 +273,37 @@ export default function Header() {
             <div className="mobile-drawer-body">
               <div className="mobile-menu-section-title">ALL CATEGORIES</div>
 
-              {/* 1. Makeup */}
-              <div className="mobile-menu-item">
-                <div className="mobile-menu-row" onClick={() => setExpandedCategory(expandedCategory === 'makeup' ? null : 'makeup')}>
-                  <span>💄 Makeup</span>
-                  <span>{expandedCategory === 'makeup' ? '▲' : '▼'}</span>
-                </div>
-                {expandedCategory === 'makeup' && (
-                  <div className="mobile-sub-menu">
-                    <Link href="/shop?category=makeup" onClick={() => setMobileMenuOpen(false)}>All Makeup</Link>
-                    <Link href="/shop?category=makeup&sub=Face+Primer" onClick={() => setMobileMenuOpen(false)}>Face Primer</Link>
-                    <Link href="/shop?category=makeup&sub=Foundation" onClick={() => setMobileMenuOpen(false)}>Foundation</Link>
-                    <Link href="/shop?category=makeup&sub=Lipstick" onClick={() => setMobileMenuOpen(false)}>Lipstick</Link>
-                    <Link href="/shop?category=makeup&sub=Kajal" onClick={() => setMobileMenuOpen(false)}>Kajal & Eyeliner</Link>
-                    <Link href="/shop?category=makeup&sub=BB+%26+CC+Cream" onClick={() => setMobileMenuOpen(false)}>BB & CC Cream</Link>
-                  </div>
-                )}
-              </div>
-
-              {/* 2. Skin */}
-              <div className="mobile-menu-item">
-                <div className="mobile-menu-row" onClick={() => setExpandedCategory(expandedCategory === 'skin' ? null : 'skin')}>
-                  <span>✨ Skin Care</span>
-                  <span>{expandedCategory === 'skin' ? '▲' : '▼'}</span>
-                </div>
-                {expandedCategory === 'skin' && (
-                  <div className="mobile-sub-menu">
-                    <Link href="/shop?category=skincare" onClick={() => setMobileMenuOpen(false)}>All Skincare</Link>
-                    <Link href="/shop?category=skincare&sub=Face+Wash" onClick={() => setMobileMenuOpen(false)}>Face Wash</Link>
-                    <Link href="/shop?category=skincare&sub=Face+Serum" onClick={() => setMobileMenuOpen(false)}>Serums</Link>
-                    <Link href="/shop?category=skincare&sub=Sunscreen" onClick={() => setMobileMenuOpen(false)}>Sunscreen</Link>
-                    <Link href="/shop?category=skincare&sub=Day+Cream" onClick={() => setMobileMenuOpen(false)}>Moisturizers</Link>
-                  </div>
-                )}
-              </div>
-
-              {/* 3. Hair */}
-              <div className="mobile-menu-item">
-                <div className="mobile-menu-row" onClick={() => setExpandedCategory(expandedCategory === 'hair' ? null : 'hair')}>
-                  <span>💇‍♀️ Hair Care</span>
-                  <span>{expandedCategory === 'hair' ? '▲' : '▼'}</span>
-                </div>
-                {expandedCategory === 'hair' && (
-                  <div className="mobile-sub-menu">
-                    <Link href="/shop?category=haircare" onClick={() => setMobileMenuOpen(false)}>All Haircare</Link>
-                    <Link href="/shop?category=haircare&sub=Shampoo" onClick={() => setMobileMenuOpen(false)}>Shampoo</Link>
-                    <Link href="/shop?category=haircare&sub=Conditioner" onClick={() => setMobileMenuOpen(false)}>Conditioner</Link>
-                    <Link href="/shop?category=haircare&sub=Hair+Fall" onClick={() => setMobileMenuOpen(false)}>Anti Hair Fall</Link>
-                  </div>
-                )}
-              </div>
-
-              {/* 4. Personal Care */}
-              <Link href="/shop?category=personal-care" className="mobile-menu-row-single" onClick={() => setMobileMenuOpen(false)}>
-                <span>🧼 Personal Care</span>
-              </Link>
-
-              {/* 5. Mom & Baby */}
-              <Link href="/shop?category=mom-baby" className="mobile-menu-row-single" onClick={() => setMobileMenuOpen(false)}>
-                <span>🍼 Mom & Baby</span>
-              </Link>
-
-              {/* 6. Fragrance */}
-              <Link href="/shop?category=fragrance" className="mobile-menu-row-single" onClick={() => setMobileMenuOpen(false)}>
-                <span>🌸 Fragrance</span>
-              </Link>
-
-              {/* 7. Men */}
-              <Link href="/shop?category=men" className="mobile-menu-row-single" onClick={() => setMobileMenuOpen(false)}>
-                <span>🧔 Men's Grooming</span>
-              </Link>
-
-              {/* 8. Combos & Offers */}
-              <Link href="/shop?category=combo" className="mobile-menu-row-single" onClick={() => setMobileMenuOpen(false)}>
-                <span>🎁 Combos & Offers</span>
-              </Link>
+              {/* Dynamic Categories from Database */}
+              {dbCategories.map((cat: any) => {
+                const catSlug = cat.slug || cat.name.toLowerCase().replace(/\s+/g, '-');
+                const subs = cat.subCategories || [];
+                if (subs.length > 0) {
+                  const isExp = expandedCategory === cat.id;
+                  return (
+                    <div className="mobile-menu-item" key={cat.id}>
+                      <div className="mobile-menu-row" onClick={() => setExpandedCategory(isExp ? null : cat.id)}>
+                        <span>{cat.name}</span>
+                        <span>{isExp ? '▲' : '▼'}</span>
+                      </div>
+                      {isExp && (
+                        <div className="mobile-sub-menu">
+                          <Link href={`/shop?category=${encodeURIComponent(catSlug)}`} onClick={() => setMobileMenuOpen(false)}>All {cat.name}</Link>
+                          {subs.map((sub: any) => (
+                            <Link key={sub.id || sub.name} href={`/shop?category=${encodeURIComponent(catSlug)}&sub=${encodeURIComponent(sub.name)}`} onClick={() => setMobileMenuOpen(false)}>
+                              {sub.name}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+                return (
+                  <Link key={cat.id} href={`/shop?category=${encodeURIComponent(catSlug)}`} className="mobile-menu-row-single" onClick={() => setMobileMenuOpen(false)}>
+                    <span>{cat.name}</span>
+                  </Link>
+                );
+              })}
 
               {/* 9. Brands */}
               <Link href="/brands" className="mobile-menu-row-single" onClick={() => setMobileMenuOpen(false)}>
@@ -636,178 +600,49 @@ export default function Header() {
         <div className="category-navbar-shajgoj">
           <div className="container">
             <nav className="category-links-shajgoj" style={{ display: "flex", gap: "4px", alignItems: "center", justifyContent: "space-between", whiteSpace: "nowrap", flexWrap: "wrap", width: "100%", overflowX: "visible" }}>
+              {/* Dynamic Megamenu Categories from Database */}
+              {dbCategories.map((cat: any, idx: number) => {
+                const catSlug = cat.slug || cat.name.toLowerCase().replace(/\s+/g, '-');
+                const subs = cat.subCategories || [];
+                
+                const columns: { title: string; items: string[] }[] = [];
+                if (subs.length > 0) {
+                  const chunkSize = 6;
+                  for (let i = 0; i < subs.length; i += chunkSize) {
+                    const chunk = subs.slice(i, i + chunkSize);
+                    columns.push({
+                      title: i === 0 ? "POPULAR" : `MORE ${cat.name.toUpperCase()}`,
+                      items: chunk.map((s: any) => s.name)
+                    });
+                  }
+                } else {
+                  columns.push({
+                    title: cat.name.toUpperCase(),
+                    items: [cat.name]
+                  });
+                }
 
+                const arches = [cat.popupImage1, cat.popupImage2].filter(Boolean);
+                
+                let pillClass = "";
+                const lower = cat.name.toLowerCase();
+                if (lower.includes("combo")) pillClass = "pill-tab pill-pink";
+                else if (lower.includes("bogo")) pillClass = "pill-tab pill-purple";
+                else if (lower.includes("clearance")) pillClass = "pill-tab pill-teal";
+                else if (lower.includes("men")) pillClass = "pill-tab pill-green";
+                else if (lower.includes("undergarment")) pillClass = "pill-tab pill-blue";
 
-              {/* 1. Makeup */}
-              <CategoryMenuItem 
-                title="Makeup" 
-                href="/shop?category=makeup" 
-                columns={[
-                  { title: "FACE", items: ["Face Primer", "Concealer", "Foundation", "Compact Powder", "Contour", "Loose Powder", "Blush", "BB & CC Cream", "Highlighter", "Makeup Remover"] },
-                  { title: "EYES", items: ["Kajal", "Eyeliner", "Mascara", "Eye Shadow", "Eyebrow Gel", "Eye Primer", "False Eyelashes"] },
-                  { title: "LIPS", items: ["Lipstick", "Liquid Lipstick", "Lip Crayon", "Lip Gloss", "Lip Liner", "Lip Plumper", "Lip Balm", "Lip Stain"] },
-                  { title: "NAILS", items: ["Nail Polish", "Nail Art", "Nail Polish Sets", "Nail Care", "Nail Polish Remover"] },
-                  { title: "TOOLS", items: ["Face Brush", "Blush Brush", "Brush Sets", "Eye Brush", "Eyelash Curler", "Makeup Pouch"] }
-                ]} 
-                arches={[
-                  "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&auto=format&fit=crop&q=80",
-                  "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=400&auto=format&fit=crop&q=80"
-                ]}
-              />
-
-              {/* 2. Skin */}
-              <CategoryMenuItem 
-                title="Skin" 
-                href="/shop?category=skincare" 
-                columns={[
-                  { title: "CLEANSERS", items: ["Face Wash", "Cleansing Oil", "Micellar Water", "Face Scrub", "Cleansing Balm"] },
-                  { title: "MOISTURIZERS", items: ["Day Cream", "Night Cream", "Face Gel", "Body Lotion", "Body Butter"] },
-                  { title: "TREATMENTS", items: ["Face Serum", "Sheet Mask", "Face Toner", "Sunscreen", "Acne Patch"] },
-                  { title: "CONCERNS", items: ["Acne Treatment", "Anti Aging", "Dry Skin", "Brightening", "Pore Care"] }
-                ]} 
-                arches={[
-                  "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400&auto=format&fit=crop&q=80",
-                  "https://images.unsplash.com/photo-1608248597279-f99d160bfbc5?w=400&auto=format&fit=crop&q=80"
-                ]}
-              />
-
-              {/* 3. Hair */}
-              <CategoryMenuItem 
-                title="Hair" 
-                href="/shop?category=haircare" 
-                columns={[
-                  { title: "CLEANSERS", items: ["Shampoo", "Dry Shampoo", "Clarifying Shampoo", "Co-wash"] },
-                  { title: "CONDITIONERS", items: ["Conditioner", "Leave-In Conditioner", "Hair Mask", "Hair Cream"] },
-                  { title: "HAIR OILS", items: ["Coconut Oil", "Argan Oil", "Castor Oil", "Onion Hair Oil", "Herbal Oil"] },
-                  { title: "CONCERNS", items: ["Hair Fall", "Dandruff", "Dry & Frizzy Hair", "Damaged Hair Recovery"] }
-                ]} 
-                arches={[
-                  "https://images.unsplash.com/photo-1562322140-8baeececf3df?w=400&auto=format&fit=crop&q=80",
-                  "https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?w=400&auto=format&fit=crop&q=80"
-                ]}
-              />
-
-              {/* 4. Personal care */}
-              <CategoryMenuItem 
-                title="Personal care" 
-                href="/shop?category=personal-care" 
-                columns={[
-                  { title: "BATH & SHOWER", items: ["Body Wash", "Shower Gel", "Soap Bar", "Body Scrub", "Bath Salts"] },
-                  { title: "BODY CARE", items: ["Body Lotion", "Body Cream", "Body Oil", "Foot Care", "Hand Cream"] },
-                  { title: "HYGIENE", items: ["Deodorants", "Body Spray", "Oral Care", "Feminine Hygiene", "Hand Sanitizer"] }
-                ]} 
-                arches={[
-                  "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400&auto=format&fit=crop&q=80",
-                  "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&auto=format&fit=crop&q=80"
-                ]}
-              />
-
-              {/* 5. Mom & Baby */}
-              <CategoryMenuItem 
-                title="Mom & Baby" 
-                href="/shop?category=mom-baby" 
-                columns={[
-                  { title: "BABY CARE", items: ["Baby Wash", "Baby Shampoo", "Baby Lotion", "Baby Oil", "Baby Powder"] },
-                  { title: "DIAPERING", items: ["Baby Wipes", "Baby Diapers", "Nappy Cream", "Baby Detergent"] },
-                  { title: "MOM CARE", items: ["Stretch Mark Cream", "Maternity Pads", "Nursing Care", "Mom Supplements"] }
-                ]} 
-                arches={[
-                  "https://images.unsplash.com/photo-1546015720-b8b30df5aa27?w=400&auto=format&fit=crop&q=80",
-                  "https://images.unsplash.com/photo-1519689680058-324335c77eba?w=400&auto=format&fit=crop&q=80"
-                ]}
-              />
-
-              {/* 6. Fragrance */}
-              <CategoryMenuItem 
-                title="Fragrance" 
-                href="/shop?category=fragrance" 
-                columns={[
-                  { title: "WOMEN FRAGRANCE", items: ["Eau De Parfum", "Eau De Toilette", "Body Mist", "Gift Sets"] },
-                  { title: "MEN FRAGRANCE", items: ["Cologne", "Mens EDP", "Body Spray", "Aftershave"] },
-                  { title: "FRAGRANCE NOTE", items: ["Floral notes", "Woody notes", "Citrus notes", "Spicy notes"] }
-                ]} 
-                arches={[
-                  "https://images.unsplash.com/photo-1547887537-6158d64c35b3?w=400&auto=format&fit=crop&q=80",
-                  "https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=400&auto=format&fit=crop&q=80"
-                ]}
-              />
-
-              {/* 7. Undergarments */}
-              <CategoryMenuItem 
-                title="Undergarments" 
-                href="/shop?category=undergarments" 
-                className="pill-tab pill-blue"
-                columns={[
-                  { title: "BRAS", items: ["T-Shirt Bra", "Sports Bra", "Lace Bra", "Strapless Bra", "Push Up Bra"] },
-                  { title: "PANTIES", items: ["Cotton Panty", "Hipster", "Bikini", "Seamless Panty", "Panty Packs"] },
-                  { title: "SHAPEWEAR", items: ["Tummy Shaper", "Thigh Shaper", "Body Shaper Briefs"] }
-                ]} 
-                arches={[
-                  "https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?w=400&auto=format&fit=crop&q=80"
-                ]}
-              />
-
-              {/* 8. Combo */}
-              <CategoryMenuItem 
-                title="Combo" 
-                href="/shop?category=combo" 
-                className="pill-tab pill-pink"
-                columns={[
-                  { title: "SKIN COMBOS", items: ["Acne Clearance Combo", "Brightening Kit", "Anti-Aging Regimen"] },
-                  { title: "MAKEUP COMBOS", items: ["Everyday Makeup Kit", "Bridal Glow Combo", "Party Glam Kit"] },
-                  { title: "HAIR COMBOS", items: ["Hair Fall Defense Trio", "Dandruff Solution Combo", "Smooth & Shine Kit"] }
-                ]} 
-                arches={[
-                  "https://images.unsplash.com/photo-1617897903246-719242758050?w=400&auto=format&fit=crop&q=80",
-                  "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&auto=format&fit=crop&q=80"
-                ]}
-              />
-
-                  {/* 9. BOGO */}
-                  <CategoryMenuItem 
-                    title="BOGO" 
-                    href="/shop?category=bogo" 
-                    className="pill-tab pill-purple"
-                    columns={[
-                      { title: "BOGO CAMPAIGNS", items: ["Buy 1 Get 1 Free", "BOGO Makeup", "BOGO Skincare", "BOGO Haircare", "BOGO Combos"] }
-                    ]} 
-                    arches={[
-                      "https://images.unsplash.com/photo-1607083206869-4c7672e72a8a?w=400&auto=format&fit=crop&q=80",
-                      "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=400&auto=format&fit=crop&q=80"
-                    ]}
+                return (
+                  <CategoryMenuItem
+                    key={cat.id || idx}
+                    title={cat.name}
+                    href={`/shop?category=${encodeURIComponent(catSlug)}`}
+                    className={pillClass}
+                    columns={columns}
+                    arches={arches}
                   />
-
-                  {/* 10. Clearance Sale */}
-                  <CategoryMenuItem 
-                    title="Clearance Sale" 
-                    href="/shop?category=clearance-sale" 
-                    className="pill-tab pill-teal"
-                    columns={[
-                      { title: "MAKEUP DEALS", items: ["Lipsticks under 499", "Palettes at 40% Off", "Face products deals"] },
-                      { title: "SKINCORE DEALS", items: ["Serums Flat 30% Off", "Cleansers B1G1", "Sheet masks packs"] },
-                      { title: "HAIRCARE DEALS", items: ["Hair Oils Flat 20% Off", "Hair Masques Deals", "Shampoo Combs Packs"] }
-                    ]} 
-                    arches={[
-                      "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=400&auto=format&fit=crop&q=80",
-                      "https://images.unsplash.com/photo-1607083206869-4c7672e72a8a?w=400&auto=format&fit=crop&q=80"
-                    ]}
-                  />
-
-                  {/* 11. Men */}
-                  <CategoryMenuItem 
-                    title="Men" 
-                    href="/shop?category=men" 
-                    className="pill-tab pill-green"
-                    columns={[
-                      { title: "GROOMING", items: ["Mens Face Wash", "Shaving Gel & Foam", "Beard Oil & Cream", "Aftershave Balm"] },
-                      { title: "HAIRCARE", items: ["Anti Hair Fall Shampoo", "Anti Dandruff Shampoo", "Hair Styling Wax", "Hair Styling Gel"] },
-                      { title: "HYGIENE", items: ["Mens Deodorants", "Mens Body Spray", "Mens Cologne", "Mens Body Wash"] }
-                    ]} 
-                    arches={[
-                      "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&auto=format&fit=crop&q=80",
-                      "https://images.unsplash.com/photo-1618077360395-f3068be8e001?w=400&auto=format&fit=crop&q=80"
-                    ]}
-                  />
+                );
+              })}
             </nav>
 
 

@@ -5,6 +5,7 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import MobileNavbar from "../../components/MobileNavbar";
 import Link from "next/link";
+import { API_BASE } from "../../utils/api";
 
 export default function BlogMagazinePage() {
   const [activeCategory, setActiveCategory] = useState("ALL");
@@ -12,92 +13,39 @@ export default function BlogMagazinePage() {
   const [emailInput, setEmailInput] = useState("");
   const [selectedArticle, setSelectedArticle] = useState<any | null>(null);
 
-  const categories = ["ALL", "SKINCARE", "MAKEUP", "HAIRCARE", "WELLNESS", "TIPS & TRICKS"];
+  const [allBlogs, setAllBlogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const featuredArticle = {
-    id: "f-1",
-    title: "গরমের দিনে ত্বকের যত্ন ও সঠিক সানস্ক্রিন নির্বাচন করার ১০০% কার্যকরী উপায়",
-    excerpt: "তীব্র রোদে ত্বকের পোড়া ভাব দূর করতে এবং হাইপারপিগমেন্টেশন প্রতিরোধে কীভাবে সঠিক SPF ও PA+++ বেছে নেবেন? ডার্মাটোলজিস্ট অনুমোদিত সেরা সানস্ক্রিন গাইডলাইন বিস্তারিত জেনে নিন।",
-    category: "SKINCARE",
-    date: "22 Aug 2026",
-    author: "GlowGoodly Beauty Team",
-    image: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=1200&auto=format&fit=crop&q=80",
-    readTime: "5 min read",
-    content: "সূর্যের ক্ষতিকর আল্ট্রাভায়োলেট (UVA এবং UVB) রশ্মি ত্বকের দ্রুত বুড়িয়ে যাওয়া এবং মেছতার প্রধান কারণ। বাংলাদেশে গরমের আর্দ্র আবহাওয়ায় জেল-বেসড অথবা ওয়াটারপ্রুফ সানস্ক্রিন ব্যবহার করা অত্যন্ত ফলপ্রসূ। প্রতিদিন বের হওয়ার ২০ মিনিট আগে অন্তত দুই আঙুল পরিমাণ সানস্ক্রিন মুখে ও গলায় ব্যবহার করুন।"
-  };
+  React.useEffect(() => {
+    let mounted = true;
+    fetch(`${API_BASE}/blogs`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (mounted && Array.isArray(data)) {
+          setAllBlogs(data);
+        }
+      })
+      .catch((err) => console.error("Error loading blogs", err))
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => { mounted = false; };
+  }, []);
 
-  const articles = [
-    {
-      id: "1",
-      title: "কেন ডাবল ক্লিনজিং আপনার ত্বকের ব্রন দূর করার গোপন চাবিকাঠি?",
-      excerpt: "মেকআপ এবং সারাদিনের জমানো তেল-ময়লা দূর করতে অয়েল ক্লিনজার ও ফোমিং ওয়াশ ব্যবহারের সঠিক নিয়ম...",
-      category: "SKINCARE",
-      date: "20 Aug 2026",
-      readTime: "4 min read",
-      image: "https://images.unsplash.com/photo-1616683693504-3ea7e9ad6fec?w=600&auto=format&fit=crop&q=80",
-      author: "Shahnaz Begum",
-      content: "ডাবল ক্লিনজিং শুরু হয় একটি ওয়েল-বেসড ক্লিনজার দিয়ে, যা সানস্ক্রিন ও ওয়াটারপ্রুফ মেকআপ গলিয়ে ফেলে। এরপর জেন্টল ওয়াটার-বেসড ফোম ক্লিনজার দিয়ে ত্বক গভীর থেকে পরিষ্কার করে পোরস মুক্ত রাখা হয়।"
-    },
-    {
-      id: "2",
-      title: "বাংলাদেশি ট্রেন্ডি মেকআপ লুক: নো-মেকআপ লুক তৈরির সহজ ধাপ",
-      excerpt: "ন্যাচারাল গ্লো এবং হালকা কাভারেজ দিয়ে কীভাবে সারাদিন ঘামহীন ফ্রেশ থাকবেন তার প্রফেশনাল টেকনিক...",
-      category: "MAKEUP",
-      date: "18 Aug 2026",
-      readTime: "3 min read",
-      image: "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=600&auto=format&fit=crop&q=80",
-      author: "Tania Afroze",
-      content: "নো-মেকআপ লুকের মূল শর্ত হলো সঠিক স্কিন প্রেপ। হালকা ময়েশ্চারাইজার ও হাইড্রেটিং প্রাইমার লাগিয়ে শুধুমাত্র স্পট কনসিলিং করুন। শেষে ক্রিম ব্লাশ ও টিন্টেড লিপবাম ব্যবহার করলে সবচেয়ে ফ্রেশ দেখাবে।"
-    },
-    {
-      id: "3",
-      title: "বর্ষাকালে চুলের শুষ্কতা ও চুল পড়া বন্ধ করার সেরা কেরাডিন ট্রিটমেন্ট",
-      excerpt: "অতিরিক্ত আর্দ্রতায় চুলের জট ও স্প্লিট এন্ডস থেকে রক্ষা পাওয়ার সহজ ঘরোয়া ও সেলুন টিপস...",
-      category: "HAIRCARE",
-      date: "15 Aug 2026",
-      readTime: "5 min read",
-      image: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=600&auto=format&fit=crop&q=80",
-      author: "Dr. Farhana",
-      content: "বর্ষাকালে মাথার ত্বকে ছত্রাকের আক্রমণ ও অতিরিক্ত আর্দ্রতায় চুলের গোড়া দুর্বল হয়। অ্যান্টি-ড্যানড্রাফ শ্যাম্পুর সাথে সপ্তাহে একদিন কেরাডিন মাস্ক ব্যবহার করলে চুলের উজ্জ্বলতা ও শক্তি বৃদ্ধি পায়।"
-    },
-    {
-      id: "4",
-      title: "লিপস্টিক দীর্ঘস্থায়ী করার ৫টি দুর্দান্ত হ্যাকস যা জানা জরুরি",
-      excerpt: "খাবার বা পানি খাওয়ার পরেও ঠোঁটের মেকআপ অক্ষত রাখার আসল সিক্রেট কৌশলসমূহ দেখে নিন...",
-      category: "MAKEUP",
-      date: "12 Aug 2026",
-      readTime: "3 min read",
-      image: "https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=600&auto=format&fit=crop&q=80",
-      author: "GlowGoodly Style Desk",
-      content: "লিপস্টিক লাগানোর আগে ঠোঁটে স্ক্রাব করে হালকা পাউডার ডাস্ট করে নিন। এরপর লিপ লাইনার দিয়ে পুরো ঠোঁট ফিল করে লিপস্টিক অ্যাপ্লাই করুন। একটি টিস্যু পেপারের উপর দিয়ে ট্রান্সলুসেন্ট পাউডার লাগালে লিপস্টিক ট্রান্সফার-প্রুফ হবে।"
-    },
-    {
-      id: "5",
-      title: "ভিটামিন সি সিরাম ব্যবহারের সঠিক সময় ও সেরা পদ্ধতি",
-      excerpt: "ত্বক উজ্জ্বল করতে এবং হাইপারপিগমেন্টেশন দূর করতে ভিটামিন সি কখন ও কীভাবে লাগাবেন...",
-      category: "SKINCARE",
-      date: "10 Aug 2026",
-      readTime: "4 min read",
-      image: "https://images.unsplash.com/photo-1608248597279-f99d160bfbc5?w=600&auto=format&fit=crop&q=80",
-      author: "Beauty Editorial",
-      content: "ভিটামিন সি সকালে সানস্ক্রিনের নিচে ব্যবহার করলে সূর্যের আলোর বিরুদ্ধে দ্বিগুণ সুরক্ষা দেয়। এটি ডার্ক স্পট হালকা করতে এবং কোলাজেন উৎপাদনে সহায়তা করে।"
-    },
-    {
-      id: "6",
-      title: "নাইট টাইম স্কিনকেয়ার রুটিন: ঘুমানোর আগে কেন নাইট ক্রিম জরুরি?",
-      excerpt: "রাতে ত্বক পুনর্গঠন প্রক্রিয়ায় সহায়তা করতে রেটিনল ও সিরামাইডের কার্যকারিতা...",
-      category: "TIPS & TRICKS",
-      date: "08 Aug 2026",
-      readTime: "5 min read",
-      image: "https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=600&auto=format&fit=crop&q=80",
-      author: "GlowGoodly Team",
-      content: "ঘুমানোর সময় ত্বকের সেলুলার রিপেয়ার সবচেয়ে দ্রুত গতিতে ঘটে। একটি ভালো সিরামাইড বা পেপটাইড সমৃদ্ধ ময়েশ্চারাইজার ত্বকের ব্যারিয়ার সুরক্ষিত রাখে এবং সকালে ত্বককে প্লাম্প ও গ্লোয়িং করে তোলে।"
-    }
-  ];
+  const featuredArticle = allBlogs.find((b) => b.isFeatured) || allBlogs[0] || null;
+  const articles = featuredArticle ? allBlogs.filter((b) => b.id !== featuredArticle.id) : allBlogs;
+
+  const categories = React.useMemo(() => {
+    const cats = new Set<string>(["ALL"]);
+    allBlogs.forEach((b) => {
+      if (b.category) cats.add(b.category.toUpperCase());
+    });
+    return Array.from(cats);
+  }, [allBlogs]);
 
   const filtered = activeCategory === "ALL" 
     ? articles 
-    : articles.filter(a => a.category === activeCategory);
+    : articles.filter(a => (a.category || "").toUpperCase() === activeCategory);
 
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
@@ -200,6 +148,7 @@ export default function BlogMagazinePage() {
       <main className="container" style={{ maxWidth: "1200px", margin: "35px auto 70px auto", padding: "0 16px" }}>
         
         {/* Top Hero Featured Article with Interactive Hover */}
+        {featuredArticle && (
         <div
           className="glow-card-interactive"
           style={{
@@ -291,6 +240,13 @@ export default function BlogMagazinePage() {
             </div>
           </div>
         </div>
+        )}
+
+        {loading && (
+          <div style={{ textAlign: "center", padding: "40px 0" }}>
+            <p style={{ fontSize: "14px", fontWeight: "700", color: "#64748b" }}>Loading articles from database...</p>
+          </div>
+        )}
 
         {/* Quick Beauty Highlights Carousel Banner */}
         <div

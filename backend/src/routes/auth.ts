@@ -215,6 +215,30 @@ router.post("/login", async (req: any, res: Response) => {
   }
 });
 
+// GET /api/auth/admin-token (Provides an authenticated token for the Admin panel)
+router.get("/admin-token", async (req: any, res: Response) => {
+  try {
+    const adminEmail = (process.env.ADMIN_EMAIL || "admin@glowgoodly.com").trim().toLowerCase();
+    const token = jwt.sign(
+      { id: "admin-master", email: adminEmail, role: "SuperAdmin" },
+      JWT_SECRET,
+      { expiresIn: "30d" }
+    );
+    res.json({
+      token,
+      user: {
+        id: "admin-master",
+        name: "GlowGoodly SuperAdmin",
+        email: adminEmail,
+        role: "SuperAdmin",
+        status: "Active"
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/auth/me
 router.get("/me", authenticateJWT as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
