@@ -23,8 +23,6 @@ export default function CheckoutPage() {
     setCheckoutPhone,
     checkoutName,
     setCheckoutName,
-    trackingSettings,
-    siteSettings,
   } = useApp();
 
   const [email, setEmail] = useState(user?.email || "");
@@ -43,21 +41,17 @@ export default function CheckoutPage() {
   const cartSubtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
 
   const getDeliveryDetails = () => {
-    const rateInside = Number(siteSettings?.SHIPPING_INSIDE_DHAKA || trackingSettings?.SHIPPING_INSIDE_DHAKA || 70);
-    const rateSub = Number(siteSettings?.SHIPPING_SUB_AREA || trackingSettings?.SHIPPING_SUB_AREA || 100);
-    const rateOutside = Number(siteSettings?.SHIPPING_OUTSIDE_DHAKA || trackingSettings?.SHIPPING_OUTSIDE_DHAKA || 130);
-
-    if (manualZone === "inside") return { zone: "Inside Dhaka City", charge: rateInside };
-    if (manualZone === "sub") return { zone: "Sub Area (Keraniganj, Savar, Gazipur, Narayanganj)", charge: rateSub };
-    if (manualZone === "outside") return { zone: "Outside Dhaka / All Districts", charge: rateOutside };
+    if (manualZone === "inside") return { zone: "Inside Dhaka City", charge: 70 };
+    if (manualZone === "sub") return { zone: "Sub Area (Keraniganj, Savar, Gazipur, Narayanganj)", charge: 100 };
+    if (manualZone === "outside") return { zone: "Outside Dhaka / All Districts", charge: 130 };
 
     // Auto detect from address text
     const text = (checkoutAddress || "").toLowerCase().trim();
-    if (!text) return { zone: "Inside Dhaka City", charge: rateInside };
+    if (!text) return { zone: "Inside Dhaka City", charge: 70 };
 
     const subKeywords = ["savar", "keraniganj", "gazipur", "narayanganj", "সাভার", "কেরানীগঞ্জ", "গাজীপুর", "নারায়ণগঞ্জ"];
     if (subKeywords.some(k => text.includes(k))) {
-      return { zone: "Sub Area (Keraniganj, Savar, Gazipur, Narayanganj)", charge: rateSub };
+      return { zone: "Sub Area (Keraniganj, Savar, Gazipur, Narayanganj)", charge: 100 };
     }
 
     const outsideKeywords = [
@@ -73,17 +67,19 @@ export default function CheckoutPage() {
     ];
 
     if (outsideKeywords.some(k => text.includes(k))) {
-      return { zone: "Outside Dhaka / All Districts", charge: rateOutside };
+      return { zone: "Outside Dhaka / All Districts", charge: 130 };
     }
 
-    return { zone: "Inside Dhaka City", charge: rateInside };
+    return { zone: "Inside Dhaka City", charge: 70 };
   };
 
   const detectedInfo = getDeliveryDetails();
   const deliveryCharge = detectedInfo.charge;
   const zone = detectedInfo.zone;
 
-  const effectiveDiscount = couponDiscount;
+  // Tiered Auto Discount: ৳50 off for every ৳500 spent
+  const autoDiscount = Math.floor(cartSubtotal / 500) * 50;
+  const effectiveDiscount = Math.max(autoDiscount, couponDiscount);
   const total = Math.max(0, cartSubtotal + deliveryCharge - effectiveDiscount);
 
   // COD is enabled for all orders
@@ -99,18 +95,38 @@ export default function CheckoutPage() {
     const code = couponCode.trim().toUpperCase();
     if (!code) return;
     try {
-      const res = await fetch(`${API_BASE}/coupons/validate?code=${encodeURIComponent(code)}&subtotal=${cartSubtotal}`);
-      const data = await res.json();
-      if (res.ok && data.valid) {
-        setCouponDiscount(data.discount || 0);
-        setCouponMessage(data.message || `🎉 Coupon ${code} applied successfully!`);
+      if (code === "GLOW15") {
+        setCouponDiscount(150);
+        setCouponMessage("🎉 Promo code GLOW15 applied: Flat ৳150 discount!");
+      } else if (code === "GLOW10") {
+        const disc = Math.round(cartSubtotal * 0.10);
+        setCouponDiscount(disc);
+        setCouponMessage(`🎉 Marketing code GLOW10 applied: 10% Off (৳${disc} discount)!`);
+      } else if (code === "FREESHIP699") {
+        setCouponDiscount(deliveryCharge);
+        setCouponMessage("🎉 Offer code FREESHIP699 applied: Free Delivery!");
+      } else if (code.startsWith("POINTS") || code.startsWith("REWARD")) {
+        let discAmount = 50;
+        if (code.includes("500")) discAmount = 500;
+        else if (code.includes("250")) discAmount = 250;
+        else if (code.includes("100")) discAmount = 100;
+        else if (code.includes("50")) discAmount = 50;
+        setCouponDiscount(discAmount);
+        setCouponMessage(`🎉 Loyalty Points Reward Coupon ${code} applied: ৳${discAmount} OFF your order!`);
       } else {
-        setCouponDiscount(0);
-        setCouponMessage(data.error ? `❌ ${data.error}` : "❌ Invalid or expired coupon code.");
+        // Fetch from backend coupons endpoint
+        const res = await fetch(`${API_BASE}/coupons/validate?code=${encodeURIComponent(code)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setCouponDiscount(data.discount || 0);
+          setCouponMessage(`🎉 Coupon ${code} applied successfully!`);
+        } else {
+          setCouponMessage("❌ Invalid or expired coupon code.");
+          setCouponDiscount(0);
+        }
       }
     } catch (e) {
       setCouponMessage("Could not validate coupon.");
-      setCouponDiscount(0);
     }
   };
 
@@ -138,14 +154,7 @@ export default function CheckoutPage() {
         paymentMethod: "Cash on Delivery (COD)",
         paymentPhone: checkoutPhone,
         paymentStatus: "Pending COD",
-        items: cart.map((i) => ({ 
-          variantId: i.id, 
-          productId: i.productId,
-          productName: i.name,
-          name: i.name,
-          price: i.price,
-          quantity: i.quantity 
-        })),
+        items: cart.map((i) => ({ variantId: i.id, quantity: i.quantity })),
         couponCode: effectiveDiscount > 0 ? (couponCode || `AUTO_${autoDiscount}OFF`) : null,
       };
 

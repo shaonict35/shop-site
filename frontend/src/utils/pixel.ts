@@ -8,10 +8,8 @@ export const trackPixelEvent = (eventName: string, params?: Record<string, any>)
     const fbq = (window as any).fbq;
     if (typeof fbq === "function") {
       if (params) {
-        console.log(`[Meta Pixel Browser] Event: ${eventName}`, params);
         fbq("track", eventName, params);
       } else {
-        console.log(`[Meta Pixel Browser] Event: ${eventName}`);
         fbq("track", eventName);
       }
     }

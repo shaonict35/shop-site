@@ -22,8 +22,23 @@ interface OfferData {
 }
 
 export default function SeasonalOfferPage() {
-  const [offer, setOffer] = useState<OfferData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [offer, setOffer] = useState<OfferData>({
+    title: "বিশেষ অফারে অরিজিনাল বিউটি কম্বো প্যাকেজ!",
+    subtitle: "সীমিত সময়ের জন্য ছাড়! ১০০% অরিজিনাল প্রোডাক্ট দ্রুত ক্যাশ অন ডেলিভারিতে পান।",
+    videoUrl: "",
+    productTitle: "প্রিমিয়াম বিউটি ও স্কিনকেয়ার গ্লো সেট",
+    productPrice: "1250",
+    originalPrice: "1850",
+    productImages: [
+      "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&auto=format&fit=crop&q=80"
+    ],
+    description: "আমাদের এই বিশেষ প্যাকেজে রয়েছে ত্বকের যত্ন ও উজ্জ্বলতার জন্য প্রয়োজনীয় প্রিমিয়াম উপাদান। নিয়মিত ব্যবহারে পাবেন দাগহীন, উজ্জ্বল ও সতেজ ত্বক।",
+    bulletPoints: "১০০% অরিজিনাল প্রোডাক্ট|ত্বক হবে সতেজ ও উজ্জ্বল|কোনো সাইড ইফেক্ট নেই|সারাদেশে ক্যাশ অন ডেলিভারি",
+    insideDhakaShipping: "70",
+    subAreaShipping: "100",
+    outsideDhakaShipping: "130",
+    isActive: true
+  });
 
   const [selectedImage, setSelectedImage] = useState(0);
   
@@ -46,27 +61,18 @@ export default function SeasonalOfferPage() {
       if (res.ok) {
         const data = await res.json();
         if (data && typeof data === "object") {
-          setOffer({
-            title: data.title || "",
-            subtitle: data.subtitle || "",
-            videoUrl: data.videoUrl || "",
-            productTitle: data.productTitle || "",
-            productPrice: data.productPrice || "0",
-            originalPrice: data.originalPrice || "0",
-            productImages: Array.isArray(data.productImages) ? data.productImages : [data.productImages || ""],
-            description: data.description || "",
-            bulletPoints: data.bulletPoints || "",
+          setOffer(prev => ({
+            ...prev,
+            ...data,
             insideDhakaShipping: data.insideDhakaShipping || "70",
             subAreaShipping: data.subAreaShipping || "100",
             outsideDhakaShipping: data.outsideDhakaShipping || "130",
-            isActive: data.isActive !== false
-          });
+            productImages: Array.isArray(data.productImages) ? data.productImages : [data.productImages || prev.productImages[0]]
+          }));
         }
       }
     } catch (e) {
-      console.error("Could not load seasonal offer data:", e);
-    } finally {
-      setIsLoading(false);
+      console.log("Could not load remote offer data, using store defaults.", e);
     }
   };
 
@@ -98,14 +104,14 @@ export default function SeasonalOfferPage() {
     }
   };
 
-  const productPriceNum = parseFloat(offer?.productPrice || "0") || 0;
-  const originalPriceNum = parseFloat(offer?.originalPrice || "0") || 0;
+  const productPriceNum = parseFloat(offer.productPrice) || 0;
+  const originalPriceNum = parseFloat(offer.originalPrice) || 0;
 
   const shippingCost = deliveryZone === "inside" 
-    ? (parseFloat(offer?.insideDhakaShipping || "70") || 70) 
+    ? (parseFloat(offer.insideDhakaShipping) || 70) 
     : deliveryZone === "sub"
-    ? (parseFloat(offer?.subAreaShipping || "100") || 100)
-    : (parseFloat(offer?.outsideDhakaShipping || "130") || 130);
+    ? (parseFloat(offer.subAreaShipping) || 100)
+    : (parseFloat(offer.outsideDhakaShipping) || 130);
 
   const itemsSubtotal = productPriceNum * quantity;
   const grandTotal = itemsSubtotal + shippingCost;
@@ -172,30 +178,6 @@ export default function SeasonalOfferPage() {
       setIsSubmitting(false);
     }
   };
-
-  if (isLoading) {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', sans-serif" }}>
-        <div style={{ textAlign: "center", color: "#e52860", fontWeight: 700, fontSize: "16px" }}>
-          Loading Seasonal Offer...
-        </div>
-      </div>
-    );
-  }
-
-  if (!offer || !offer.isActive) {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', sans-serif" }}>
-        <div style={{ textAlign: "center", color: "#64748b", fontWeight: 600 }}>
-          <h2 style={{ fontSize: "20px", color: "#1e293b", marginBottom: "8px" }}>কোনো সক্রিয় অফার পাওয়া যায়নি</h2>
-          <p>অনুগ্রহ করে পরবর্তীতে আবার চেষ্টা করুন অথবা হোমপেজে ফিরে যান।</p>
-          <Link href="/" style={{ display: "inline-block", marginTop: "16px", background: "#e52860", color: "#fff", padding: "8px 20px", borderRadius: "8px", textDecoration: "none", fontWeight: 700 }}>
-            হোমপেজে যান
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   const pointsList = offer.bulletPoints ? offer.bulletPoints.split("|").filter(Boolean) : [];
 

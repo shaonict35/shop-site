@@ -3,10 +3,6 @@ const cache: Record<string, { data: any; expiry: number }> = {};
 
 // Base API URL calculation supporting full URLs, paths, and trailing slash normalization
 const getBaseApiUrl = () => {
-  if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.trim()) {
-    const raw = process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, "");
-    return raw.endsWith("/api") ? raw : `${raw}/api`;
-  }
   if (typeof window !== "undefined") {
     const host = window.location.hostname;
     if (host === "localhost" || host === "127.0.0.1" || host.includes("192.168.")) {
@@ -16,6 +12,10 @@ const getBaseApiUrl = () => {
       return "https://api.glowgoodly.com/api";
     }
     return `${window.location.origin}/api`;
+  }
+  if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.trim()) {
+    const raw = process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, "");
+    return raw.endsWith("/api") ? raw : `${raw}/api`;
   }
   return "http://localhost:5000/api";
 };
@@ -40,11 +40,9 @@ export function getProductUrl(p: { id?: string; slug?: string; name?: string } |
   return `/product/${slug}`;
 }
 
-
-// In-flight request deduplication map (prevents multiple duplicate downloads of the same heavy API endpoint)
+// In-flight request deduplication map
 const inFlightRequests = new Map<string, Promise<any>>();
 
-// Helper to sanitize bulky product payloads so they fit into localStorage without QuotaExceededError
 function sanitizeForStorage(data: any) {
   if (Array.isArray(data) && data.length > 50) {
     return data.map((p: any) => ({
@@ -71,19 +69,16 @@ function sanitizeForStorage(data: any) {
   return data;
 }
 
-// High performance client-side memory cache with Stale-While-Revalidate (SWR) pattern
 const CACHE_DURATION = 60 * 1000; // 1 minute fresh duration
 
 export async function fetchWithCache(url: string, bypassCache: boolean = false) {
   const now = Date.now();
   const cached = cache[url];
 
-  // 1. In-memory fresh hit -> instant 0ms return
   if (!bypassCache && cached && cached.expiry > now) {
     return cached.data;
   }
 
-  // 2. Check localStorage persistent cache
   let existingData: any = null;
   let isExpired = true;
 
@@ -106,14 +101,11 @@ export async function fetchWithCache(url: string, bypassCache: boolean = false) 
     }
   }
 
-  // 3. Stale-While-Revalidate: If we have cached data, return it immediately for instant rendering!
-  // And silently revalidate in the background if expired.
   if (existingData && !bypassCache) {
     if (!isExpired) {
       return existingData;
     }
 
-    // Silent background revalidation without blocking caller
     if (!inFlightRequests.has(url)) {
       const bgPromise = (async () => {
         try {
@@ -142,7 +134,6 @@ export async function fetchWithCache(url: string, bypassCache: boolean = false) 
     return existingData;
   }
 
-  // 4. Cold fetch (no cached data available yet)
   if (inFlightRequests.has(url)) {
     return inFlightRequests.get(url);
   }
@@ -167,7 +158,6 @@ export async function fetchWithCache(url: string, bypassCache: boolean = false) 
       try {
         data = JSON.parse(text);
       } catch (parseError) {
-        console.warn("Invalid JSON response from URL:", url);
         return cached ? cached.data : null;
       }
 
@@ -194,7 +184,6 @@ export async function fetchWithCache(url: string, bypassCache: boolean = false) 
       return data;
     } catch (error) {
       if (cached) return cached.data;
-      console.warn("fetchWithCache network warning for:", url);
       return null;
     } finally {
       inFlightRequests.delete(url);
@@ -205,7 +194,6 @@ export async function fetchWithCache(url: string, bypassCache: boolean = false) 
   return fetchPromise;
 }
 
-// Clear cache for a specific URL (call this after admin saves data)
 export function clearCache(url: string) {
   delete cache[url];
   if (typeof window !== "undefined") {
@@ -213,7 +201,6 @@ export function clearCache(url: string) {
   }
 }
 
-// Clear ALL cached data (call after any admin save to force fresh fetch)
 export function clearAllCache() {
   Object.keys(cache).forEach(key => delete cache[key]);
   if (typeof window !== "undefined") {
@@ -227,19 +214,13 @@ export function clearAllCache() {
   }
 }
 
-// Trigger global sync event across tabs and components
 export function triggerGlobalDataSync() {
   clearAllCache();
   if (typeof window !== "undefined") {
-    // 1. Dispatch event in current window
     window.dispatchEvent(new Event("glowgoodly_data_updated"));
-
-    // 2. Trigger cross-tab storage event
     try {
       localStorage.setItem("glowgoodly_sync_ping", Date.now().toString());
     } catch (e) {}
-
-    // 3. Trigger BroadcastChannel for instant cross-tab sync
     try {
       const channel = new BroadcastChannel("glowgoodly_sync_channel");
       channel.postMessage({ type: "DATA_UPDATED", timestamp: Date.now() });
@@ -248,7 +229,6 @@ export function triggerGlobalDataSync() {
   }
 }
 
-// Universal listener for all components & pages to auto-refresh when admin changes data
 export function subscribeToDataSync(callback: () => void): () => void {
   if (typeof window === "undefined") return () => {};
 
@@ -280,4 +260,3 @@ export function subscribeToDataSync(callback: () => void): () => void {
     if (bc) bc.close();
   };
 }
-

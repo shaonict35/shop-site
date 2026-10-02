@@ -37,7 +37,112 @@ interface Product {
   variants: Variant[];
 }
 
-
+const ALL_CATEGORIES = [
+  {
+    name: "Makeup",
+    slug: "makeup",
+    subs: [
+      "Face Primer", "Concealer", "Foundation", "Compact Powder", "Contour", "Loose Powder", "Blush", "BB & CC Cream", "Highlighter", "Makeup Remover",
+      "Kajal", "Eyeliner", "Mascara", "Eye Shadow", "Eyebrow Gel", "Eye Primer", "False Eyelashes",
+      "Lipstick", "Liquid Lipstick", "Lip Crayon", "Lip Gloss", "Lip Liner", "Lip Plumper", "Lip Balm", "Lip Stain",
+      "Nail Polish", "Nail Art", "Nail Polish Sets", "Nail Care", "Nail Polish Remover",
+      "Face Brush", "Blush Brush", "Brush Sets", "Eye Brush", "Eyelash Curler", "Makeup Pouch"
+    ]
+  },
+  {
+    name: "Skin",
+    slug: "skincare",
+    subs: [
+      "Face Wash", "Cleansing Oil", "Micellar Water", "Face Scrub", "Cleansing Balm",
+      "Day Cream", "Night Cream", "Face Gel", "Body Lotion", "Body Butter",
+      "Face Serum", "Sheet Mask", "Face Toner", "Sunscreen", "Acne Patch",
+      "Acne Treatment", "Anti Aging", "Dry Skin", "Brightening", "Pore Care"
+    ]
+  },
+  {
+    name: "Hair",
+    slug: "haircare",
+    subs: [
+      "Shampoo", "Dry Shampoo", "Clarifying Shampoo", "Co-wash",
+      "Conditioner", "Leave-In Conditioner", "Hair Mask", "Hair Cream",
+      "Coconut Oil", "Argan Oil", "Castor Oil", "Onion Hair Oil", "Herbal Oil",
+      "Hair Fall", "Dandruff", "Dry & Frizzy Hair", "Damaged Hair Recovery"
+    ]
+  },
+  {
+    name: "Personal care",
+    slug: "personal-care",
+    subs: [
+      "Deodorant", "Roll-on", "Body Spray", "Intimate Wash", "Hand Sanitizer",
+      "Body Wash", "Bar Soap", "Shower Gel",
+      "Toothpaste", "Toothbrush", "Mouthwash", "Dental Floss",
+      "Sanitary Napkin", "Panty Liner", "Menstrual Cup", "Feminine Wash"
+    ]
+  },
+  {
+    name: "Mom & Baby",
+    slug: "mom-baby",
+    subs: [
+      "Baby Lotion", "Baby Oil", "Baby Wash", "Diaper Cream",
+      "Stretch Mark Cream", "Nursing Pads", "Nipple Cream",
+      "Baby Shampoo", "Baby Powder", "Baby Sunscreen", "Wipes",
+      "Pregnancy Supplements", "Lactation Support"
+    ]
+  },
+  {
+    name: "Fragrance",
+    slug: "fragrance",
+    subs: [
+      "Womens Perfume", "Mens Cologne", "Unisex Fragrance",
+      "Attar", "Body Mist", "Perfume Gift Set",
+      "Roll-On Perfume", "Solid Perfume", "Hair Mist"
+    ]
+  },
+  {
+    name: "Perfect Match COMBO",
+    slug: "combo",
+    subs: [
+      "Skin Combos", "Makeup Combos", "Hair Combos",
+      "Acne Clearance Combo", "Brightening Kit", "Anti-Aging Regimen",
+      "Everyday Makeup Kit", "Bridal Glow Combo", "Party Glam Kit",
+      "Hair Fall Defense Trio", "Dandruff Solution Combo", "Smooth & Shine Kit"
+    ]
+  },
+  {
+    name: "Clearance SALE",
+    slug: "clearance-sale",
+    subs: [
+      "Makeup Deals", "Skincare Deals", "Haircare Deals",
+      "Lipsticks under 499", "Palettes at 40% Off", "Face products deals",
+      "Serums Flat 30% Off", "Cleansers B1G1", "Sheet masks packs",
+      "Hair Oils Flat 20% Off", "Hair Masques Deals", "Shampoo Combs Packs"
+    ]
+  },
+  {
+    name: "BOGO",
+    slug: "bogo",
+    subs: [
+      "Buy 1 Get 1 Free", "BOGO Cosmetics", "BOGO Skincare", "BOGO Haircare", "BOGO Combos"
+    ]
+  },
+  {
+    name: "Exclusive OFFERS",
+    slug: "exclusive",
+    subs: [
+      "VIP Offers", "Luxury Brands Discount", "Limited Collection", "Exclusive Gift Sets"
+    ]
+  },
+  {
+    name: "Men",
+    slug: "men",
+    subs: [
+      "Grooming", "Hygiene", "Skincare",
+      "Mens Face Wash", "Shaving Gel & Foam", "Beard Oil & Cream", "Aftershave Balm",
+      "Anti Hair Fall Shampoo", "Anti Dandruff Shampoo", "Hair Styling Wax", "Hair Styling Gel",
+      "Mens Deodorants", "Mens Body Spray", "Mens Cologne", "Mens Body Wash"
+    ]
+  }
+];
 
 const productMatchesSubcategory = (p: Product, subName: string) => {
   if (!p) return false;
@@ -162,30 +267,10 @@ function ShopPageContent() {
   // Mobile filter drawer
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
-  const [dbCategories, setDbCategories] = useState<any[]>([]);
-
-  useEffect(() => {
-    let mounted = true;
-    fetchWithCache(`${API_BASE}/categories`).then((data) => {
-      if (mounted && Array.isArray(data)) {
-        setDbCategories(data);
-      }
-    }).catch(() => {});
-    return () => { mounted = false; };
-  }, []);
-
-  const categoryList = React.useMemo(() => {
-    return dbCategories.map((c: any) => ({
-      name: c.name,
-      slug: c.slug || generateSlug(c.name),
-      subs: (c.subCategories || []).map((s: any) => s.name)
-    }));
-  }, [dbCategories]);
-
   // Pre-calculate counts with useMemo to eliminate render lag
   const categoryCounts = React.useMemo(() => {
     const counts: Record<string, number> = {};
-    categoryList.forEach((cat) => {
+    ALL_CATEGORIES.forEach((cat) => {
       const target = cat.name.toLowerCase();
       let matchNames = [target];
       if (target === "skin" || target === "skincare") matchNames = ["skin", "skincare"];
@@ -197,17 +282,17 @@ function ShopPageContent() {
       }).length;
     });
     return counts;
-  }, [products, categoryList]);
+  }, [products]);
 
   const subcategoryCounts = React.useMemo(() => {
     const counts: Record<string, number> = {};
-    categoryList.forEach((cat) => {
+    ALL_CATEGORIES.forEach((cat) => {
       cat.subs.forEach((sub) => {
         counts[sub] = products.filter((p) => productMatchesSubcategory(p, sub)).length;
       });
     });
     return counts;
-  }, [products, categoryList]);
+  }, [products]);
 
   const getCategoryCount = (catName: string) => categoryCounts[catName] || 0;
   const getSubcategoryCount = (subName: string) => subcategoryCounts[subName] || 0;
@@ -239,11 +324,11 @@ function ShopPageContent() {
 
     const targetCatQuery = catQuery || (campaignQuery ? (campaignQuery.toUpperCase() === "CLEARANCE" ? "clearance-sale" : campaignQuery) : null);
     if (targetCatQuery) {
-      const found = categoryList.find(c => 
+      const found = ALL_CATEGORIES.find(c => 
         c.slug === targetCatQuery.toLowerCase() || 
         c.name.toLowerCase() === targetCatQuery.toLowerCase() ||
-        (targetCatQuery.toLowerCase() === "skincare" && (c.slug === "skin" || c.name.toLowerCase() === "skin")) ||
-        (targetCatQuery.toLowerCase() === "haircare" && (c.slug === "hair" || c.name.toLowerCase() === "hair"))
+        (targetCatQuery.toLowerCase() === "skincare" && c.slug === "skin") ||
+        (targetCatQuery.toLowerCase() === "haircare" && c.slug === "hair")
       );
       if (found) {
         setActiveCategories([found.name]);
@@ -359,7 +444,7 @@ function ShopPageContent() {
             if (!inParent) return false;
 
             // If the parent matches, does it have active subcategories checked?
-            const catObj = categoryList.find(c => c.name === cat);
+            const catObj = ALL_CATEGORIES.find(c => c.name === cat);
             const activeSubsForThisCat = catObj ? catObj.subs.filter(sub => activeSubcategories.includes(sub)) : [];
 
             if (activeSubsForThisCat.length > 0) {
@@ -439,20 +524,11 @@ function ShopPageContent() {
 
   const handleAddToCart = (product: Product, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    const v = product.variants?.[0];
-    const img = product.images?.find((i) => i.isPrimary)?.url || product.images?.[0]?.url || "";
-    const effectivePrice = v 
-      ? ((v.discountPrice !== null && v.discountPrice !== undefined && v.discountPrice > 0) ? v.discountPrice : v.price)
-      : (product.price || 0);
-    addToCart({ 
-      id: v?.id || product.id, 
-      productId: product.id, 
-      name: product.name, 
-      variantName: v?.name || "Standard", 
-      image: img, 
-      price: effectivePrice, 
-      stock: v?.stock ?? 50 
-    });
+    const v = product.variants[0];
+    if (!v) return;
+    const img = product.images.find((i) => i.isPrimary)?.url || product.images[0]?.url || "";
+    const effectivePrice = (v.discountPrice !== null && v.discountPrice !== undefined && v.discountPrice > 0) ? v.discountPrice : v.price;
+    addToCart({ id: v.id, productId: product.id, name: product.name, variantName: v.name, image: img, price: effectivePrice, stock: v.stock || 50 });
   };
 
   const handleBuyNow = (product: Product, e?: React.MouseEvent) => {
@@ -482,7 +558,7 @@ function ShopPageContent() {
           Product Categories
         </h3>
         <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
-          {categoryList.map((cat, idx) => {
+          {ALL_CATEGORIES.map((cat, idx) => {
             const isCatActive = activeCategories.includes(cat.name);
             const isExpanded = expandedCategories.includes(cat.name);
             const catCount = getCategoryCount(cat.name);
