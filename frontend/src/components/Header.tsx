@@ -597,56 +597,180 @@ export default function Header() {
         </div>
 
         {/* Shajgoj Sub-header Navigation (Category navbar row) */}
-        <div className="category-navbar-shajgoj">
-          <div className="container">
-            <nav className="category-links-shajgoj" style={{ display: "flex", gap: "4px", alignItems: "center", justifyContent: "space-between", whiteSpace: "nowrap", flexWrap: "wrap", width: "100%", overflowX: "visible" }}>
-              {/* Dynamic Megamenu Categories from Database */}
-              {dbCategories.map((cat: any, idx: number) => {
-                const catSlug = cat.slug || cat.name.toLowerCase().replace(/\s+/g, '-');
-                const subs = cat.subCategories || [];
-                
-                const columns: { title: string; items: string[] }[] = [];
-                if (subs.length > 0) {
-                  const chunkSize = 6;
-                  for (let i = 0; i < subs.length; i += chunkSize) {
-                    const chunk = subs.slice(i, i + chunkSize);
-                    columns.push({
-                      title: i === 0 ? "POPULAR" : `MORE ${cat.name.toUpperCase()}`,
-                      items: chunk.map((s: any) => s.name)
-                    });
-                  }
-                } else {
-                  columns.push({
-                    title: cat.name.toUpperCase(),
-                    items: [cat.name]
-                  });
-                }
+        <div className="category-navbar-shajgoj" style={{ overflowX: "auto", overflowY: "visible" }}>
+          <div className="container" style={{ display: "flex", justifyContent: "center" }}>
+            <nav className="category-links-shajgoj" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "nowrap", whiteSpace: "nowrap", minWidth: "max-content", padding: "2px 0" }}>
+              {/* 1. Makeup */}
+              <CategoryMenuItem 
+                title="Makeup" 
+                href="/shop?category=makeup" 
+                columns={[
+                  { title: "FACE", items: ["Face Primer", "Concealer", "Foundation", "Compact Powder", "Contour", "Loose Powder", "Blush", "BB & CC Cream", "Highlighter", "Makeup Remover"] },
+                  { title: "EYES", items: ["Kajal", "Eyeliner", "Mascara", "Eye Shadow", "Eyebrow Gel", "Eye Primer", "False Eyelashes"] },
+                  { title: "LIPS", items: ["Lipstick", "Liquid Lipstick", "Lip Crayon", "Lip Gloss", "Lip Liner", "Lip Plumper", "Lip Balm", "Lip Stain"] },
+                  { title: "NAILS", items: ["Nail Polish", "Nail Art", "Nail Polish Sets", "Nail Care", "Nail Polish Remover"] },
+                  { title: "TOOLS", items: ["Face Brush", "Blush Brush", "Brush Sets", "Eye Brush", "Eyelash Curler", "Makeup Pouch"] }
+                ]} 
+                arches={[
+                  "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200&q=80",
+                  "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=200&q=80",
+                  "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=200&q=80"
+                ]}
+              />
 
-                const arches = [cat.popupImage1, cat.popupImage2].filter(Boolean);
-                
-                let pillClass = "";
-                const lower = cat.name.toLowerCase();
-                if (lower.includes("combo")) pillClass = "pill-tab pill-pink";
-                else if (lower.includes("bogo")) pillClass = "pill-tab pill-purple";
-                else if (lower.includes("clearance")) pillClass = "pill-tab pill-teal";
-                else if (lower.includes("men")) pillClass = "pill-tab pill-green";
-                else if (lower.includes("undergarment")) pillClass = "pill-tab pill-blue";
+              {/* 2. Skin */}
+              <CategoryMenuItem 
+                title="Skin" 
+                href="/shop?category=skincare" 
+                columns={[
+                  { title: "CLEANSERS", items: ["Face Wash", "Cleansing Oil", "Micellar Water", "Face Scrub", "Cleansing Balm"] },
+                  { title: "MOISTURIZERS", items: ["Day Cream", "Night Cream", "Face Gel", "Body Lotion", "Body Butter"] },
+                  { title: "TREATMENTS", items: ["Face Serum", "Sheet Mask", "Face Toner", "Sunscreen", "Acne Patch"] },
+                  { title: "CONCERNS", items: ["Acne Treatment", "Anti Aging", "Dry Skin", "Brightening", "Pore Care"] }
+                ]} 
+                arches={[
+                  "https://images.unsplash.com/photo-1601049541289-9b1b7bbbfe19?w=200&q=80",
+                  "https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?w=200&q=80",
+                  "https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?w=200&q=80"
+                ]}
+              />
 
-                return (
-                  <CategoryMenuItem
-                    key={cat.id || idx}
-                    title={cat.name}
-                    href={`/shop?category=${encodeURIComponent(catSlug)}`}
-                    className={pillClass}
-                    columns={columns}
-                    arches={arches}
-                  />
-                );
-              })}
+              {/* 3. Hair */}
+              <CategoryMenuItem 
+                title="Hair" 
+                href="/shop?category=haircare" 
+                columns={[
+                  { title: "CLEANSERS", items: ["Shampoo", "Dry Shampoo", "Clarifying Shampoo", "Co-wash"] },
+                  { title: "CONDITIONERS", items: ["Conditioner", "Leave-In Conditioner", "Hair Mask", "Hair Cream"] },
+                  { title: "HAIR OILS", items: ["Coconut Oil", "Argan Oil", "Castor Oil", "Onion Hair Oil", "Herbal Oil"] },
+                  { title: "CONCERNS", items: ["Hair Fall", "Dandruff", "Dry & Frizzy Hair", "Damaged Hair Recovery"] }
+                ]} 
+                arches={[
+                  "https://images.unsplash.com/photo-1562322140-8baeececf3df?w=200&q=80",
+                  "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200&q=80"
+                ]}
+              />
+
+              {/* 4. Personal care */}
+              <CategoryMenuItem 
+                title="Personal care" 
+                href="/shop?category=personal-care" 
+                columns={[
+                  { title: "BATH & SHOWER", items: ["Body Wash", "Shower Gel", "Soap Bar", "Body Scrub", "Bath Salts"] },
+                  { title: "BODY CARE", items: ["Body Lotion", "Body Cream", "Body Oil", "Foot Care", "Hand Cream"] },
+                  { title: "HYGIENE", items: ["Deodorants", "Body Spray", "Oral Care", "Feminine Hygiene", "Hand Sanitizer"] }
+                ]} 
+                arches={[
+                  "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=200&q=80",
+                  "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=200&q=80"
+                ]}
+              />
+
+              {/* 5. Mom & Baby */}
+              <CategoryMenuItem 
+                title="Mom & Baby" 
+                href="/shop?category=mom-baby" 
+                columns={[
+                  { title: "BABY CARE", items: ["Baby Wash", "Baby Shampoo", "Baby Lotion", "Baby Oil", "Baby Powder"] },
+                  { title: "DIAPERING", items: ["Baby Wipes", "Baby Diapers", "Nappy Cream", "Baby Detergent"] },
+                  { title: "MOM CARE", items: ["Stretch Mark Cream", "Maternity Pads", "Nursing Care", "Mom Supplements"] }
+                ]} 
+                arches={[
+                  "https://images.unsplash.com/photo-1546015720-b8b30df5aa27?w=200&q=80",
+                  "https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?w=200&q=80"
+                ]}
+              />
+
+              {/* 6. Fragrance */}
+              <CategoryMenuItem 
+                title="Fragrance" 
+                href="/shop?category=fragrance" 
+                columns={[
+                  { title: "WOMEN FRAGRANCE", items: ["Eau De Parfum", "Eau De Toilette", "Body Mist", "Gift Sets"] },
+                  { title: "MEN FRAGRANCE", items: ["Cologne", "Mens EDP", "Body Spray", "Aftershave"] },
+                  { title: "FRAGRANCE NOTE", items: ["Floral notes", "Woody notes", "Citrus notes", "Spicy notes"] }
+                ]} 
+                arches={[
+                  "https://images.unsplash.com/photo-1547887537-6158d64c35b3?w=200&q=80",
+                  "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=200&q=80"
+                ]}
+              />
+
+              {/* 7. Undergarments */}
+              <CategoryMenuItem 
+                title="Undergarments" 
+                href="/shop?category=undergarments" 
+                className="pill-tab pill-blue"
+                columns={[
+                  { title: "BRAS", items: ["T-Shirt Bra", "Sports Bra", "Lace Bra", "Strapless Bra", "Push Up Bra"] },
+                  { title: "PANTIES", items: ["Cotton Panty", "Hipster", "Bikini", "Seamless Panty", "Panty Packs"] },
+                  { title: "SHAPEWEAR", items: ["Tummy Shaper", "Thigh Shaper", "Body Shaper Briefs"] }
+                ]} 
+                arches={[
+                  "https://images.unsplash.com/photo-1574921094002-cd6a3a1059f1?w=200&q=80"
+                ]}
+              />
+
+              {/* 8. Combo */}
+              <CategoryMenuItem 
+                title="Combo" 
+                href="/shop?category=combo" 
+                className="pill-tab pill-pink"
+                columns={[
+                  { title: "SKIN COMBOS", items: ["Acne Clearance Combo", "Brightening Kit", "Anti-Aging Regimen"] },
+                  { title: "MAKEUP COMBOS", items: ["Everyday Makeup Kit", "Bridal Glow Combo", "Party Glam Kit"] },
+                  { title: "HAIR COMBOS", items: ["Hair Fall Defense Trio", "Dandruff Solution Combo", "Smooth & Shine Kit"] }
+                ]} 
+                arches={[
+                  "https://images.unsplash.com/photo-1512290906873-108719bc5a0e?w=200&q=80"
+                ]}
+              />
+
+              {/* 9. Jewellery */}
+              <CategoryMenuItem 
+                title="Jewellery" 
+                href="/shop?category=jewellery" 
+                className="pill-tab pill-purple"
+                columns={[
+                  { title: "EARRINGS", items: ["Jhumkas", "Studs", "Hoop Earrings", "Drop Earrings", "Ear Cuffs"] },
+                  { title: "NECKLACES", items: ["Chokers", "Pendant Necklaces", "Pearl Necklaces", "Layered Chains"] },
+                  { title: "BRACELETS", items: ["Bangles", "Charm Bracelets", "Adjustable Rings", "Finger Rings"] }
+                ]} 
+                arches={[
+                  "https://images.unsplash.com/photo-1595425970377-c9703cf48b6d?w=200&q=80"
+                ]}
+              />
+
+              {/* 10. Clearance Sale */}
+              <CategoryMenuItem 
+                title="Clearance Sale" 
+                href="/shop?category=clearance-sale" 
+                className="pill-tab pill-teal"
+                columns={[
+                  { title: "MAKEUP DEALS", items: ["Lipsticks under 499", "Palettes at 40% Off", "Face products deals"] },
+                  { title: "SKINCARE DEALS", items: ["Serums Flat 30% Off", "Cleansers B1G1", "Sheet masks packs"] },
+                  { title: "HAIRCARE DEALS", items: ["Hair Oils Flat 20% Off", "Hair Masques Deals", "Shampoo Combs Packs"] }
+                ]} 
+                arches={[
+                  "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=200&q=80"
+                ]}
+              />
+
+              {/* 11. Men */}
+              <CategoryMenuItem 
+                title="Men" 
+                href="/shop?category=men" 
+                className="pill-tab pill-green"
+                columns={[
+                  { title: "GROOMING", items: ["Mens Face Wash", "Shaving Gel & Foam", "Beard Oil & Cream", "Aftershave Balm"] },
+                  { title: "HAIRCARE", items: ["Anti Hair Fall Shampoo", "Anti Dandruff Shampoo", "Hair Styling Wax", "Hair Styling Gel"] },
+                  { title: "HYGIENE", items: ["Mens Deodorants", "Mens Body Spray", "Mens Cologne", "Mens Body Wash"] }
+                ]} 
+                arches={[
+                  "https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?w=200&q=80"
+                ]}
+              />
             </nav>
-
-
-
           </div>
         </div>
       </header>

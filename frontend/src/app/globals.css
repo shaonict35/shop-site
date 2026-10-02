@@ -941,15 +941,24 @@ button, input, select, textarea {
   background-color: #ffffff;
   border-top: 1px solid #f1f3f5;
   border-bottom: 1px solid #e9ecef;
-  padding: 6px 0;
+  padding: 4px 0;
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.category-navbar-shajgoj::-webkit-scrollbar {
+  display: none;
 }
 .category-links-shajgoj {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
-  gap: 15px;
-  font-size: 14px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  min-width: max-content;
+  gap: 10px;
+  font-size: 13.5px;
   font-weight: 700;
   color: #495057;
 }

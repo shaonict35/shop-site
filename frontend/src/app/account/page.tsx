@@ -7,7 +7,7 @@ import Footer from "../../components/Footer";
 import MobileNavbar from "../../components/MobileNavbar";
 import GlowLoader from "../../components/GlowLoader";
 import { useApp } from "../../context/AppContext";
-import { API_BASE } from "../../utils/api";
+import { API_BASE, fetchWithCache } from "../../utils/api";
 
 export default function CustomerAccountPage() {
   const { user, logout, wishlist, toggleWishlist, updateUser } = useApp();
@@ -76,29 +76,42 @@ export default function CustomerAccountPage() {
 
 
   useEffect(() => {
+    let isMounted = true;
     const fetchAccountData = async () => {
-      const token = localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token");
+      const token = typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : null;
       try {
-        const prodRes = await fetch(`${API_BASE}/products`);
-        if (prodRes.ok) setProducts(await prodRes.json());
-
-        if (token) {
-          const res = await fetch(`${API_BASE}/orders/my-orders`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          if (res.ok) {
-            const data = await res.json();
-            setOrders(data);
-          }
+        const prodData = await fetchWithCache(`${API_BASE}/products`);
+        if (isMounted && Array.isArray(prodData)) {
+          setProducts(prodData);
+        } else if (isMounted) {
+          const prodRes = await fetch(`${API_BASE}/products`).catch(() => null);
+          if (prodRes && prodRes.ok) setProducts(await prodRes.json());
         }
       } catch (e) {
-        console.error("Error fetching account data", e);
-      } finally {
+        console.warn("Could not fetch products for wishlist display:", e);
+      }
+
+      if (token && isMounted) {
+        try {
+          const res = await fetch(`${API_BASE}/orders/my-orders`, {
+            headers: { Authorization: `Bearer ${token}` }
+          }).catch(() => null);
+          if (res && res.ok) {
+            const data = await res.json();
+            if (isMounted) setOrders(data);
+          }
+        } catch (e) {
+          console.warn("Could not fetch user orders:", e);
+        }
+      }
+
+      if (isMounted) {
         setLoading(false);
       }
     };
 
     fetchAccountData();
+    return () => { isMounted = false; };
   }, [user]);
 
   if (!user && !loading) {
