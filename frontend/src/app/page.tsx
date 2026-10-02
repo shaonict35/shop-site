@@ -1,71 +1,65 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { fetchWithCache, API_BASE, getProductUrl, subscribeToDataSync } from "../utils/api";
-import { registerFcmToken } from "../utils/fcm";
-
+import { fetchWithCache, API_BASE } from "../utils/api";
 import Header from "../components/Header";
 import PromoBanner from "../components/PromoBanner";
 import MobileNavbar from "../components/MobileNavbar";
 import Footer from "../components/Footer";
 import { useApp } from "../context/AppContext";
 import Link from "next/link";
-import GlowLoader from "../components/GlowLoader";
 
 interface Product {
   id: string;
   name: string;
-  slug?: string;
   description: string;
   brand: { name: string };
   category: { name: string };
-  campaignName?: string | null;
   images: { url: string; isPrimary: boolean }[];
-  variants: { id: string; name: string; price: number; discountPrice: number | null; stock: number; shadeColor: string | null; size?: string | null }[];
+  variants: { id: string; name: string; price: number; discountPrice: number | null; stock: number; shadeColor: string | null }[];
 }
+
+const DEFAULT_CONCERNS = [
+  { name: "Acne", subtitle: "TREATMENT", image: "https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?w=100&h=100&fit=crop&q=80", link: "/shop?category=skincare&sub=Acne%20Treatment" },
+  { name: "Anti Aging", subtitle: "CARE", image: "https://images.unsplash.com/photo-1601049676099-e7ed07d825b0?w=100&h=100&fit=crop&q=80", link: "/shop?category=skincare&sub=Anti%20Aging" },
+  { name: "Dandruff", subtitle: "SOLUTION", image: "https://images.unsplash.com/photo-1562322140-8baeececf3df?w=100&h=100&fit=crop&q=80", link: "/shop?category=haircare&sub=Dandruff" },
+  { name: "Dry Skin", subtitle: "HYDRATION", image: "https://images.unsplash.com/photo-1512290906873-108719bc5a0e?w=100&h=100&fit=crop&q=80", link: "/shop?category=skincare&sub=Dry%20Skin" },
+  { name: "Hair Fall", subtitle: "DEFENSE", image: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=100&h=100&fit=crop&q=80", link: "/shop?category=haircare&sub=Hair%20Fall" },
+  { name: "Oil Control", subtitle: "BALANCE", image: "https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?w=100&h=100&fit=crop&q=80", link: "/shop?category=skincare" },
+  { name: "Pore Care", subtitle: "REFINING", image: "https://images.unsplash.com/photo-1601049676099-e7ed07d825b0?w=100&h=100&fit=crop&q=80", link: "/shop?category=skincare&sub=Pore%20Care" },
+  { name: "Spot Treatment", subtitle: "CLEAR GLOW", image: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=100&h=100&fit=crop&q=80", link: "/shop?category=skincare" },
+  { name: "Hair Thinning", subtitle: "VOLUME", image: "https://images.unsplash.com/photo-1562322140-8baeececf3df?w=100&h=100&fit=crop&q=80", link: "/shop?category=haircare" },
+  { name: "Sun Burn", subtitle: "RELIEF", image: "https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?w=100&h=100&fit=crop&q=80", link: "/shop?category=skincare" }
+];
 
 export default function Home() {
   const { addToCart, wishlist, toggleWishlist } = useApp();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [dynamicSlides, setDynamicSlides] = useState<any[]>([]);
   const [homepageBanners, setHomepageBanners] = useState<any[]>([]);
+  const [pagesConfig, setPagesConfig] = useState<any>({
+    shopByCategory: {
+      title: "SHOP BEAUTY PRODUCTS BY CATEGORY",
+      showCount: 8,
+      enabled: true
+    },
+    shopByConcern: {
+      title: "SHOP BY CONCERN",
+      enabled: true,
+      concerns: DEFAULT_CONCERNS
+    }
+  });
 
-  const getBannerForPage = (identifier: string, fallbackImg: string, fallbackTitle: string, fallbackLink: string = "#") => {
-    const term = (identifier || "").toLowerCase().trim();
-    const found = homepageBanners.find((b: any) => {
-      const p = (b.page || "").toLowerCase().trim();
-      const id = (b.id || "").toLowerCase().trim();
-      return p === term || id === term || (term.length > 5 && p.includes(term));
-    });
-    const rawImg = found ? (found.imageUrl || found.image) : "";
-    const isHeroSliderImg = Boolean(rawImg && rawImg.includes("/images/sliders/"));
-    const isIconSection = term.startsWith("category:") || term.startsWith("concern:");
-    const isValidImg = Boolean(rawImg && (rawImg.startsWith("http") || rawImg.startsWith("/") || rawImg.startsWith("data:")) && !(isIconSection && isHeroSliderImg));
+  const getBannerForPage = (pageName: string, fallbackImg: string, fallbackTitle: string, fallbackLink: string = "#") => {
+    const found = homepageBanners.find((b: any) => b.page === pageName);
     return {
-      img: isValidImg ? rawImg : fallbackImg,
-      mobileImg: (found && found.mobileImageUrl) ? found.mobileImageUrl : (isValidImg ? rawImg : fallbackImg),
-      tabletImg: (found && found.tabletImageUrl) ? found.tabletImageUrl : (isValidImg ? rawImg : fallbackImg),
-      title: (found && found.title) ? found.title : fallbackTitle,
-      link: (found && found.linkUrl) ? found.linkUrl : fallbackLink
+      img: found ? found.imageUrl : fallbackImg,
+      title: found ? found.title : fallbackTitle,
+      link: found ? (found.linkUrl || fallbackLink) : fallbackLink
     };
-  };
-
-  const getCategorySlug = (catName: string) => {
-    const name = catName.toLowerCase().trim();
-    if (name === "skin") return "skincare";
-    if (name === "hair") return "haircare";
-    if (name === "personal care") return "personal-care";
-    if (name === "mom & baby") return "mom-baby";
-    if (name === "undergarments") return "undergarments";
-    if (name === "undergarment") return "undergarments";
-    return name;
-  };
-
-  const getCategoryImage = (catName: string) => {
-    return "/cosmetics_circle_illustration.png";
   };
 
   // Filter States
@@ -80,13 +74,25 @@ export default function Home() {
 
   // Slide Banner State
   const [activeSlide, setActiveSlide] = useState(0);
-  const [bannersLoaded, setBannersLoaded] = useState(false);
-
-  const activeSlidesList = dynamicSlides;
+  const slides = [
+    {
+      title: "Glow Up Season is Here!",
+      desc: "Up to 40% off on premium Korean Skincare brands. Get clear skin today.",
+      bg: "linear-gradient(135deg, #e63b7a 0%, #ff758c 100%)",
+      img: "https://images.unsplash.com/photo-1556228453-efd6c1ff04f6?w=600&q=80",
+    },
+    {
+      title: "Vibrant Lips, Premium Shine",
+      desc: "Explore L'Oreal Paris Color Riche collection with unique variants.",
+      bg: "linear-gradient(135deg, #495057 0%, #1a1a2e 100%)",
+      img: "https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=600&q=80",
+    },
+  ];
 
   // Auto rotate slides
+  const activeSlidesList = dynamicSlides.length > 0 ? dynamicSlides : slides;
+
   useEffect(() => {
-    if (activeSlidesList.length <= 1) return;
     const timer = setInterval(() => {
       setActiveSlide((prev) => (prev + 1) % activeSlidesList.length);
     }, 5000);
@@ -115,41 +121,30 @@ export default function Home() {
 
   // Fetch initial data
   useEffect(() => {
-    registerFcmToken();
-
-    const fetchMetadata = async (bypass: boolean = false) => {
+    const fetchMetadata = async () => {
       try {
-        // Fetch real categories and promotional banners dynamically from backend database
-        const [categoriesRes, bannersRes] = await Promise.all([
-          fetchWithCache(`${API_BASE}/categories`, bypass).catch(() => null),
-          fetchWithCache(`${API_BASE}/banners?t=${Date.now()}`, true).catch(() => null),
+        const [catData, brandData, bannerData] = await Promise.all([
+          fetchWithCache("http://localhost:5000/api/categories"),
+          fetchWithCache("http://localhost:5000/api/brands"),
+          fetch("http://localhost:5000/api/banners").then(res => res.json()).catch(() => [])
         ]);
-
-        if (Array.isArray(categoriesRes) && categoriesRes.length > 0) {
-          setCategories(categoriesRes);
-        }
-        if (Array.isArray(bannersRes) && bannersRes.length > 0) {
-          setHomepageBanners(bannersRes);
-          // Extract dynamic hero slides from banners where page is Hero Slides or hero
-          const heroBanners = bannersRes.filter((b: any) => 
-            b.page?.toLowerCase().includes("hero") || b.title?.toLowerCase().includes("hero")
-          );
-          if (heroBanners.length > 0) {
-            setDynamicSlides(heroBanners.map((b: any, idx: number) => ({
-              id: b.id || `hero-${idx}`,
-              title: b.title || "",
-              desc: b.description || b.subTitle || "",
-              bg: b.backgroundColor || "linear-gradient(135deg, #111827 0%, #1f2937 100%)",
-              img: b.imageUrl || b.image || "",
-              mobileImg: b.mobileImageUrl || b.imageUrl || b.image || "",
-              tabletImg: b.tabletImageUrl || b.imageUrl || b.image || "",
-              link: b.linkUrl || b.link || "/shop"
+        setCategories(catData);
+        setBrands(brandData);
+        if (bannerData && bannerData.length > 0) {
+          setHomepageBanners(bannerData);
+          const homeBanners = bannerData.filter((b: any) => !b.page || b.page === "Homepage");
+          if (homeBanners.length > 0) {
+            setDynamicSlides(homeBanners.map((b: any) => ({
+              title: b.title,
+              desc: "Exclusive Collection at GlowGoodly",
+              bg: b.bgColor || "linear-gradient(135deg, #e63b7a 0%, #ff758c 100%)",
+              img: b.imageUrl,
+              link: b.linkUrl || "#store-section"
             })));
           }
         }
-
-        // Optional non-intrusive notification banner check
-        const notifRes = await fetchWithCache(`${API_BASE}/notifications/active`, bypass).catch(() => null);
+        // Fetch active notification
+        const notifRes = await fetch("http://localhost:5000/api/notifications/active").then(res => res.json()).catch(() => null);
         if (notifRes && notifRes.isActive) {
           const closedId = localStorage.getItem("glowgoodly_last_notification_closed");
           if (closedId !== notifRes.id) {
@@ -157,32 +152,34 @@ export default function Home() {
             setShowNotification(true);
           }
         }
+
+        // Fetch dynamic pages & sections config
+        fetch(`${API_BASE}/settings/pages-config`)
+          .then(res => res.json())
+          .then(cfg => { if (cfg) setPagesConfig((prev: any) => ({ ...prev, ...cfg })); })
+          .catch(() => {});
       } catch (e) {
-        console.error("Error setting metadata", e);
-      } finally {
-        setBannersLoaded(true);
+        console.error("Error loading categories/brands/notifications", e);
       }
     };
     fetchMetadata();
-
-    return subscribeToDataSync(() => fetchMetadata(true));
   }, []);
 
   // Fetch filtered products
   useEffect(() => {
-    const fetchProducts = async (bypass: boolean = false) => {
+    const fetchProducts = async () => {
+      setLoading(true);
       try {
-        let url = `${API_BASE}/products?includeAll=true&`;
+        let url = `http://localhost:5000/api/products?`;
         if (activeCategory) url += `category=${activeCategory}&`;
         if (activeBrand) url += `brand=${activeBrand}&`;
         if (searchQuery) url += `search=${encodeURIComponent(searchQuery)}&`;
         if (minPrice) url += `minPrice=${minPrice}&`;
         if (maxPrice) url += `maxPrice=${maxPrice}&`;
         if (sortOption) url += `sort=${sortOption}&`;
-        url += `t=${Date.now()}`;
 
-        const data = await fetchWithCache(url, true);
-        setProducts(Array.isArray(data) ? data : []);
+        const data = await fetchWithCache(url);
+        setProducts(data);
       } catch (e) {
         console.error("Error loading products", e);
       } finally {
@@ -191,26 +188,22 @@ export default function Home() {
     };
 
     fetchProducts();
-
-    return subscribeToDataSync(() => fetchProducts(true));
   }, [activeCategory, activeBrand, searchQuery, minPrice, maxPrice, sortOption]);
 
-
   const handleAddToCart = (product: Product) => {
-    const primaryVariant = product.variants?.[0];
-    const primaryImage = product.images?.find((img) => img.isPrimary)?.url || product.images?.[0]?.url || "";
-    const effectivePrice = primaryVariant 
-      ? (primaryVariant.discountPrice || primaryVariant.price)
-      : ((product as any).price || 0);
+    const primaryVariant = product.variants[0];
+    if (!primaryVariant) return;
+
+    const primaryImage = product.images.find((img) => img.isPrimary)?.url || product.images[0]?.url || "";
 
     addToCart({
-      id: primaryVariant?.id || product.id,
+      id: primaryVariant.id,
       productId: product.id,
       name: product.name,
-      variantName: primaryVariant?.name || "Standard",
+      variantName: primaryVariant.name,
       image: primaryImage,
-      price: effectivePrice,
-      stock: primaryVariant?.stock ?? 50,
+      price: primaryVariant.discountPrice || primaryVariant.price,
+      stock: primaryVariant.stock,
     });
   };
 
@@ -228,812 +221,294 @@ export default function Home() {
     <>
       <Header />
       <PromoBanner />
-      <h1
+
+      {/* Full-width Dynamic Promotional Banner Slider - Responsive with larger styling */}
+      <section
+        className="hero-banner-slider-container"
         style={{
-          position: "absolute",
-          width: "1px",
-          height: "1px",
-          padding: 0,
-          margin: "-1px",
-          overflow: "hidden",
-          clip: "rect(0, 0, 0, 0)",
-          whiteSpace: "nowrap",
-          border: 0,
+          background: activeSlidesList[activeSlide]?.bg || "linear-gradient(135deg, #e63b7a 0%, #ff758c 100%)",
         }}
       >
-        GlowGoodly — 100% Authentic Cosmetics, Korean Skincare & Beauty Shop Bangladesh
-      </h1>
+        <div className="container" style={{ display: "flex", width: "100%", height: "100%", position: "relative" }}>
+          <div className="hero-slider-content">
+            <h1 className="hero-slider-title">
+              {activeSlidesList[activeSlide]?.title}
+            </h1>
+            <p className="hero-slider-desc">
+              {activeSlidesList[activeSlide]?.desc}
+            </p>
+            <Link
+              href={activeSlidesList[activeSlide]?.link || "#store-section"}
+              style={{
+                backgroundColor: "var(--white)",
+                color: "var(--primary)",
+                padding: "14px 32px",
+                borderRadius: "var(--radius-full)",
+                fontSize: "14px",
+                fontWeight: "800",
+                width: "fit-content",
+                boxShadow: "var(--shadow-md)",
+                cursor: "pointer",
+                transition: "var(--transition-fast)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "scale(1.05)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+            >
+              SHOP THE CAMPAIGN
+            </Link>
+          </div>
+          <div className="hero-slider-image-container">
+            <img
+              src={activeSlidesList[activeSlide]?.img}
+              alt="Banner Promotion"
+              className="hero-slider-image"
+            />
+          </div>
 
-      {/* Full-width Dynamic Promotional Banner Slider - Responsive Hero Slider */}
-      {(() => {
-        const safeSlideIdx = activeSlide % (activeSlidesList.length || 1);
-        const currentSlide = activeSlidesList[safeSlideIdx] || activeSlidesList[0];
-        if (!currentSlide || !currentSlide.img) return null;
-        return (
-          <section
+          {/* Dots Indicator */}
+          <div
             style={{
-              width: "100%",
-              position: "relative",
-              overflow: "hidden",
-              backgroundColor: "#fcf8fa",
+              position: "absolute",
+              bottom: "15px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              display: "flex",
+              gap: "10px",
+              zIndex: 3,
             }}
           >
-            <div style={{ position: "relative", width: "100%", display: "block" }}>
-              {currentSlide?.link?.startsWith("http") ? (
-                <a
-                  href={currentSlide?.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ display: "block", width: "100%", cursor: "pointer" }}
-                >
-                  <picture style={{ display: "block", width: "100%" }}>
-                    {currentSlide?.mobileImg && (
-                      <source media="(max-width: 640px)" srcSet={currentSlide?.mobileImg} />
-                    )}
-                    {currentSlide?.tabletImg && (
-                      <source media="(max-width: 1024px)" srcSet={currentSlide?.tabletImg} />
-                    )}
-                    <img
-                      src={currentSlide?.img}
-                      alt={currentSlide?.title || "Hero Slider"}
-                      style={{
-                        width: "100%",
-                        height: "auto",
-                        display: "block",
-                      }}
-                    />
-                  </picture>
-                </a>
-              ) : (
-                <Link
-                  href={currentSlide?.link || "/shop"}
-                  style={{ display: "block", width: "100%", cursor: "pointer" }}
-                >
-                  <picture style={{ display: "block", width: "100%" }}>
-                    {currentSlide?.mobileImg && (
-                      <source media="(max-width: 640px)" srcSet={currentSlide?.mobileImg} />
-                    )}
-                    {currentSlide?.tabletImg && (
-                      <source media="(max-width: 1024px)" srcSet={currentSlide?.tabletImg} />
-                    )}
-                    <img
-                      src={currentSlide?.img}
-                      alt={currentSlide?.title || "Hero Slider"}
-                      style={{
-                        width: "100%",
-                        height: "auto",
-                        display: "block",
-                      }}
-                    />
-                  </picture>
-                </Link>
-              )}
-
-              {/* Dots Indicator */}
-              {activeSlidesList.length > 1 && (
-                <div
-                  style={{
-                    position: "absolute",
-                    bottom: "15px",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    display: "flex",
-                    gap: "8px",
-                    zIndex: 3,
-                  }}
-                >
-                  {activeSlidesList.map((_, idx) => (
-                    <div
-                      key={idx}
-                      onClick={() => setActiveSlide(idx)}
-                      style={{
-                        width: "10px",
-                        height: "10px",
-                        borderRadius: "50%",
-                        backgroundColor: safeSlideIdx === idx ? "#e63b7a" : "rgba(255, 255, 255, 0.6)",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
-        );
-      })()}
+            {activeSlidesList.map((_, idx) => (
+              <div
+                key={idx}
+                onClick={() => setActiveSlide(idx)}
+                style={{
+                  width: "10px",
+                  height: "10px",
+                  borderRadius: "50%",
+                  backgroundColor: activeSlide === idx ? "#e52860" : "#555555",
+                  cursor: "pointer",
+                  transition: "var(--transition-fast)",
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
 
       <main className="container" style={{ paddingBottom: "40px", paddingTop: "20px" }}>
 
-        {/* Wide horizontal promo banner ad with Mobile & Tablet responsiveness */}
-        {(() => {
-          const wideBanner = getBannerForPage("Homepage Wide Banner", "/hero-slide-1.png", "Beauty Must Haves Exclusive Savings", "/shop");
-          return (
-            <Link href={wideBanner.link} style={{ margin: "10px 0 35px 0", borderRadius: "8px", overflow: "hidden", cursor: "pointer", display: "block" }} className="promo-card-hover">
-              <picture style={{ display: "block", width: "100%" }}>
-                {wideBanner.mobileImg && (
-                  <source media="(max-width: 640px)" srcSet={wideBanner.mobileImg} />
-                )}
-                {wideBanner.tabletImg && (
-                  <source media="(max-width: 1024px)" srcSet={wideBanner.tabletImg} />
-                )}
-                <img
-                  src={wideBanner.img}
-                  alt={wideBanner.title}
-                  style={{
-                    width: "100%",
-                    height: "auto",
-                    display: "block",
-                  }}
-                />
-              </picture>
-            </Link>
-          );
-        })()}
-
-        {/* Loading Products Indicator */}
-        {loading && products.length === 0 && (
-          <div style={{ margin: "40px 0" }}>
-            <GlowLoader text="Loading Products..." subtext="Authentic Skincare & Cosmetics" />
-          </div>
-        )}
-
-        {/* MAKEUP Section */}
-        {(() => {
-          const makeupProducts = products
-            .filter(p => p.category?.name?.toLowerCase().includes("makeup") || p.name?.toLowerCase().includes("lipstick") || p.name?.toLowerCase().includes("mascara") || p.name?.toLowerCase().includes("powder") || p.name?.toLowerCase().includes("foundation") || p.name?.toLowerCase().includes("primer"))
-            .slice(0, 4);
-
-          if (makeupProducts.length === 0) return null;
-
-          return (
-            <section style={{ margin: "30px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
-              <div style={{ position: "relative", marginBottom: "20px" }}>
-                <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", color: "#000", margin: 0 }}>
-                  MAKEUP
-                </h2>
-                <Link href="/shop?category=Makeup" style={{ position: "absolute", right: "0", top: "50%", transform: "translateY(-50%)", backgroundColor: "#e2136e", color: "#ffffff", padding: "6px 14px", borderRadius: "20px", fontSize: "11.5px", fontWeight: "800", textDecoration: "none", boxShadow: "0 2px 8px rgba(226,19,110,0.25)" }}>
-                  SEE ALL ›
-                </Link>
-              </div>
-
-              <div className="homepage-product-grid mobile-limit-2">
-                {makeupProducts.map((p) => {
-                  const primaryImage = p.images?.find((img) => img.isPrimary)?.url || p.images?.[0]?.url || "";
-                  const primaryVariant = p.variants?.[0];
-                  const oldPrice = primaryVariant?.price || 0;
-                  const currentPrice = primaryVariant?.discountPrice || primaryVariant?.price || 0;
-                  const hasDiscount = Boolean(primaryVariant?.discountPrice && primaryVariant.discountPrice < primaryVariant.price);
-                  const discountPercent = hasDiscount && oldPrice > 0 ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100) : 0;
-                  const sizeLabel = (primaryVariant as any)?.size || (primaryVariant?.name && !primaryVariant.name.toLowerCase().includes("default") ? primaryVariant.name : "");
-
-                  return (
-                    <div key={p.id} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
-                      {hasDiscount && discountPercent > 0 && (
-                        <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
-                          {discountPercent}% OFF
-                        </div>
-                      )}
-
-                      <div className={`wishlist-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)}>
-                        <svg fill={wishlist.includes(p.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-                        </svg>
-                      </div>
-                      <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
-                      </Link>
-                      <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
-                        <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                          {p.name}
-                        </Link>
-                        <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
-                          MAKEUP
-                        </span>
-                        <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                          {hasDiscount && (
-                            <span className="old-price" style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "line-through", fontWeight: "600" }}>
-                              ৳{oldPrice.toFixed(2)}
-                            </span>
-                          )}
-                          <span className="price" style={{ fontSize: "16px", fontWeight: "800", color: "#e2136e" }}>
-                            ৳{currentPrice.toFixed(2)}
-                          </span>
-                        </div>
-                        <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
-                          ★ ★ ★ ★ <span style={{ color: "#cbd5e1" }}>★</span>
-                        </div>
-                        {sizeLabel && (
-                          <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
-                            {sizeLabel}
-                          </div>
-                        )}
-                      </div>
-                      <button className="add-to-cart-btn" onClick={() => handleAddToCart(p)} style={{ backgroundColor: "#581c87", color: "#ffffff", border: "none", padding: "12px", fontWeight: "800", fontSize: "13px", letterSpacing: "0.5px", cursor: "pointer", width: "100%", borderRadius: "0 0 12px 12px" }}>
-                        ADD TO CART
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })()}
+        {/* Wide horizontal promo banner ad */}
+        <Link href={getBannerForPage("Homepage Wide Banner", "", "").link} style={{ margin: "10px 0 35px 0", borderRadius: "var(--radius-md)", overflow: "hidden", cursor: "pointer", display: "block" }} className="promo-card-hover">
+          <img
+            src={getBannerForPage("Homepage Wide Banner", "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=1200&q=80", "").img}
+            alt={getBannerForPage("Homepage Wide Banner", "", "Beauty Must Haves Exclusive Savings").title}
+            style={{
+              width: "100%",
+              height: "auto",
+              maxHeight: "160px",
+              objectFit: "cover",
+              display: "block",
+            }}
+          />
+        </Link>
 
         {/* DEALS YOU CANNOT MISS Section */}
         <section style={{ margin: "30px 0 40px 0" }}>
-          <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "20px", color: "#000" }}>
+          <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "20px", color: "var(--dark)" }}>
             DEALS YOU CANNOT MISS
           </h2>
-          <div className="dycm-grid">
+          <div className="shajgoj-grid-4">
             {/* Card 1 */}
-            <Link href={getBannerForPage("Deal Card 1", "/images/deals/deal-1.png", "Ombre 30% Off", "/shop?deal=ombre").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img 
-                src={getBannerForPage("Deal Card 1", "/images/deals/deal-1.png", "Ombre 30% Off").img} 
-                onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/images/deals/deal-1.png"; }}
-                alt="Deal Card 1" 
-                style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} 
-              />
+            <Link href={getBannerForPage("Deal Card 1", "", "", "/shop?category=clearance-sale").link} style={{ borderRadius: "var(--radius-md)", overflow: "hidden", boxShadow: "var(--shadow-sm)", border: "1px solid var(--gray-200)", cursor: "pointer", transition: "var(--transition-fast)", backgroundColor: "#fff", display: "block", textDecoration: "none" }} className="promo-card-hover">
+              <img src={getBannerForPage("Deal Card 1", "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=500&q=80", "", "/shop?category=clearance-sale").img} alt="Deal Card 1" style={{ width: "100%", height: "260px", objectFit: "cover" }} />
+              <div style={{ padding: "10px", textAlign: "center", fontWeight: "700", fontSize: "12px", color: "var(--primary)" }}>{getBannerForPage("Deal Card 1", "", "MEGA OFFERS (UP TO 50% OFF)").title}</div>
             </Link>
             {/* Card 2 */}
-            <Link href={getBannerForPage("Deal Card 2", "/images/deals/deal-2.png", "Marico Free Delivery", "/shop?deal=marico").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img 
-                src={getBannerForPage("Deal Card 2", "/images/deals/deal-2.png", "Marico Free Delivery").img} 
-                onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/images/deals/deal-2.png"; }}
-                alt="Deal Card 2" 
-                style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} 
-              />
+            <Link href={getBannerForPage("Deal Card 2", "", "", "/shop?category=skincare").link} style={{ borderRadius: "var(--radius-md)", overflow: "hidden", boxShadow: "var(--shadow-sm)", border: "1px solid var(--gray-200)", cursor: "pointer", transition: "var(--transition-fast)", backgroundColor: "#fff", display: "block", textDecoration: "none" }} className="promo-card-hover">
+              <img src={getBannerForPage("Deal Card 2", "https://images.unsplash.com/photo-1612817288484-6f916006741a?w=500&q=80", "", "/shop?category=skincare").img} alt="Deal Card 2" style={{ width: "100%", height: "260px", objectFit: "cover" }} />
+              <div style={{ padding: "10px", textAlign: "center", fontWeight: "700", fontSize: "12px", color: "var(--primary)" }}>{getBannerForPage("Deal Card 2", "", "GOODNESS OF NATURE").title}</div>
             </Link>
             {/* Card 3 */}
-            <Link href={getBannerForPage("Deal Card 3", "/images/deals/deal-3.gif", "PNS Campaign", "/shop?deal=pns").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img 
-                src={getBannerForPage("Deal Card 3", "/images/deals/deal-3.gif", "PNS Campaign").img} 
-                onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/images/deals/deal-3.gif"; }}
-                alt="Deal Card 3" 
-                style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} 
-              />
+            <Link href={getBannerForPage("Deal Card 3", "", "", "/shop?category=combo").link} style={{ borderRadius: "var(--radius-md)", overflow: "hidden", boxShadow: "var(--shadow-sm)", border: "1px solid var(--gray-200)", cursor: "pointer", transition: "var(--transition-fast)", backgroundColor: "#fff", display: "block", textDecoration: "none" }} className="promo-card-hover">
+              <img src={getBannerForPage("Deal Card 3", "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=500&q=80", "", "/shop?category=combo").img} alt="Deal Card 3" style={{ width: "100%", height: "260px", objectFit: "cover" }} />
+              <div style={{ padding: "10px", textAlign: "center", fontWeight: "700", fontSize: "12px", color: "var(--primary)" }}>{getBannerForPage("Deal Card 3", "", "BUY 2 GET BDT 101 OFF").title}</div>
             </Link>
             {/* Card 4 */}
-            <Link href={getBannerForPage("Deal Card 4", "/images/deals/deal-4.jpg", "Senora Deal", "/shop?deal=senora").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img 
-                src={getBannerForPage("Deal Card 4", "/images/deals/deal-4.jpg", "Senora Deal").img} 
-                onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/images/deals/deal-4.jpg"; }}
-                alt="Deal Card 4" 
-                style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} 
-              />
+            <Link href={getBannerForPage("Deal Card 4", "", "", "/shop?category=makeup").link} style={{ borderRadius: "var(--radius-md)", overflow: "hidden", boxShadow: "var(--shadow-sm)", border: "1px solid var(--gray-200)", cursor: "pointer", transition: "var(--transition-fast)", backgroundColor: "#fff", display: "block", textDecoration: "none" }} className="promo-card-hover">
+              <img src={getBannerForPage("Deal Card 4", "https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=500&q=80", "", "/shop?category=makeup").img} alt="Deal Card 4" style={{ width: "100%", height: "260px", objectFit: "cover" }} />
+              <div style={{ padding: "10px", textAlign: "center", fontWeight: "700", fontSize: "12px", color: "var(--primary)" }}>{getBannerForPage("Deal Card 4", "", "OMBRE SALE (UP TO 16% OFF)").title}</div>
             </Link>
           </div>
         </section>
-
-        {/* SKIN CARE Section */}
-        {(() => {
-          const skincareProducts = products
-            .filter(p => p.category?.name?.toLowerCase().includes("skin") || p.name?.toLowerCase().includes("serum") || p.name?.toLowerCase().includes("cream") || p.name?.toLowerCase().includes("sunscreen") || p.name?.toLowerCase().includes("moisturizer") || p.name?.toLowerCase().includes("toner") || p.name?.toLowerCase().includes("face wash"))
-            .slice(0, 4);
-
-          if (skincareProducts.length === 0) return null;
-
-          return (
-            <section style={{ margin: "40px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
-              <div style={{ position: "relative", marginBottom: "20px" }}>
-                <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", color: "#000", margin: 0 }}>
-                  SKIN CARE
-                </h2>
-                <Link href="/shop?category=Skincare" style={{ position: "absolute", right: "0", top: "50%", transform: "translateY(-50%)", backgroundColor: "#e2136e", color: "#ffffff", padding: "6px 14px", borderRadius: "20px", fontSize: "11.5px", fontWeight: "800", textDecoration: "none", boxShadow: "0 2px 8px rgba(226,19,110,0.25)" }}>
-                  SEE ALL ›
-                </Link>
-              </div>
-
-              <div className="homepage-product-grid mobile-limit-2">
-                {skincareProducts.map((p) => {
-                  const primaryImage = p.images?.find((img) => img.isPrimary)?.url || p.images?.[0]?.url || "";
-                  const primaryVariant = p.variants?.[0];
-                  const oldPrice = primaryVariant?.price || 0;
-                  const currentPrice = primaryVariant?.discountPrice || primaryVariant?.price || 0;
-                  const hasDiscount = Boolean(primaryVariant?.discountPrice && primaryVariant.discountPrice < primaryVariant.price);
-                  const discountPercent = hasDiscount && oldPrice > 0 ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100) : 0;
-                  const sizeLabel = (primaryVariant as any)?.size || (primaryVariant?.name && !primaryVariant.name.toLowerCase().includes("default") ? primaryVariant.name : "");
-
-                  return (
-                    <div key={p.id} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
-                      {hasDiscount && discountPercent > 0 && (
-                        <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
-                          {discountPercent}% OFF
-                        </div>
-                      )}
-
-                      <div className={`wishlist-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)}>
-                        <svg fill={wishlist.includes(p.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-                        </svg>
-                      </div>
-                      <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
-                      </Link>
-                      <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
-                        <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                          {p.name}
-                        </Link>
-                        <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
-                          SKIN CARE
-                        </span>
-                        <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                          {hasDiscount && (
-                            <span className="old-price" style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "line-through", fontWeight: "600" }}>
-                              ৳{oldPrice.toFixed(2)}
-                            </span>
-                          )}
-                          <span className="price" style={{ fontSize: "16px", fontWeight: "800", color: "#e2136e" }}>
-                            ৳{currentPrice.toFixed(2)}
-                          </span>
-                        </div>
-                        <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
-                          ★ ★ ★ ★ ★
-                        </div>
-                        {sizeLabel && (
-                          <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
-                            {sizeLabel}
-                          </div>
-                        )}
-                      </div>
-                      <button className="add-to-cart-btn" onClick={() => handleAddToCart(p)} style={{ backgroundColor: "#581c87", color: "#ffffff", border: "none", padding: "12px", fontWeight: "800", fontSize: "13px", letterSpacing: "0.5px", cursor: "pointer", width: "100%", borderRadius: "0 0 12px 12px" }}>
-                        ADD TO CART
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })()}
 
         {/* TOP BRANDS & OFFERS Section */}
-        <section style={{ margin: "30px 0" }}>
-          <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "16px", color: "#000" }}>
+        <section style={{ margin: "40px 0" }}>
+          <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "20px", color: "var(--dark)" }}>
             TOP BRANDS & OFFERS
           </h2>
-          <div className="top-brands-grid">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "15px" }}>
             {/* Banner 1 */}
-            <Link href={getBannerForPage("Brand Offer 1", "/images/brands/brand-offer-1.png", "The Ordinary", "/shop?brand=the-ordinary").link} style={{ display: "block", overflow: "hidden", borderRadius: "10px", transition: "transform 0.2s ease" }} className="promo-card-hover">
-              <img 
-                src={getBannerForPage("Brand Offer 1", "/images/brands/brand-offer-1.png", "The Ordinary").img} 
-                onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/images/brands/brand-offer-1.png"; }}
-                alt="Brand Offer 1 - The Ordinary" 
-                style={{ width: "100%", height: "auto", display: "block", borderRadius: "10px" }} 
-              />
+            <Link href={getBannerForPage("Brand Offer 1", "", "", "/shop?search=trimmer").link} style={{ borderRadius: "var(--radius-md)", overflow: "hidden", boxShadow: "var(--shadow-sm)", border: "1px solid var(--gray-200)", cursor: "pointer", transition: "var(--transition-fast)", backgroundColor: "#fff", display: "block", textDecoration: "none" }} className="promo-card-hover">
+              <img src={getBannerForPage("Brand Offer 1", "https://images.unsplash.com/photo-1608248597279-f99d160bfcbc5?w=800&q=80", "", "/shop?search=trimmer").img} alt="Brand Offer 1" style={{ width: "100%", height: "180px", objectFit: "cover" }} />
+              <div style={{ padding: "10px", textAlign: "center", fontWeight: "700", fontSize: "12.5px", color: "#2b3544" }}>{getBannerForPage("Brand Offer 1", "", "THE ONLY TRIMMER YOU NEED").title}</div>
             </Link>
             {/* Banner 2 */}
-            <Link href={getBannerForPage("Brand Offer 2", "/images/brands/brand-offer-2.gif", "Skin Cafe", "/shop?brand=skin-cafe").link} style={{ display: "block", overflow: "hidden", borderRadius: "10px", transition: "transform 0.2s ease" }} className="promo-card-hover">
-              <img 
-                src={getBannerForPage("Brand Offer 2", "/images/brands/brand-offer-2.gif", "Skin Cafe").img} 
-                onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/images/brands/brand-offer-2.gif"; }}
-                alt="Brand Offer 2 - Skin Cafe" 
-                style={{ width: "100%", height: "auto", display: "block", borderRadius: "10px" }} 
-              />
+            <Link href={getBannerForPage("Brand Offer 2", "", "", "/shop?search=sunscreen").link} style={{ borderRadius: "var(--radius-md)", overflow: "hidden", boxShadow: "var(--shadow-sm)", border: "1px solid var(--gray-200)", cursor: "pointer", transition: "var(--transition-fast)", backgroundColor: "#fff", display: "block", textDecoration: "none" }} className="promo-card-hover">
+              <img src={getBannerForPage("Brand Offer 2", "https://images.unsplash.com/photo-1556228453-efd6c1ff04f6?w=800&q=80", "", "/shop?search=sunscreen").img} alt="Brand Offer 2" style={{ width: "100%", height: "180px", objectFit: "cover" }} />
+              <div style={{ padding: "10px", textAlign: "center", fontWeight: "700", fontSize: "12.5px", color: "#2b3544" }}>{getBannerForPage("Brand Offer 2", "", "SUMMER PROTECTION (UP TO 50% OFF)").title}</div>
+            </Link>
+            {/* Banner 3 */}
+            <Link href={getBannerForPage("Brand Offer 3", "", "", "/shop?brand=Vatika").link} style={{ borderRadius: "var(--radius-md)", overflow: "hidden", boxShadow: "var(--shadow-sm)", border: "1px solid var(--gray-200)", cursor: "pointer", transition: "var(--transition-fast)", backgroundColor: "#fff", display: "block", textDecoration: "none" }} className="promo-card-hover">
+              <img src={getBannerForPage("Brand Offer 3", "https://images.unsplash.com/photo-1527799822364-9491090333d0?w=800&q=80", "", "/shop?brand=Vatika").img} alt="Brand Offer 3" style={{ width: "100%", height: "180px", objectFit: "cover" }} />
+              <div style={{ padding: "10px", textAlign: "center", fontWeight: "700", fontSize: "12.5px", color: "#2b3544" }}>{getBannerForPage("Brand Offer 3", "", "FLAT 30% OFF ON VATIKA").title}</div>
+            </Link>
+            {/* Banner 4 */}
+            <Link href={getBannerForPage("Brand Offer 4", "", "", "/shop?search=glow").link} style={{ borderRadius: "var(--radius-md)", overflow: "hidden", boxShadow: "var(--shadow-sm)", border: "1px solid var(--gray-200)", cursor: "pointer", transition: "var(--transition-fast)", backgroundColor: "#fff", display: "block", textDecoration: "none" }} className="promo-card-hover">
+              <img src={getBannerForPage("Brand Offer 4", "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=800&q=80", "", "/shop?search=glow").img} alt="Brand Offer 4" style={{ width: "100%", height: "180px", objectFit: "cover" }} />
+              <div style={{ padding: "10px", textAlign: "center", fontWeight: "700", fontSize: "12.5px", color: "#2b3544" }}>{getBannerForPage("Brand Offer 4", "", "TREASURE OF GLOW (UP TO 35% OFF)").title}</div>
             </Link>
             {/* Banner 5 */}
-            <Link href={getBannerForPage("Brand Offer 5", "/images/brands/brand-offer-5.png", "Treasure of Glow", "/shop?brand=treasure-of-glow").link} style={{ display: "block", overflow: "hidden", borderRadius: "10px", transition: "transform 0.2s ease" }} className="promo-card-hover">
-              <img 
-                src={getBannerForPage("Brand Offer 5", "/images/brands/brand-offer-5.png", "Treasure of Glow").img} 
-                onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/images/brands/brand-offer-5.png"; }}
-                alt="Brand Offer 5 - Treasure of Glow" 
-                style={{ width: "100%", height: "auto", display: "block", borderRadius: "10px" }} 
-              />
+            <Link href={getBannerForPage("Brand Offer 5", "", "", "/shop?brand=The+Ordinary").link} style={{ borderRadius: "var(--radius-md)", overflow: "hidden", boxShadow: "var(--shadow-sm)", border: "1px solid var(--gray-200)", cursor: "pointer", transition: "var(--transition-fast)", backgroundColor: "#fff", display: "block", textDecoration: "none" }} className="promo-card-hover">
+              <img src={getBannerForPage("Brand Offer 5", "https://images.unsplash.com/photo-1612817288484-6f916006741a?w=800&q=80", "", "/shop?brand=The+Ordinary").img} alt="Brand Offer 5" style={{ width: "100%", height: "180px", objectFit: "cover" }} />
+              <div style={{ padding: "10px", textAlign: "center", fontWeight: "700", fontSize: "12.5px", color: "#2b3544" }}>{getBannerForPage("Brand Offer 5", "", "THE ORDINARY (UP TO 33% OFF)").title}</div>
             </Link>
             {/* Banner 6 */}
-            <Link href={getBannerForPage("Brand Offer 6", "/images/brands/brand-offer-6.gif", "Trimmer Offer", "/shop?category=trimmer").link} style={{ display: "block", overflow: "hidden", borderRadius: "10px", transition: "transform 0.2s ease" }} className="promo-card-hover">
-              <img 
-                src={getBannerForPage("Brand Offer 6", "/images/brands/brand-offer-6.gif", "Trimmer Offer").img} 
-                onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/images/brands/brand-offer-6.gif"; }}
-                alt="Brand Offer 6 - Trimmer Offer" 
-                style={{ width: "100%", height: "auto", display: "block", borderRadius: "10px" }} 
-              />
+            <Link href={getBannerForPage("Brand Offer 6", "", "", "/shop?brand=skin+cafe&search=shower+gel").link} style={{ borderRadius: "var(--radius-md)", overflow: "hidden", boxShadow: "var(--shadow-sm)", border: "1px solid var(--gray-200)", cursor: "pointer", transition: "var(--transition-fast)", backgroundColor: "#fff", display: "block", textDecoration: "none" }} className="promo-card-hover">
+              <img src={getBannerForPage("Brand Offer 6", "https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=800&q=80", "", "/shop?brand=skin+cafe&search=shower+gel").img} alt="Brand Offer 6" style={{ width: "100%", height: "180px", objectFit: "cover" }} />
+              <div style={{ padding: "10px", textAlign: "center", fontWeight: "700", fontSize: "12.5px", color: "#2b3544" }}>{getBannerForPage("Brand Offer 6", "", "SKIN CAFE SHOWER GEL").title}</div>
             </Link>
           </div>
         </section>
 
-        {/* BOGO Section */}
-        {(() => {
-          const bogoProducts = products
-            .filter(p => p.category?.name?.toLowerCase().includes("bogo") || p.name?.toLowerCase().includes("bogo") || p.name?.toLowerCase().includes("buy 1") || p.campaignName === "BOGO")
-            .slice(0, 4);
-
-          if (bogoProducts.length === 0) return null;
-
-          return (
-            <section style={{ margin: "40px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
-              <div style={{ position: "relative", marginBottom: "20px" }}>
-                <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", color: "#000", margin: 0 }}>
-                  BOGO
-                </h2>
-                <Link href="/shop?category=BOGO" style={{ position: "absolute", right: "0", top: "50%", transform: "translateY(-50%)", backgroundColor: "#e2136e", color: "#ffffff", padding: "6px 14px", borderRadius: "20px", fontSize: "11.5px", fontWeight: "800", textDecoration: "none", boxShadow: "0 2px 8px rgba(226,19,110,0.25)" }}>
-                  SEE ALL ›
-                </Link>
-              </div>
-
-              <div className="homepage-product-grid mobile-limit-2">
-                {bogoProducts.map((p) => {
-                  const primaryImage = p.images?.find((img) => img.isPrimary)?.url || p.images?.[0]?.url || "";
-                  const primaryVariant = p.variants?.[0];
-                  const oldPrice = primaryVariant?.price || 0;
-                  const currentPrice = primaryVariant?.discountPrice || primaryVariant?.price || 0;
-                  const hasDiscount = Boolean(primaryVariant?.discountPrice && primaryVariant.discountPrice < primaryVariant.price);
-                  const discountPercent = hasDiscount && oldPrice > 0 ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100) : 0;
-                  const sizeLabel = (primaryVariant as any)?.size || (primaryVariant?.name && !primaryVariant.name.toLowerCase().includes("default") ? primaryVariant.name : "");
-
-                  return (
-                    <div key={p.id} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
-                      {hasDiscount && discountPercent > 0 && (
-                        <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
-                          {discountPercent}% OFF
-                        </div>
-                      )}
-
-                      <div className={`wishlist-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)}>
-                        <svg fill={wishlist.includes(p.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-                        </svg>
-                      </div>
-                      <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
-                      </Link>
-                      <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
-                        <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                          {p.name}
-                        </Link>
-                        <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
-                          BOGO OFFER
-                        </span>
-                        <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                          {hasDiscount && (
-                            <span className="old-price" style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "line-through", fontWeight: "600" }}>
-                              ৳{oldPrice.toFixed(2)}
-                            </span>
-                          )}
-                          <span className="price" style={{ fontSize: "16px", fontWeight: "800", color: "#e2136e" }}>
-                            ৳{currentPrice.toFixed(2)}
-                          </span>
-                        </div>
-                        <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
-                          ★ ★ ★ ★ ★
-                        </div>
-                        {sizeLabel && (
-                          <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
-                            {sizeLabel}
-                          </div>
-                        )}
-                      </div>
-                      <button className="add-to-cart-btn" onClick={() => handleAddToCart(p)} style={{ backgroundColor: "#581c87", color: "#ffffff", border: "none", padding: "12px", fontWeight: "800", fontSize: "13px", letterSpacing: "0.5px", cursor: "pointer", width: "100%", borderRadius: "0 0 12px 12px" }}>
-                        ADD TO CART
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })()}
+        {/* EXTRA DISCOUNT Section */}
+        <section style={{ margin: "40px 0" }}>
+          <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "20px", color: "var(--dark)" }}>
+            EXTRA DISCOUNT
+          </h2>
+          <Link href={getBannerForPage("Homepage Extra Discount", "", "").link} style={{ borderRadius: "var(--radius-md)", overflow: "hidden", cursor: "pointer", display: "block" }} className="promo-card-hover">
+            <img
+              src={getBannerForPage("Homepage Extra Discount", "https://images.unsplash.com/photo-1617897903246-719242758050?w=1200&q=80", "").img}
+              alt={getBannerForPage("Homepage Extra Discount", "", "Extra Discount Step-by-Step Deal").title}
+              style={{
+                width: "100%",
+                height: "auto",
+                maxHeight: "160px",
+                objectFit: "cover",
+                display: "block",
+              }}
+            />
+          </Link>
+        </section>
 
         {/* LIMITED TIME OFFERS Section */}
         <section style={{ margin: "40px 0" }}>
-          <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "20px", color: "#000" }}>
+          <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "20px", color: "var(--dark)" }}>
             LIMITED TIME OFFERS
           </h2>
-          <div className="limited-offers-grid">
+          <div className="shajgoj-grid-4">
             {/* Card 1: BOGO */}
-            <Link href={getBannerForPage("BOGO", "", "", "/shop?campaign=BOGO").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("BOGO", "/images/deals/deal-1.png", "").img} alt="BOGO Offer" style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
+            <Link href={getBannerForPage("Offer BOGO", "/shop?campaign=BOGO", "").link} style={{ display: "block", background: `url(${getBannerForPage("Offer BOGO", "", "").img}) center/cover, linear-gradient(135deg, #d63384 0%, #e52860 100%)`, borderRadius: "16px", height: "200px", color: "#ffffff", padding: "20px", textAlign: "center", boxShadow: "var(--shadow-sm)", cursor: "pointer", position: "relative", overflow: "hidden", textDecoration: "none" }} className="promo-card-hover">
+              <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", height: "100%", width: "100%", background: getBannerForPage("Offer BOGO", "", "").img ? "rgba(0,0,0,0.4)" : "transparent" }}>
+                <span style={{ fontSize: "10px", fontWeight: "800", textTransform: "uppercase", letterSpacing: "1.5px", opacity: "0.9" }}>{getBannerForPage("Offer BOGO", "", "Double the fun with").title}</span>
+                {!getBannerForPage("Offer BOGO", "", "").title && <span style={{ fontSize: "36px", fontWeight: "900", textTransform: "uppercase", letterSpacing: "0.5px", transform: "rotate(-3deg)", marginTop: "8px" }}>BOGO</span>}
+              </div>
             </Link>
             {/* Card 2: COMBO */}
-            <Link href={getBannerForPage("COMBO", "", "", "/shop?campaign=COMBO").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("COMBO", "/images/deals/deal-2.png", "").img} alt="COMBO Offer" style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
+            <Link href={getBannerForPage("Offer COMBO", "/shop?campaign=COMBO", "").link} style={{ display: "block", background: `url(${getBannerForPage("Offer COMBO", "", "").img}) center/cover, linear-gradient(135deg, #d63384 0%, #e52860 100%)`, borderRadius: "16px", height: "200px", color: "#ffffff", padding: "20px", textAlign: "center", boxShadow: "var(--shadow-sm)", cursor: "pointer", position: "relative", overflow: "hidden", textDecoration: "none" }} className="promo-card-hover">
+              <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", height: "100%", width: "100%", background: getBannerForPage("Offer COMBO", "", "").img ? "rgba(0,0,0,0.4)" : "transparent" }}>
+                <span style={{ fontSize: "10px", fontWeight: "800", textTransform: "uppercase", letterSpacing: "1.5px", opacity: "0.9" }}>{getBannerForPage("Offer COMBO", "", "Perfect Match").title}</span>
+                {!getBannerForPage("Offer COMBO", "", "").title && <span style={{ fontSize: "36px", fontWeight: "900", textTransform: "uppercase", letterSpacing: "0.5px", transform: "rotate(-3deg)", marginTop: "8px" }}>COMBO</span>}
+              </div>
             </Link>
-            {/* Card 3: OFFERS */}
-            <Link href={getBannerForPage("OFFERS", "", "", "/shop?campaign=OFFERS").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("OFFERS", "/images/deals/deal-3.gif", "").img} alt="OFFERS" style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
+            {/* Card 3: EXCLUSIVE OFFERS */}
+            <Link href={getBannerForPage("Offer Exclusive", "/shop?campaign=EXCLUSIVE", "").link} style={{ display: "block", background: `url(${getBannerForPage("Offer Exclusive", "", "").img}) center/cover, linear-gradient(135deg, #d63384 0%, #e52860 100%)`, borderRadius: "16px", height: "200px", color: "#ffffff", padding: "20px", textAlign: "center", boxShadow: "var(--shadow-sm)", cursor: "pointer", position: "relative", overflow: "hidden", textDecoration: "none" }} className="promo-card-hover">
+              <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", height: "100%", width: "100%", background: getBannerForPage("Offer Exclusive", "", "").img ? "rgba(0,0,0,0.4)" : "transparent" }}>
+                <span style={{ fontSize: "10px", fontWeight: "800", textTransform: "uppercase", letterSpacing: "1.5px", opacity: "0.9" }}>{getBannerForPage("Offer Exclusive", "", "Exclusive").title}</span>
+                {!getBannerForPage("Offer Exclusive", "", "").title && <span style={{ fontSize: "36px", fontWeight: "900", textTransform: "uppercase", letterSpacing: "0.5px", transform: "rotate(-3deg)", marginTop: "8px" }}>OFFERS</span>}
+              </div>
             </Link>
-            {/* Card 4: Clearance SALE */}
-            <Link href={getBannerForPage("Clearance SALE", "", "", "/shop?campaign=Clearance%20SALE").link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-              <img src={getBannerForPage("Clearance SALE", "/images/deals/deal-4.jpg", "").img} alt="Clearance SALE Offer" style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
+            {/* Card 4: CLEARANCE SALE */}
+            <Link href={getBannerForPage("Offer Clearance", "/shop?campaign=CLEARANCE", "").link} style={{ display: "block", background: `url(${getBannerForPage("Offer Clearance", "", "").img}) center/cover, linear-gradient(135deg, #d63384 0%, #e52860 100%)`, borderRadius: "16px", height: "200px", color: "#ffffff", padding: "20px", textAlign: "center", boxShadow: "var(--shadow-sm)", cursor: "pointer", position: "relative", overflow: "hidden", textDecoration: "none" }} className="promo-card-hover">
+              <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", height: "100%", width: "100%", background: getBannerForPage("Offer Clearance", "", "").img ? "rgba(0,0,0,0.4)" : "transparent" }}>
+                <span style={{ fontSize: "10px", fontWeight: "800", textTransform: "uppercase", letterSpacing: "1.5px", opacity: "0.9" }}>{getBannerForPage("Offer Clearance", "", "Clearance").title}</span>
+                {!getBannerForPage("Offer Clearance", "", "").title && <span style={{ fontSize: "36px", fontWeight: "900", textTransform: "uppercase", letterSpacing: "0.5px", transform: "rotate(-3deg)", marginTop: "8px" }}>SALE</span>}
+              </div>
             </Link>
           </div>
         </section>
-
-        {/* PERFECT MATCH WITH COMBO Section */}
-        {(() => {
-          const comboProducts = products
-            .filter(p => p.category?.name?.toLowerCase().includes("combo") || p.name?.toLowerCase().includes("combo") || p.campaignName === "COMBO")
-            .sort((a, b) => {
-              const discA = (a.variants?.[0]?.price || 0) - (a.variants?.[0]?.discountPrice || a.variants?.[0]?.price || 0);
-              const discB = (b.variants?.[0]?.price || 0) - (b.variants?.[0]?.discountPrice || b.variants?.[0]?.price || 0);
-              return discB - discA;
-            })
-            .slice(0, 4);
-
-          if (comboProducts.length === 0) return null;
-
-          return (
-            <section style={{ margin: "40px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
-              <div style={{ position: "relative", marginBottom: "20px" }}>
-                <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", color: "#000", margin: 0 }}>
-                  PERFECT MATCH WITH COMBO
-                </h2>
-                <Link href="/shop?category=Combo" style={{ position: "absolute", right: "0", top: "50%", transform: "translateY(-50%)", backgroundColor: "#e2136e", color: "#ffffff", padding: "6px 14px", borderRadius: "20px", fontSize: "11.5px", fontWeight: "800", textDecoration: "none", boxShadow: "0 2px 8px rgba(226,19,110,0.25)" }}>
-                  SEE ALL ›
-                </Link>
-              </div>
-
-              <div className="homepage-product-grid mobile-limit-2">
-                {comboProducts.map((p) => {
-                  const primaryImage = p.images?.find((img) => img.isPrimary)?.url || p.images?.[0]?.url || "";
-                  const primaryVariant = p.variants?.[0];
-                  const oldPrice = primaryVariant?.price || 0;
-                  const currentPrice = primaryVariant?.discountPrice || primaryVariant?.price || 0;
-                  const hasDiscount = Boolean(primaryVariant?.discountPrice && primaryVariant.discountPrice < primaryVariant.price);
-                  const discountPercent = hasDiscount && oldPrice > 0 ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100) : 0;
-                  const sizeLabel = (primaryVariant as any)?.size || (primaryVariant?.name && !primaryVariant.name.toLowerCase().includes("default") ? primaryVariant.name : "");
-
-                  return (
-                    <div key={p.id} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
-                      {hasDiscount && discountPercent > 0 && (
-                        <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
-                          {discountPercent}% OFF
-                        </div>
-                      )}
-
-                      <div className={`wishlist-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)}>
-                        <svg fill={wishlist.includes(p.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-                        </svg>
-                      </div>
-                      <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
-                      </Link>
-                      <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
-                        <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                          {p.name}
-                        </Link>
-                        <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
-                          COMBO
-                        </span>
-                        <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                          {hasDiscount && (
-                            <span className="old-price" style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "line-through", fontWeight: "600" }}>
-                              ৳{oldPrice.toFixed(2)}
-                            </span>
-                          )}
-                          <span className="price" style={{ fontSize: "16px", fontWeight: "800", color: "#e2136e" }}>
-                            ৳{currentPrice.toFixed(2)}
-                          </span>
-                        </div>
-                        <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
-                          ★ ★ ★ ★ <span style={{ color: "#cbd5e1" }}>★</span>
-                        </div>
-                        {sizeLabel && (
-                          <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
-                            {sizeLabel}
-                          </div>
-                        )}
-                      </div>
-                      <button className="add-to-cart-btn" onClick={() => handleAddToCart(p)} style={{ backgroundColor: "#581c87", color: "#ffffff", border: "none", padding: "12px", fontWeight: "800", fontSize: "13px", letterSpacing: "0.5px", cursor: "pointer", width: "100%", borderRadius: "0 0 12px 12px" }}>
-                        ADD TO CART
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })()}
 
         {/* SHOP BEAUTY PRODUCTS BY CATEGORY Section */}
-        {(() => {
-          const defaultCategories = [
-            { name: "Makeup", slug: "makeup" },
-            { name: "Skin", slug: "skin" },
-            { name: "Hair", slug: "hair" },
-            { name: "Personal Care", slug: "personal-care" },
-            { name: "Mom & Baby", slug: "mom-baby" },
-            { name: "Fragrance", slug: "fragrance" },
-            { name: "Undergarments", slug: "undergarments" },
-            { name: "Combo", slug: "combo" }
-          ];
-
-          const displayCats = defaultCategories.map(item => {
-            const fromDb = categories.find((c: any) => c.name?.toLowerCase().trim() === item.name.toLowerCase() || c.slug === item.slug);
-            return {
-              id: fromDb?.id || `cat-${item.slug}`,
-              name: fromDb?.name || item.name,
-              slug: fromDb?.slug || item.slug,
-              imageUrl: fromDb?.imageUrl || fromDb?.image || ""
-            };
-          });
-
-          return (
-            <section style={{ margin: "40px 0" }}>
-              <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "20px", color: "#000" }}>
-                SHOP BEAUTY PRODUCTS BY CATEGORY
-              </h2>
-              <div className="categories-grid">
-                {displayCats.map((cat: any) => {
-                  const catLink = `/shop?category=${encodeURIComponent(cat.slug)}`;
-                  const bannerInfo = getBannerForPage(`Category: ${cat.name}`, cat.imageUrl, cat.name, catLink);
-                  const catImg = bannerInfo.img || cat.imageUrl;
-                  return (
-                    <Link 
-                      key={cat.id || cat.name} 
-                      href={bannerInfo.link || catLink} 
-                      style={{ display: "block", borderRadius: "10px", overflow: "hidden", cursor: "pointer", textDecoration: "none" }} 
-                      className="promo-card-hover"
-                    >
-                      {catImg ? (
-                        <img 
-                          src={catImg} 
-                          alt={cat.name} 
-                          style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block", borderRadius: "10px" }} 
-                        />
-                      ) : (
-                        <div style={{
-                          aspectRatio: "1 / 1",
-                          backgroundColor: "#fdf2f8",
-                          border: "1.5px solid #fbcfe8",
-                          borderRadius: "10px",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          padding: "10px",
-                          boxShadow: "0 2px 6px rgba(0,0,0,0.03)"
-                        }}>
-                          <span style={{ fontSize: "26px", marginBottom: "4px" }}>✨</span>
-                          <span style={{ fontSize: "12px", fontWeight: "800", color: "#0f172a", textAlign: "center", lineHeight: "1.2" }}>{cat.name}</span>
-                        </div>
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })()}
-
-        {/* CLEARANCE SALE Section */}
-        {(() => {
-          const clearanceProducts = products
-            .filter(p => p.category?.name?.toLowerCase().includes("clearance") || p.name?.toLowerCase().includes("clearance") || p.campaignName === "CLEARANCE")
-            .slice(0, 4);
-
-          if (clearanceProducts.length === 0) return null;
-
-          return (
-            <section style={{ margin: "40px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
-              <div style={{ position: "relative", marginBottom: "20px" }}>
-                <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", color: "#000", margin: 0 }}>
-                  CLEARANCE SALE
-                </h2>
-                <Link href="/shop?category=clearance-sale" style={{ position: "absolute", right: "0", top: "50%", transform: "translateY(-50%)", backgroundColor: "#e2136e", color: "#ffffff", padding: "6px 14px", borderRadius: "20px", fontSize: "11.5px", fontWeight: "800", textDecoration: "none", boxShadow: "0 2px 8px rgba(226,19,110,0.25)" }}>
-                  SEE ALL ›
+        {pagesConfig?.shopByCategory?.enabled !== false && (
+          <section style={{ margin: "40px 0" }}>
+            <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1px", marginBottom: pagesConfig?.shopByCategory?.subtitle ? "6px" : "20px", color: "var(--dark)" }}>
+              {pagesConfig?.shopByCategory?.title || "SHOP BEAUTY PRODUCTS BY CATEGORY"}
+            </h2>
+            {pagesConfig?.shopByCategory?.subtitle && (
+              <p style={{ textAlign: "center", fontSize: "12px", color: "#718096", margin: "0 0 20px 0" }}>
+                {pagesConfig.shopByCategory.subtitle}
+              </p>
+            )}
+            <div className="shajgoj-grid-4">
+              {categories.filter(c => !c.parentId).slice(0, pagesConfig?.shopByCategory?.showCount || 8).map((cat) => (
+                <Link 
+                  key={cat.id} 
+                  href={`/shop?category=${cat.id}`} 
+                  style={{ display: "block", borderRadius: "16px", overflow: "hidden", height: "260px", position: "relative", boxShadow: "var(--shadow-sm)", cursor: "pointer" }} 
+                  className="promo-card-hover"
+                >
+                  <img 
+                    src={getBannerForPage(`Category: ${cat.name}`, cat.imageUrl || "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=500&q=80", "").img} 
+                    alt={cat.name} 
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+                  />
+                  <div style={{ position: "absolute", top: "15px", width: "100%", textAlign: "center", color: "#ffffff", textShadow: "1px 1px 3px rgba(0,0,0,0.8)", fontSize: "20px", fontWeight: "900", textTransform: "uppercase", letterSpacing: "1px" }}>
+                    {cat.name}
+                  </div>
                 </Link>
-              </div>
-
-              <div className="homepage-product-grid mobile-limit-2">
-                {clearanceProducts.map((p, idx) => {
-                  const primaryImage = p.images?.find((img) => img.isPrimary)?.url || p.images?.[0]?.url || "";
-                  const primaryVariant = p.variants?.[0];
-                  const oldPrice = primaryVariant?.price || 0;
-                  const currentPrice = primaryVariant?.discountPrice || primaryVariant?.price || 0;
-                  const hasDiscount = Boolean(primaryVariant?.discountPrice && primaryVariant.discountPrice < primaryVariant.price);
-                  const discountPercent = hasDiscount && oldPrice > 0 ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100) : 0;
-                  const sizeLabel = (primaryVariant as any)?.size || (primaryVariant?.name && !primaryVariant.name.toLowerCase().includes("default") ? primaryVariant.name : "");
-
-                  return (
-                    <div key={p.id ? `${p.id}-${idx}` : idx} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
-                      {hasDiscount && discountPercent > 0 && (
-                        <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
-                          {discountPercent}% OFF
-                        </div>
-                      )}
-
-                      <div className={`wishlist-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)}>
-                        <svg fill={wishlist.includes(p.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-                        </svg>
-                      </div>
-                      <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
-                      </Link>
-                      <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
-                        <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                          {p.name}
-                        </Link>
-                        <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
-                          CLEARANCE
-                        </span>
-                        <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                          {hasDiscount && (
-                            <span className="old-price" style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "line-through", fontWeight: "600" }}>
-                              ৳{oldPrice.toFixed(2)}
-                            </span>
-                          )}
-                          <span className="price" style={{ fontSize: "16px", fontWeight: "800", color: "#e2136e" }}>
-                            ৳{currentPrice.toFixed(2)}
-                          </span>
-                        </div>
-                        <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
-                          ★ ★ ★ ★ <span style={{ color: "#cbd5e1" }}>★</span>
-                        </div>
-                        {sizeLabel && (
-                          <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
-                            {sizeLabel}
-                          </div>
-                        )}
-                      </div>
-                      <button className="add-to-cart-btn" onClick={() => handleAddToCart(p)} style={{ backgroundColor: "#581c87", color: "#ffffff", border: "none", padding: "12px", fontWeight: "800", fontSize: "13px", letterSpacing: "0.5px", cursor: "pointer", width: "100%", borderRadius: "0 0 12px 12px" }}>
-                        ADD TO CART
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })()}
+              ))}
+            </div>
+          </section>
+        )}
         
         {/* SHOP BY CONCERN Section */}
-        <section style={{ margin: "20px 0 10px 0" }}>
-          <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "20px", color: "#000" }}>
-            SHOP BY CONCERN
-          </h2>
-          <div className="concerns-grid">
-            {[
-              { id: "Concern: Acne", title: "Acne Treatment", icon: "🌿", color: "#ecfdf5", border: "#a7f3d0", link: "/shop?category=skincare&sub=Acne%20Treatment", extra: false },
-              { id: "Concern: Anti Aging", title: "Anti Aging Treatment", icon: "✨", color: "#fffbeb", border: "#fde68a", link: "/shop?category=skincare&sub=Anti%20Aging", extra: false },
-              { id: "Concern: Dandruff", title: "Dandruff Solution", icon: "💧", color: "#eff6ff", border: "#bfdbfe", link: "/shop?category=haircare&sub=Dandruff", extra: false },
-              { id: "Concern: Dry Skin", title: "Dry Skin Treatment", icon: "🧴", color: "#fef2f2", border: "#fecaca", link: "/shop?category=skincare&sub=Dry%20Skin", extra: false },
-              { id: "Concern: Hair Fall", title: "Hair Fall Treatment", icon: "💇‍♀️", color: "#faf5ff", border: "#e9d5ff", link: "/shop?category=haircare&sub=Hair%20Fall", extra: true },
-              { id: "Concern: Oil Control", title: "Oil Control Treatment", icon: "🍃", color: "#f0fdf4", border: "#bbf7d0", link: "/shop?category=skincare", extra: true },
-              { id: "Concern: Pore Care", title: "Pore Care", icon: "🫧", color: "#f0f9ff", border: "#bae6fd", link: "/shop?category=skincare&sub=Pore%20Care", extra: true },
-              { id: "Concern: Spot Treatment", title: "Spot Treatment", icon: "🎯", color: "#fdf4ff", border: "#f5d0fe", link: "/shop?category=skincare", extra: true },
-              { id: "Concern: Hair Thinning", title: "Hair Thinning Solution", icon: "🌾", color: "#fff7ed", border: "#fed7aa", link: "/shop?category=haircare", extra: true },
-              { id: "Concern: Sun Burn", title: "Sun Burn Treatment", icon: "☀️", color: "#fff1f2", border: "#fecdd3", link: "/shop?category=skincare", extra: true }
-            ].map((concern) => {
-              const banner = getBannerForPage(concern.id, "", concern.title, concern.link);
-              return (
+        {pagesConfig?.shopByConcern?.enabled !== false && (
+          <section style={{ margin: "40px 0" }}>
+            <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1px", marginBottom: pagesConfig?.shopByConcern?.subtitle ? "6px" : "20px", color: "var(--dark)" }}>
+              {pagesConfig?.shopByConcern?.title || "SHOP BY CONCERN"}
+            </h2>
+            {pagesConfig?.shopByConcern?.subtitle && (
+              <p style={{ textAlign: "center", fontSize: "12px", color: "#718096", margin: "0 0 20px 0" }}>
+                {pagesConfig.shopByConcern.subtitle}
+              </p>
+            )}
+            <div className="shajgoj-grid-5">
+              {(pagesConfig?.shopByConcern?.concerns && pagesConfig?.shopByConcern?.concerns.length > 0 ? pagesConfig.shopByConcern.concerns : DEFAULT_CONCERNS).map((concern: any, idx: number) => (
                 <Link
-                  key={concern.id}
-                  href={banner.link}
-                  style={{ display: "block", overflow: "hidden", borderRadius: "10px", textDecoration: "none" }}
-                  className={`promo-card-hover ${concern.extra ? "concern-card-extra" : ""}`}
+                  key={idx}
+                  href={getBannerForPage(`Concern: ${concern.name}`, concern.link || "/shop", "").link}
+                  style={{ display: "flex", textDecoration: "none", background: "linear-gradient(135deg, #e5a93b 0%, #ffd066 100%)", borderRadius: "16px", height: "230px", flexDirection: "column", justifyContent: "center", alignItems: "center", padding: "20px", textAlign: "center", color: "#ffffff", cursor: "pointer", boxShadow: "var(--shadow-sm)" }}
+                  className="promo-card-hover"
                 >
-                  {banner.img ? (
-                    <img
-                      src={banner.img}
-                      alt={concern.title}
-                      style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block", borderRadius: "10px" }}
-                    />
-                  ) : (
-                    <div style={{
-                      aspectRatio: "1 / 1",
-                      backgroundColor: concern.color,
-                      border: `1.5px solid ${concern.border}`,
-                      borderRadius: "10px",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: "10px",
-                      boxShadow: "0 2px 6px rgba(0,0,0,0.03)"
-                    }}>
-                      <span style={{ fontSize: "24px", marginBottom: "4px" }}>{concern.icon}</span>
-                      <span style={{ fontSize: "11px", fontWeight: "800", color: "#1e293b", textAlign: "center", lineHeight: "1.2" }}>{concern.title}</span>
-                    </div>
-                  )}
+                  <img
+                    src={getBannerForPage(`Concern: ${concern.name}`, concern.image || "https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?w=100&h=100&fit=crop&q=80", "").img}
+                    alt={concern.name}
+                    style={{ width: "90px", height: "90px", borderRadius: "50%", objectFit: "cover", border: "2px solid #ffffff", marginBottom: "15px" }}
+                  />
+                  <span style={{ fontSize: "15px", fontWeight: "900", letterSpacing: "0.5px", textShadow: "1px 1px 2px rgba(0,0,0,0.3)" }}>
+                    {concern.name?.toUpperCase()}
+                  </span>
+                  <span style={{ fontSize: "10px", fontWeight: "800", opacity: "0.9" }}>
+                    {concern.subtitle?.toUpperCase()}
+                  </span>
                 </Link>
-              );
-            })}
-          </div>
-        </section>
+              ))}
+            </div>
+          </section>
+        )}
 
       </main>
 

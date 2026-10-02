@@ -31,6 +31,28 @@ export default function CheckoutPage() {
   // Delivery Zone Selection State ("auto", "inside", "sub", "outside")
   const [manualZone, setManualZone] = useState<"auto" | "inside" | "sub" | "outside">("auto");
 
+  // Dynamic pages configuration
+  const [pagesConfig, setPagesConfig] = useState<any>({
+    insideDhakaCharge: 70,
+    subAreaCharge: 100,
+    outsideDhakaCharge: 130,
+    autoDiscountEnabled: true,
+    discountStepAmount: 50,
+    discountPerCartAmount: 500,
+    deliveryNote: "২৪ থেকে ৪৮ ঘণ্টার মধ্যে ডেলিভারি"
+  });
+
+  React.useEffect(() => {
+    fetch(`${API_BASE}/settings/pages-config`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.checkoutPage) {
+          setPagesConfig((prev: any) => ({ ...prev, ...data.checkoutPage }));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponMessage, setCouponMessage] = useState("");
@@ -40,18 +62,22 @@ export default function CheckoutPage() {
 
   const cartSubtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
 
+  const insideCharge = Number(pagesConfig?.insideDhakaCharge ?? 70);
+  const subCharge = Number(pagesConfig?.subAreaCharge ?? 100);
+  const outsideCharge = Number(pagesConfig?.outsideDhakaCharge ?? 130);
+
   const getDeliveryDetails = () => {
-    if (manualZone === "inside") return { zone: "Inside Dhaka City", charge: 70 };
-    if (manualZone === "sub") return { zone: "Sub Area (Keraniganj, Savar, Gazipur, Narayanganj)", charge: 100 };
-    if (manualZone === "outside") return { zone: "Outside Dhaka / All Districts", charge: 130 };
+    if (manualZone === "inside") return { zone: "Inside Dhaka City", charge: insideCharge };
+    if (manualZone === "sub") return { zone: "Sub Area (Keraniganj, Savar, Gazipur, Narayanganj)", charge: subCharge };
+    if (manualZone === "outside") return { zone: "Outside Dhaka / All Districts", charge: outsideCharge };
 
     // Auto detect from address text
     const text = (checkoutAddress || "").toLowerCase().trim();
-    if (!text) return { zone: "Inside Dhaka City", charge: 70 };
+    if (!text) return { zone: "Inside Dhaka City", charge: insideCharge };
 
     const subKeywords = ["savar", "keraniganj", "gazipur", "narayanganj", "সাভার", "কেরানীগঞ্জ", "গাজীপুর", "নারায়ণগঞ্জ"];
     if (subKeywords.some(k => text.includes(k))) {
-      return { zone: "Sub Area (Keraniganj, Savar, Gazipur, Narayanganj)", charge: 100 };
+      return { zone: "Sub Area (Keraniganj, Savar, Gazipur, Narayanganj)", charge: subCharge };
     }
 
     const outsideKeywords = [
@@ -67,18 +93,21 @@ export default function CheckoutPage() {
     ];
 
     if (outsideKeywords.some(k => text.includes(k))) {
-      return { zone: "Outside Dhaka / All Districts", charge: 130 };
+      return { zone: "Outside Dhaka / All Districts", charge: outsideCharge };
     }
 
-    return { zone: "Inside Dhaka City", charge: 70 };
+    return { zone: "Inside Dhaka City", charge: insideCharge };
   };
 
   const detectedInfo = getDeliveryDetails();
   const deliveryCharge = detectedInfo.charge;
   const zone = detectedInfo.zone;
 
-  // Tiered Auto Discount: ৳50 off for every ৳500 spent
-  const autoDiscount = Math.floor(cartSubtotal / 500) * 50;
+  // Tiered Auto Discount configurable from Admin
+  const isAutoDiscount = pagesConfig?.autoDiscountEnabled !== false;
+  const stepAmount = Number(pagesConfig?.discountStepAmount ?? 50);
+  const perCartAmount = Number(pagesConfig?.discountPerCartAmount ?? 500);
+  const autoDiscount = isAutoDiscount && perCartAmount > 0 ? Math.floor(cartSubtotal / perCartAmount) * stepAmount : 0;
   const effectiveDiscount = Math.max(autoDiscount, couponDiscount);
   const total = Math.max(0, cartSubtotal + deliveryCharge - effectiveDiscount);
 
@@ -277,7 +306,7 @@ export default function CheckoutPage() {
                             textAlign: "center"
                           }}
                         >
-                          Inside Dhaka (৳70)
+                          Inside Dhaka (৳{insideCharge})
                         </button>
                         <button
                           type="button"
@@ -294,7 +323,7 @@ export default function CheckoutPage() {
                             textAlign: "center"
                           }}
                         >
-                          Sub Area (৳100)
+                          Sub Area (৳{subCharge})
                         </button>
                         <button
                           type="button"
@@ -311,7 +340,7 @@ export default function CheckoutPage() {
                             textAlign: "center"
                           }}
                         >
-                          All Districts (৳130)
+                          All Districts (৳{outsideCharge})
                         </button>
                       </div>
                     </div>
@@ -320,6 +349,12 @@ export default function CheckoutPage() {
                       <span>🚚 Selected Shipping Charge:</span>
                       <span style={{ fontSize: "14px", fontWeight: "900", color: "#e63b7a" }}>৳{deliveryCharge} ({zone})</span>
                     </div>
+                    {pagesConfig?.deliveryNote && (
+                      <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#64748b", fontWeight: "600" }}>
+                        <Truck size={14} color="#e63b7a" />
+                        <span>{pagesConfig.deliveryNote}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -438,7 +473,7 @@ export default function CheckoutPage() {
                   {effectiveDiscount > 0 && (
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px", fontWeight: "700", color: "#16a34a" }}>
                       <span>
-                        {couponDiscount > autoDiscount ? `Coupon Discount (${couponCode})` : `Volume Discount (৳50 off per ৳500)`}
+                        {couponDiscount > autoDiscount ? `Coupon Discount (${couponCode})` : `Volume Discount (৳${stepAmount} off per ৳${perCartAmount})`}
                       </span>
                       <span>- BDT {effectiveDiscount}</span>
                     </div>
@@ -456,19 +491,21 @@ export default function CheckoutPage() {
               {/* Automatic Tiered Discount Info & Optional Promo Box */}
               <div style={{ backgroundColor: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
                 {/* Automatic Volume Offer Banner */}
-                <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", padding: "12px", borderRadius: "8px", marginBottom: "14px" }}>
-                  <div style={{ fontSize: "12px", fontWeight: "800", color: "#15803d", marginBottom: "4px" }}>
-                    🎉 Automatic Tiered Discount Active!
-                  </div>
-                  <div style={{ fontSize: "11px", color: "#166534", fontWeight: "600", lineHeight: "1.4" }}>
-                    Every ৳500 spent gets ৳50 instant discount (৳500 = ৳50 OFF, ৳1000 = ৳100 OFF, ৳1500 = ৳150 OFF, etc.)
-                  </div>
-                  {autoDiscount > 0 && (
-                    <div style={{ fontSize: "12px", fontWeight: "900", color: "#e63b7a", marginTop: "6px" }}>
-                      Current Tier Savings: ৳{autoDiscount} OFF
+                {isAutoDiscount && stepAmount > 0 && perCartAmount > 0 && (
+                  <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", padding: "12px", borderRadius: "8px", marginBottom: "14px" }}>
+                    <div style={{ fontSize: "12px", fontWeight: "800", color: "#15803d", marginBottom: "4px" }}>
+                      🎉 Automatic Tiered Discount Active!
                     </div>
-                  )}
-                </div>
+                    <div style={{ fontSize: "11px", color: "#166534", fontWeight: "600", lineHeight: "1.4" }}>
+                      Every ৳{perCartAmount} spent gets ৳{stepAmount} instant discount (৳{perCartAmount} = ৳{stepAmount} OFF, ৳{perCartAmount * 2} = ৳{stepAmount * 2} OFF, etc.)
+                    </div>
+                    {autoDiscount > 0 && (
+                      <div style={{ fontSize: "12px", fontWeight: "900", color: "#e63b7a", marginTop: "6px" }}>
+                        Current Tier Savings: ৳{autoDiscount} OFF
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <h3 style={{ fontSize: "13px", fontWeight: "800", color: "#0f172a", marginBottom: "8px" }}>
                   Have an Extra Special Promo Code?

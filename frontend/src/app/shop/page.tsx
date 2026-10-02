@@ -260,6 +260,26 @@ function ShopPageContent() {
   const [maxPriceBound, setMaxPriceBound] = useState(500000);
   const [searchVal, setSearchVal] = useState("");
   const [sortVal, setSortVal] = useState("");
+  const [pagesConfig, setPagesConfig] = useState<any>({
+    bannerTitle: "Shop All Products",
+    announcement: "100% Authentic Cosmetics, Skincare & Fragrances",
+    defaultSort: ""
+  });
+
+  useEffect(() => {
+    fetch(`${API_BASE}/settings/pages-config`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.shopPage) {
+          setPagesConfig(data.shopPage);
+          if (data.shopPage.defaultSort) {
+            setSortVal((current: string) => current || data.shopPage.defaultSort);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const [activeCategories, setActiveCategories] = useState<string[]>([]);
   const [activeSubcategories, setActiveSubcategories] = useState<string[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
@@ -727,7 +747,7 @@ function ShopPageContent() {
     ? activeSubcategories.join(", ")
     : activeCategories.length > 0
     ? activeCategories.join(" & ").toUpperCase() + " COLLECTION"
-    : "ALL PRODUCTS";
+    : (pagesConfig?.bannerTitle || "ALL PRODUCTS");
 
   const bannerBg = activeSubcategories.length > 0
     ? "#000"
@@ -744,7 +764,7 @@ function ShopPageContent() {
         <span className="shop-banner-side">GLOWGOODLY</span>
         <span className="shop-banner-title">{bannerTitle}</span>
         <span className="shop-banner-subtitle">
-          {activeSubcategories.length > 0 ? "Premium Beauty & Skincare" : "#1 Beauty Destination in Bangladesh"}
+          {activeSubcategories.length > 0 ? "Premium Beauty & Skincare" : (pagesConfig?.announcement || "#1 Beauty Destination in Bangladesh")}
         </span>
       </div>
 

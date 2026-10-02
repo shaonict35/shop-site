@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Header from "../../components/Header";
 import PromoBanner from "../../components/PromoBanner";
 import Footer from "../../components/Footer";
 import MobileNavbar from "../../components/MobileNavbar";
 import { Sparkles, ArrowRight, Search, Heart, ShieldCheck, Truck, CheckCircle2 } from "lucide-react";
+import { API_BASE } from "../../utils/api";
 
 interface CategoryMeta {
   name: string;
@@ -149,6 +150,22 @@ const CATEGORIES: CategoryMeta[] = [
 
 export default function CategoryDirectoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [pagesConfig, setPagesConfig] = useState({
+    heroTitle: "Explore All Categories",
+    heroSubtitle: "Discover 100% authentic cosmetics, skincare, haircare & fragrances from top international brands with fast cash-on-delivery in Bangladesh.",
+    badgeText: "GlowGoodly Beauty Directory"
+  });
+
+  useEffect(() => {
+    fetch(`${API_BASE}/settings/pages-config`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.categoryPage) {
+          setPagesConfig(data.categoryPage);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const filteredCategories = CATEGORIES.filter((cat) => {
     if (!searchTerm.trim()) return true;
@@ -184,15 +201,15 @@ export default function CategoryDirectoryPage() {
             
             <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "rgba(255,255,255,0.1)", backdropFilter: "blur(10px)", padding: "6px 16px", borderRadius: "30px", fontSize: "13px", fontWeight: "700", color: "#f472b6", marginBottom: "16px", border: "1px solid rgba(255,255,255,0.15)" }}>
               <Sparkles size={15} />
-              <span>GlowGoodly Beauty Directory</span>
+              <span>{pagesConfig.badgeText || "GlowGoodly Beauty Directory"}</span>
             </div>
 
             <h1 style={{ fontSize: "36px", fontWeight: "900", letterSpacing: "-0.5px", marginBottom: "14px", lineHeight: "1.2" }}>
-              Explore All Categories
+              {pagesConfig.heroTitle || "Explore All Categories"}
             </h1>
 
             <p style={{ fontSize: "16px", color: "#cbd5e1", maxWidth: "600px", margin: "0 auto 28px auto", lineHeight: "1.6" }}>
-              Discover 100% authentic cosmetics, skincare, haircare & fragrances from top international brands with fast cash-on-delivery in Bangladesh.
+              {pagesConfig.heroSubtitle || "Discover 100% authentic cosmetics, skincare, haircare & fragrances from top international brands with fast cash-on-delivery in Bangladesh."}
             </p>
 
             {/* Quick Search */}

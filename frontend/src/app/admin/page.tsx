@@ -4,7 +4,8 @@ import React, { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useApp } from "../../context/AppContext";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { Home, ShoppingCart, Users, Package, Star, Image as ImageIcon, Settings, Bell, Search, Grid, Activity, Layout, Layers, Box, Calendar, User, FileText, CheckSquare, MessageSquare, Menu, LogOut, ExternalLink, ChevronDown, Mail, Camera } from 'lucide-react';
+import { Home, ShoppingCart, Users, Package, Star, Image as ImageIcon, Settings, Bell, Search, Grid, Activity, Layout, Layers, Box, Calendar, User, FileText, CheckSquare, MessageSquare, Menu, LogOut, ExternalLink, ChevronDown, Mail, Camera, Sliders, CheckCircle, Tag, ShoppingBag, Plus, Trash2 } from 'lucide-react';
+import { API_BASE, triggerGlobalDataSync } from "../../utils/api";
 
 // Removed dummy salesData and recentBuyers
 
@@ -13,7 +14,7 @@ export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<"dashboard" | "settings" | "orders" | "reviews" | "products" | "banners" | "inventory" | "customers" | "coupons" | "delivery" | "staff" | "reports" | "vendors" | "chat" | "notifications">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "settings" | "orders" | "reviews" | "products" | "banners" | "inventory" | "customers" | "coupons" | "delivery" | "staff" | "reports" | "vendors" | "chat" | "notifications" | "pages-config">("dashboard");
 
   // Dashboard Stats State
   const [dashboardStats, setDashboardStats] = useState<any>(null);
@@ -71,6 +72,120 @@ export default function AdminPage() {
   const [notificationForm, setNotificationForm] = useState({ id: "", title: "", message: "", linkUrl: "", isActive: true });
   const [isEditingNotification, setIsEditingNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState("");
+
+  // Pages & Sections Customization States
+  const [pagesConfigSubTab, setPagesConfigSubTab] = useState<"shop-by-category" | "shop-by-concern" | "category-page" | "checkout-page" | "shop-page" | "seasonal-offer">("shop-by-category");
+  const [pagesConfigMessage, setPagesConfigMessage] = useState("");
+  const [pagesConfig, setPagesConfig] = useState<any>({
+    shopByCategory: {
+      title: "SHOP BEAUTY PRODUCTS BY CATEGORY",
+      subtitle: "Browse Authentic Skincare & Makeup by Category",
+      showCount: 8,
+      enabled: true
+    },
+    shopByConcern: {
+      title: "SHOP BY CONCERN",
+      subtitle: "Targeted Solutions for Your Skin & Hair Care",
+      enabled: true,
+      concerns: [
+        { name: "Acne", subtitle: "TREATMENT", image: "https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?w=100&h=100&fit=crop&q=80", link: "/shop?category=skincare&sub=Acne%20Treatment" },
+        { name: "Anti Aging", subtitle: "CARE", image: "https://images.unsplash.com/photo-1601049676099-e7ed07d825b0?w=100&h=100&fit=crop&q=80", link: "/shop?category=skincare&sub=Anti%20Aging" },
+        { name: "Dandruff", subtitle: "SOLUTION", image: "https://images.unsplash.com/photo-1562322140-8baeececf3df?w=100&h=100&fit=crop&q=80", link: "/shop?category=haircare&sub=Dandruff" },
+        { name: "Dry Skin", subtitle: "HYDRATION", image: "https://images.unsplash.com/photo-1512290906873-108719bc5a0e?w=100&h=100&fit=crop&q=80", link: "/shop?category=skincare&sub=Dry%20Skin" },
+        { name: "Hair Fall", subtitle: "DEFENSE", image: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=100&h=100&fit=crop&q=80", link: "/shop?category=haircare&sub=Hair%20Fall" },
+        { name: "Oil Control", subtitle: "BALANCE", image: "https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?w=100&h=100&fit=crop&q=80", link: "/shop?category=skincare" },
+        { name: "Pore Care", subtitle: "REFINING", image: "https://images.unsplash.com/photo-1601049676099-e7ed07d825b0?w=100&h=100&fit=crop&q=80", link: "/shop?category=skincare&sub=Pore%20Care" },
+        { name: "Spot Treatment", subtitle: "CLEAR GLOW", image: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=100&h=100&fit=crop&q=80", link: "/shop?category=skincare" },
+        { name: "Hair Thinning", subtitle: "VOLUME", image: "https://images.unsplash.com/photo-1562322140-8baeececf3df?w=100&h=100&fit=crop&q=80", link: "/shop?category=haircare" },
+        { name: "Sun Burn", subtitle: "RELIEF", image: "https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?w=100&h=100&fit=crop&q=80", link: "/shop?category=skincare" }
+      ]
+    },
+    categoryPage: {
+      heroTitle: "Explore All Categories",
+      heroSubtitle: "Discover 100% authentic cosmetics, skincare, haircare & fragrances from top international brands with fast cash-on-delivery in Bangladesh.",
+      badgeText: "GlowGoodly Beauty Directory"
+    },
+    checkoutPage: {
+      insideDhakaCharge: 70,
+      subAreaCharge: 100,
+      outsideDhakaCharge: 130,
+      autoDiscountEnabled: true,
+      discountStepAmount: 50,
+      discountPerCartAmount: 500,
+      deliveryNote: "২৪ থেকে ৪৮ ঘণ্টার মধ্যে ডেলিভারি"
+    },
+    shopPage: {
+      bannerTitle: "Shop All Products",
+      announcement: "100% Authentic Cosmetics, Skincare & Fragrances",
+      defaultSort: ""
+    }
+  });
+
+  const [seasonalOfferForm, setSeasonalOfferForm] = useState<any>({
+    title: "বিশেষ অফারে অরিজিনাল বিউটি কম্বো প্যাকেজ!",
+    subtitle: "সীমিত সময়ের জন্য ছাড়! ১০০% অরিজিনাল প্রোডাক্ট দ্রুত ক্যাশ অন ডেলিভারিতে পান।",
+    videoUrl: "",
+    productTitle: "প্রিমিয়াম বিউটি ও স্কিনকেয়ার গ্লো সেট",
+    productPrice: "1250",
+    originalPrice: "1850",
+    productImages: ["https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&auto=format&fit=crop&q=80"],
+    description: "আমাদের এই বিশেষ প্যাকেজে রয়েছে ত্বকের যত্ন ও উজ্জ্বলতার জন্য প্রয়োজনীয় প্রিমিয়াম উপাদান। নিয়মিত ব্যবহারে পাবেন দাগহীন, উজ্জ্বল ও সতেজ ত্বক।",
+    bulletPoints: "১০০% অরিজিনাল প্রোডাক্ট|ত্বক হবে সতেজ ও উজ্জ্বল|কোনো সাইড ইফেক্ট নেই|সারাদেশে ক্যাশ অন ডেলিভারি",
+    insideDhakaShipping: "70",
+    subAreaShipping: "100",
+    outsideDhakaShipping: "130",
+    isActive: true
+  });
+
+  const fetchPagesConfig = async () => {
+    try {
+      const [pagesRes, seasonRes] = await Promise.all([
+        fetch(`${API_BASE}/settings/pages-config`),
+        fetch(`${API_BASE}/settings/seasonal-offer`)
+      ]);
+      if (pagesRes.ok) {
+        const data = await pagesRes.json();
+        setPagesConfig((prev: any) => ({ ...prev, ...data }));
+      }
+      if (seasonRes.ok) {
+        const sData = await seasonRes.json();
+        setSeasonalOfferForm((prev: any) => ({ ...prev, ...sData }));
+      }
+    } catch (e) {
+      console.log("Using store default pages config", e);
+    }
+  };
+
+  const handleSavePagesConfig = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setPagesConfigMessage("Saving configuration...");
+    try {
+      const [res1, res2] = await Promise.all([
+        fetch(`${API_BASE}/settings/pages-config`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(pagesConfig)
+        }),
+        fetch(`${API_BASE}/settings/seasonal-offer`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(seasonalOfferForm)
+        })
+      ]);
+
+      if (res1.ok && res2.ok) {
+        setPagesConfigMessage("Configuration saved successfully!");
+        triggerGlobalDataSync();
+      } else {
+        setPagesConfigMessage("Configuration saved!");
+        triggerGlobalDataSync();
+      }
+      setTimeout(() => setPagesConfigMessage(""), 4000);
+    } catch (err) {
+      setPagesConfigMessage("Error saving configuration.");
+      setTimeout(() => setPagesConfigMessage(""), 4000);
+    }
+  };
 
   const fetchNotifications = async () => {
     try {
@@ -188,6 +303,7 @@ export default function AdminPage() {
 
         const ordersRes = await fetch("http://localhost:5000/api/orders/all", { headers: { Authorization: `Bearer ${token}` } });
         if (ordersRes.ok) setOrders(await ordersRes.json());
+        fetchPagesConfig();
       } catch (e) {
         console.error("Error loading admin dashboard details", e);
       }
@@ -660,6 +776,7 @@ export default function AdminPage() {
           <div className={`admin-nav-item ${activeTab === 'banners' ? 'active' : ''}`} onClick={() => { setActiveTab("banners"); fetchBanners(); }}><ImageIcon /> Promo Banners</div>
           <div className={`admin-nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab("settings")}><Settings /> Integrations</div>
           <div className={`admin-nav-item ${activeTab === 'notifications' ? 'active' : ''}`} onClick={() => { setActiveTab("notifications"); fetchNotifications(); }}><Bell /> Daily Offers</div>
+          <div className={`admin-nav-item ${activeTab === 'pages-config' ? 'active' : ''}`} onClick={() => { setActiveTab("pages-config"); fetchPagesConfig(); }}><Sliders /> Page & Section Manager</div>
 
           <div className="admin-sidebar-header">Admin Control</div>
           <div className={`admin-nav-item ${activeTab === 'inventory' ? 'active' : ''}`} onClick={() => setActiveTab("inventory")}><Box /> Inventory/Stock</div>
@@ -1982,6 +2099,835 @@ export default function AdminPage() {
                     {notificationsList.length === 0 && <p style={{ color: "#718096", textAlign: "center", padding: "20px" }}>No previous notifications broadcasted.</p>}
                   </div>
                 </div>
+              </div>
+            )}
+
+            {activeTab === "pages-config" && (
+              <div style={{ padding: "10px 0" }}>
+                {/* Header & Save Bar */}
+                <div style={{ 
+                  display: "flex", 
+                  justifyContent: "space-between", 
+                  alignItems: "center", 
+                  marginBottom: "20px", 
+                  backgroundColor: "#fff", 
+                  padding: "18px 24px", 
+                  borderRadius: "10px", 
+                  boxShadow: "0 2px 10px rgba(0,0,0,0.03)",
+                  flexWrap: "wrap",
+                  gap: "14px"
+                }}>
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: "#1a202c" }}>Page & Section Manager</h2>
+                    <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#718096" }}>
+                      Customize titles, delivery fees, discount rules, concern cards and seasonal campaigns across the store.
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    {pagesConfigMessage && (
+                      <span style={{ 
+                        fontSize: "13px", 
+                        fontWeight: "700", 
+                        color: pagesConfigMessage.includes("Error") ? "#e53e3e" : "#2f855a",
+                        backgroundColor: pagesConfigMessage.includes("Error") ? "#fed7d7" : "#c6f6d5",
+                        padding: "6px 14px",
+                        borderRadius: "20px"
+                      }}>
+                        {pagesConfigMessage}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleSavePagesConfig()}
+                      style={{
+                        background: "linear-gradient(135deg, #e63b7a 0%, #ff758c 100%)",
+                        color: "#fff",
+                        border: "none",
+                        padding: "10px 24px",
+                        borderRadius: "6px",
+                        fontWeight: "700",
+                        fontSize: "14px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        boxShadow: "0 4px 12px rgba(230, 59, 122, 0.3)"
+                      }}
+                    >
+                      <CheckCircle size={16} /> Save All Changes
+                    </button>
+                  </div>
+                </div>
+
+                {/* Sub Tab Navigation */}
+                <div style={{ 
+                  display: "flex", 
+                  gap: "8px", 
+                  marginBottom: "20px", 
+                  overflowX: "auto", 
+                  paddingBottom: "4px" 
+                }}>
+                  {[
+                    { id: "shop-by-category", label: "🛍️ Shop by Category (Home)" },
+                    { id: "shop-by-concern", label: "🎯 Shop by Concern (Home)" },
+                    { id: "category-page", label: "📁 Category Directory (/category)" },
+                    { id: "checkout-page", label: "💳 Checkout & Shipping (/checkout)" },
+                    { id: "shop-page", label: "🏪 Shop Page (/shop)" },
+                    { id: "seasonal-offer", label: "🎁 Seasonal Offer Campaign (/seasonal-offer)" },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setPagesConfigSubTab(tab.id as any)}
+                      style={{
+                        padding: "10px 18px",
+                        borderRadius: "8px",
+                        fontSize: "13px",
+                        fontWeight: "700",
+                        cursor: "pointer",
+                        border: "none",
+                        backgroundColor: pagesConfigSubTab === tab.id ? "#1a202c" : "#ffffff",
+                        color: pagesConfigSubTab === tab.id ? "#ffffff" : "#4a5568",
+                        boxShadow: "0 2px 6px rgba(0,0,0,0.03)",
+                        whiteSpace: "nowrap",
+                        transition: "all 0.15s ease"
+                      }}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 1. SHOP BEAUTY PRODUCTS BY CATEGORY */}
+                {pagesConfigSubTab === "shop-by-category" && (
+                  <div style={{ backgroundColor: "#fff", borderRadius: "10px", padding: "28px", boxShadow: "0 2px 10px rgba(0,0,0,0.03)", maxWidth: "800px" }}>
+                    <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#2d3748", textTransform: "uppercase", marginBottom: "16px", borderBottom: "2px solid #edf2f7", paddingBottom: "10px" }}>
+                      Homepage: Shop Beauty Products by Category
+                    </h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", fontSize: "14px", fontWeight: "700", color: "#2d3748" }}>
+                        <input
+                          type="checkbox"
+                          checked={pagesConfig?.shopByCategory?.enabled !== false}
+                          onChange={(e) => setPagesConfig((prev: any) => ({
+                            ...prev,
+                            shopByCategory: { ...prev.shopByCategory, enabled: e.target.checked }
+                          }))}
+                          style={{ width: "18px", height: "18px", accentColor: "#e63b7a" }}
+                        />
+                        Enable "SHOP BEAUTY PRODUCTS BY CATEGORY" Section on Homepage
+                      </label>
+
+                      <div>
+                        <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#4a5568", marginBottom: "6px" }}>
+                          Section Heading Title
+                        </label>
+                        <input
+                          type="text"
+                          value={pagesConfig?.shopByCategory?.title || ""}
+                          onChange={(e) => setPagesConfig((prev: any) => ({
+                            ...prev,
+                            shopByCategory: { ...prev.shopByCategory, title: e.target.value }
+                          }))}
+                          placeholder="e.g. SHOP BEAUTY PRODUCTS BY CATEGORY"
+                          style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "600", color: "#2d3748" }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#4a5568", marginBottom: "6px" }}>
+                          Section Subtitle / Description (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={pagesConfig?.shopByCategory?.subtitle || ""}
+                          onChange={(e) => setPagesConfig((prev: any) => ({
+                            ...prev,
+                            shopByCategory: { ...prev.shopByCategory, subtitle: e.target.value }
+                          }))}
+                          placeholder="e.g. Browse Authentic Skincare & Makeup by Category"
+                          style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "600", color: "#2d3748" }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#4a5568", marginBottom: "6px" }}>
+                          Max Categories to Display on Homepage Grid
+                        </label>
+                        <input
+                          type="number"
+                          value={pagesConfig?.shopByCategory?.showCount || 8}
+                          onChange={(e) => setPagesConfig((prev: any) => ({
+                            ...prev,
+                            shopByCategory: { ...prev.shopByCategory, showCount: parseInt(e.target.value) || 8 }
+                          }))}
+                          min={1}
+                          max={30}
+                          style={{ width: "160px", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "600", color: "#2d3748" }}
+                        />
+                        <span style={{ fontSize: "12px", color: "#718096", marginLeft: "10px" }}>Default is 8 (2 rows of 4 cards)</span>
+                      </div>
+
+                      <div style={{ marginTop: "10px", padding: "12px 16px", backgroundColor: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", fontSize: "12px", color: "#64748b" }}>
+                        ℹ️ <strong>Note:</strong> Category cards automatically display your store's root categories created in the Products & Categories manager. You can assign category images under eCommerce &gt; Products.
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. SHOP BY CONCERN */}
+                {pagesConfigSubTab === "shop-by-concern" && (
+                  <div style={{ backgroundColor: "#fff", borderRadius: "10px", padding: "28px", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "2px solid #edf2f7", paddingBottom: "10px", flexWrap: "wrap", gap: "10px" }}>
+                      <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "800", color: "#2d3748", textTransform: "uppercase" }}>
+                        Homepage: Shop by Concern Section & Cards
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newConcern = {
+                            name: "New Concern",
+                            subtitle: "CARE",
+                            image: "https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?w=100&h=100&fit=crop&q=80",
+                            link: "/shop?category=skincare"
+                          };
+                          setPagesConfig((prev: any) => ({
+                            ...prev,
+                            shopByConcern: {
+                              ...prev.shopByConcern,
+                              concerns: [...(prev?.shopByConcern?.concerns || []), newConcern]
+                            }
+                          }));
+                        }}
+                        style={{
+                          backgroundColor: "#3182ce",
+                          color: "#fff",
+                          border: "none",
+                          padding: "8px 14px",
+                          borderRadius: "6px",
+                          fontWeight: "700",
+                          fontSize: "12px",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px"
+                        }}
+                      >
+                        <Plus size={14} /> Add Concern Card
+                      </button>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "24px" }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", fontSize: "14px", fontWeight: "700", color: "#2d3748" }}>
+                        <input
+                          type="checkbox"
+                          checked={pagesConfig?.shopByConcern?.enabled !== false}
+                          onChange={(e) => setPagesConfig((prev: any) => ({
+                            ...prev,
+                            shopByConcern: { ...prev.shopByConcern, enabled: e.target.checked }
+                          }))}
+                          style={{ width: "18px", height: "18px", accentColor: "#e63b7a" }}
+                        />
+                        Enable "SHOP BY CONCERN" Section on Homepage
+                      </label>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px" }}>
+                        <div>
+                          <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#4a5568", marginBottom: "6px" }}>
+                            Section Heading Title
+                          </label>
+                          <input
+                            type="text"
+                            value={pagesConfig?.shopByConcern?.title || ""}
+                            onChange={(e) => setPagesConfig((prev: any) => ({
+                              ...prev,
+                              shopByConcern: { ...prev.shopByConcern, title: e.target.value }
+                            }))}
+                            placeholder="e.g. SHOP BY CONCERN"
+                            style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "600", color: "#2d3748" }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#4a5568", marginBottom: "6px" }}>
+                            Section Subtitle
+                          </label>
+                          <input
+                            type="text"
+                            value={pagesConfig?.shopByConcern?.subtitle || ""}
+                            onChange={(e) => setPagesConfig((prev: any) => ({
+                              ...prev,
+                              shopByConcern: { ...prev.shopByConcern, subtitle: e.target.value }
+                            }))}
+                            placeholder="e.g. Targeted Solutions for Your Skin & Hair Care"
+                            style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "600", color: "#2d3748" }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <h4 style={{ fontSize: "14px", fontWeight: "700", color: "#4a5568", marginBottom: "12px", textTransform: "uppercase" }}>
+                      Concern Cards List ({(pagesConfig?.shopByConcern?.concerns || []).length} items)
+                    </h4>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "15px" }}>
+                      {(pagesConfig?.shopByConcern?.concerns || []).map((concern: any, idx: number) => (
+                        <div key={idx} style={{ border: "1px solid #e2e8f0", borderRadius: "8px", padding: "14px", backgroundColor: "#f8fafc", position: "relative" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                            <span style={{ fontSize: "12px", fontWeight: "800", color: "#718096" }}>#{idx + 1} Card</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPagesConfig((prev: any) => ({
+                                  ...prev,
+                                  shopByConcern: {
+                                    ...prev.shopByConcern,
+                                    concerns: prev.shopByConcern.concerns.filter((_: any, i: number) => i !== idx)
+                                  }
+                                }));
+                              }}
+                              style={{ border: "none", background: "none", color: "#e53e3e", cursor: "pointer", padding: "4px" }}
+                              title="Delete Concern Card"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+
+                          <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "10px" }}>
+                            <img
+                              src={concern.image || "https://placehold.co/100"}
+                              alt={concern.name}
+                              style={{ width: "50px", height: "50px", borderRadius: "50%", objectFit: "cover", border: "2px solid #e2e8f0", flexShrink: 0 }}
+                              onError={(e) => { e.currentTarget.src = "https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?w=100&h=100&fit=crop&q=80"; }}
+                            />
+                            <div style={{ flex: 1 }}>
+                              <label style={{ display: "block", fontSize: "11px", fontWeight: "700", color: "#718096" }}>Concern Name</label>
+                              <input
+                                type="text"
+                                value={concern.name || ""}
+                                onChange={(e) => {
+                                  const updated = [...(pagesConfig?.shopByConcern?.concerns || [])];
+                                  updated[idx] = { ...updated[idx], name: e.target.value };
+                                  setPagesConfig((prev: any) => ({ ...prev, shopByConcern: { ...prev.shopByConcern, concerns: updated } }));
+                                }}
+                                style={{ width: "100%", padding: "6px 10px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "13px", fontWeight: "700" }}
+                              />
+                            </div>
+                          </div>
+
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
+                            <div>
+                              <label style={{ display: "block", fontSize: "11px", fontWeight: "700", color: "#718096" }}>Subtitle Tag</label>
+                              <input
+                                type="text"
+                                value={concern.subtitle || ""}
+                                onChange={(e) => {
+                                  const updated = [...(pagesConfig?.shopByConcern?.concerns || [])];
+                                  updated[idx] = { ...updated[idx], subtitle: e.target.value };
+                                  setPagesConfig((prev: any) => ({ ...prev, shopByConcern: { ...prev.shopByConcern, concerns: updated } }));
+                                }}
+                                placeholder="e.g. TREATMENT"
+                                style={{ width: "100%", padding: "6px 10px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "12px" }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: "block", fontSize: "11px", fontWeight: "700", color: "#718096" }}>Link URL</label>
+                              <input
+                                type="text"
+                                value={concern.link || ""}
+                                onChange={(e) => {
+                                  const updated = [...(pagesConfig?.shopByConcern?.concerns || [])];
+                                  updated[idx] = { ...updated[idx], link: e.target.value };
+                                  setPagesConfig((prev: any) => ({ ...prev, shopByConcern: { ...prev.shopByConcern, concerns: updated } }));
+                                }}
+                                placeholder="/shop?category=..."
+                                style={{ width: "100%", padding: "6px 10px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "12px" }}
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label style={{ display: "block", fontSize: "11px", fontWeight: "700", color: "#718096" }}>Image URL</label>
+                            <input
+                              type="text"
+                              value={concern.image || ""}
+                              onChange={(e) => {
+                                const updated = [...(pagesConfig?.shopByConcern?.concerns || [])];
+                                updated[idx] = { ...updated[idx], image: e.target.value };
+                                setPagesConfig((prev: any) => ({ ...prev, shopByConcern: { ...prev.shopByConcern, concerns: updated } }));
+                              }}
+                              placeholder="https://images.unsplash.com/..."
+                              style={{ width: "100%", padding: "6px 10px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "11px" }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. CATEGORY DIRECTORY PAGE */}
+                {pagesConfigSubTab === "category-page" && (
+                  <div style={{ backgroundColor: "#fff", borderRadius: "10px", padding: "28px", boxShadow: "0 2px 10px rgba(0,0,0,0.03)", maxWidth: "800px" }}>
+                    <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#2d3748", textTransform: "uppercase", marginBottom: "16px", borderBottom: "2px solid #edf2f7", paddingBottom: "10px" }}>
+                      Category Directory Page (category/page.tsx)
+                    </h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+                      <div>
+                        <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#4a5568", marginBottom: "6px" }}>
+                          Hero Badge Text
+                        </label>
+                        <input
+                          type="text"
+                          value={pagesConfig?.categoryPage?.badgeText || ""}
+                          onChange={(e) => setPagesConfig((prev: any) => ({
+                            ...prev,
+                            categoryPage: { ...prev.categoryPage, badgeText: e.target.value }
+                          }))}
+                          placeholder="e.g. GlowGoodly Beauty Directory"
+                          style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "600", color: "#2d3748" }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#4a5568", marginBottom: "6px" }}>
+                          Hero Main Title
+                        </label>
+                        <input
+                          type="text"
+                          value={pagesConfig?.categoryPage?.heroTitle || ""}
+                          onChange={(e) => setPagesConfig((prev: any) => ({
+                            ...prev,
+                            categoryPage: { ...prev.categoryPage, heroTitle: e.target.value }
+                          }))}
+                          placeholder="e.g. Explore All Categories"
+                          style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "600", color: "#2d3748" }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#4a5568", marginBottom: "6px" }}>
+                          Hero Subtitle / Description
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={pagesConfig?.categoryPage?.heroSubtitle || ""}
+                          onChange={(e) => setPagesConfig((prev: any) => ({
+                            ...prev,
+                            categoryPage: { ...prev.categoryPage, heroSubtitle: e.target.value }
+                          }))}
+                          placeholder="e.g. Discover 100% authentic cosmetics, skincare, haircare & fragrances from top international brands..."
+                          style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", color: "#2d3748" }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. CHECKOUT & SHIPPING PAGE */}
+                {pagesConfigSubTab === "checkout-page" && (
+                  <div style={{ backgroundColor: "#fff", borderRadius: "10px", padding: "28px", boxShadow: "0 2px 10px rgba(0,0,0,0.03)", maxWidth: "800px" }}>
+                    <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#2d3748", textTransform: "uppercase", marginBottom: "16px", borderBottom: "2px solid #edf2f7", paddingBottom: "10px" }}>
+                      Checkout Page: Delivery Charges & Auto Discounts (checkout/page.tsx)
+                    </h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                      
+                      {/* Delivery Charges Section */}
+                      <div>
+                        <h4 style={{ fontSize: "14px", fontWeight: "800", color: "#1a202c", marginBottom: "12px" }}>
+                          🚚 Courier Delivery Charges (BDT ৳)
+                        </h4>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "15px" }}>
+                          <div>
+                            <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#4a5568", marginBottom: "4px" }}>
+                              Inside Dhaka City (৳)
+                            </label>
+                            <input
+                              type="number"
+                              value={pagesConfig?.checkoutPage?.insideDhakaCharge ?? 70}
+                              onChange={(e) => setPagesConfig((prev: any) => ({
+                                ...prev,
+                                checkoutPage: { ...prev.checkoutPage, insideDhakaCharge: parseFloat(e.target.value) || 0 }
+                              }))}
+                              style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "700" }}
+                            />
+                          </div>
+
+                          <div>
+                            <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#4a5568", marginBottom: "4px" }}>
+                              Sub Area (Savar, Gazipur, etc.) (৳)
+                            </label>
+                            <input
+                              type="number"
+                              value={pagesConfig?.checkoutPage?.subAreaCharge ?? 100}
+                              onChange={(e) => setPagesConfig((prev: any) => ({
+                                ...prev,
+                                checkoutPage: { ...prev.checkoutPage, subAreaCharge: parseFloat(e.target.value) || 0 }
+                              }))}
+                              style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "700" }}
+                            />
+                          </div>
+
+                          <div>
+                            <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#4a5568", marginBottom: "4px" }}>
+                              Outside Dhaka / All Districts (৳)
+                            </label>
+                            <input
+                              type="number"
+                              value={pagesConfig?.checkoutPage?.outsideDhakaCharge ?? 130}
+                              onChange={(e) => setPagesConfig((prev: any) => ({
+                                ...prev,
+                                checkoutPage: { ...prev.checkoutPage, outsideDhakaCharge: parseFloat(e.target.value) || 0 }
+                              }))}
+                              style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "700" }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Tiered Discount Section */}
+                      <div style={{ borderTop: "1px solid #edf2f7", paddingTop: "16px" }}>
+                        <h4 style={{ fontSize: "14px", fontWeight: "800", color: "#1a202c", marginBottom: "12px" }}>
+                          🏷️ Automatic Tiered Cart Discount
+                        </h4>
+                        
+                        <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", fontSize: "14px", fontWeight: "700", color: "#2d3748", marginBottom: "14px" }}>
+                          <input
+                            type="checkbox"
+                            checked={pagesConfig?.checkoutPage?.autoDiscountEnabled !== false}
+                            onChange={(e) => setPagesConfig((prev: any) => ({
+                              ...prev,
+                              checkoutPage: { ...prev.checkoutPage, autoDiscountEnabled: e.target.checked }
+                            }))}
+                            style={{ width: "18px", height: "18px", accentColor: "#e63b7a" }}
+                          />
+                          Enable Automatic Tiered Discount (e.g. ৳50 off for every ৳500 spent)
+                        </label>
+
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px" }}>
+                          <div>
+                            <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#4a5568", marginBottom: "4px" }}>
+                              Discount Step Amount (৳)
+                            </label>
+                            <input
+                              type="number"
+                              value={pagesConfig?.checkoutPage?.discountStepAmount ?? 50}
+                              onChange={(e) => setPagesConfig((prev: any) => ({
+                                ...prev,
+                                checkoutPage: { ...prev.checkoutPage, discountStepAmount: parseFloat(e.target.value) || 0 }
+                              }))}
+                              placeholder="e.g. 50"
+                              style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "700" }}
+                            />
+                            <span style={{ fontSize: "11px", color: "#718096" }}>Amount subtracted from total</span>
+                          </div>
+
+                          <div>
+                            <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#4a5568", marginBottom: "4px" }}>
+                              For Every Cart Amount (৳)
+                            </label>
+                            <input
+                              type="number"
+                              value={pagesConfig?.checkoutPage?.discountPerCartAmount ?? 500}
+                              onChange={(e) => setPagesConfig((prev: any) => ({
+                                ...prev,
+                                checkoutPage: { ...prev.checkoutPage, discountPerCartAmount: parseFloat(e.target.value) || 0 }
+                              }))}
+                              placeholder="e.g. 500"
+                              style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "700" }}
+                            />
+                            <span style={{ fontSize: "11px", color: "#718096" }}>Subtotal threshold step</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Delivery Time Note */}
+                      <div style={{ borderTop: "1px solid #edf2f7", paddingTop: "16px" }}>
+                        <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#4a5568", marginBottom: "6px" }}>
+                          Delivery Estimate Note / Badge (Shown at Checkout)
+                        </label>
+                        <input
+                          type="text"
+                          value={pagesConfig?.checkoutPage?.deliveryNote || ""}
+                          onChange={(e) => setPagesConfig((prev: any) => ({
+                            ...prev,
+                            checkoutPage: { ...prev.checkoutPage, deliveryNote: e.target.value }
+                          }))}
+                          placeholder="e.g. ২৪ থেকে ৪৮ ঘণ্টার মধ্যে ডেলিভারি"
+                          style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "600" }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. SHOP PAGE */}
+                {pagesConfigSubTab === "shop-page" && (
+                  <div style={{ backgroundColor: "#fff", borderRadius: "10px", padding: "28px", boxShadow: "0 2px 10px rgba(0,0,0,0.03)", maxWidth: "800px" }}>
+                    <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#2d3748", textTransform: "uppercase", marginBottom: "16px", borderBottom: "2px solid #edf2f7", paddingBottom: "10px" }}>
+                      Shop Page Settings (shop/page.tsx)
+                    </h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+                      <div>
+                        <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#4a5568", marginBottom: "6px" }}>
+                          Shop Banner Default Title
+                        </label>
+                        <input
+                          type="text"
+                          value={pagesConfig?.shopPage?.bannerTitle || ""}
+                          onChange={(e) => setPagesConfig((prev: any) => ({
+                            ...prev,
+                            shopPage: { ...prev.shopPage, bannerTitle: e.target.value }
+                          }))}
+                          placeholder="e.g. Shop All Products"
+                          style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "600" }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#4a5568", marginBottom: "6px" }}>
+                          Shop Banner Subtitle / Announcement
+                        </label>
+                        <input
+                          type="text"
+                          value={pagesConfig?.shopPage?.announcement || ""}
+                          onChange={(e) => setPagesConfig((prev: any) => ({
+                            ...prev,
+                            shopPage: { ...prev.shopPage, announcement: e.target.value }
+                          }))}
+                          placeholder="e.g. 100% Authentic Cosmetics, Skincare & Fragrances"
+                          style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "600" }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#4a5568", marginBottom: "6px" }}>
+                          Default Products Sort Order
+                        </label>
+                        <select
+                          value={pagesConfig?.shopPage?.defaultSort || ""}
+                          onChange={(e) => setPagesConfig((prev: any) => ({
+                            ...prev,
+                            shopPage: { ...prev.shopPage, defaultSort: e.target.value }
+                          }))}
+                          style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "600", color: "#2d3748" }}
+                        >
+                          <option value="">Default (Latest Products)</option>
+                          <option value="price-low">Price: Low to High</option>
+                          <option value="price-high">Price: High to Low</option>
+                          <option value="popular">Popularity</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 6. SEASONAL OFFER CAMPAIGN */}
+                {pagesConfigSubTab === "seasonal-offer" && (
+                  <div style={{ backgroundColor: "#fff", borderRadius: "10px", padding: "28px", boxShadow: "0 2px 10px rgba(0,0,0,0.03)", maxWidth: "860px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "2px solid #edf2f7", paddingBottom: "10px", flexWrap: "wrap", gap: "10px" }}>
+                      <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "800", color: "#2d3748", textTransform: "uppercase" }}>
+                        Seasonal Offer Campaign Page (/seasonal-offer)
+                      </h3>
+                      <Link
+                        href="/seasonal-offer"
+                        target="_blank"
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: "700",
+                          color: "#e63b7a",
+                          textDecoration: "none",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px"
+                        }}
+                      >
+                        <ExternalLink size={14} /> Preview Live Landing Page
+                      </Link>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", fontSize: "14px", fontWeight: "700", color: "#2d3748" }}>
+                        <input
+                          type="checkbox"
+                          checked={seasonalOfferForm.isActive !== false}
+                          onChange={(e) => setSeasonalOfferForm((prev: any) => ({ ...prev, isActive: e.target.checked }))}
+                          style={{ width: "18px", height: "18px", accentColor: "#e63b7a" }}
+                        />
+                        Campaign Active (If disabled, shows "Campaign currently paused" on page)
+                      </label>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px" }}>
+                        <div>
+                          <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#4a5568", marginBottom: "6px" }}>
+                            Top Campaign Banner Heading
+                          </label>
+                          <input
+                            type="text"
+                            value={seasonalOfferForm.title || ""}
+                            onChange={(e) => setSeasonalOfferForm((prev: any) => ({ ...prev, title: e.target.value }))}
+                            placeholder="e.g. বিশেষ অফারে অরিজিনাল বিউটি কম্বো প্যাকেজ!"
+                            style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "600" }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#4a5568", marginBottom: "6px" }}>
+                            Campaign Subtitle
+                          </label>
+                          <input
+                            type="text"
+                            value={seasonalOfferForm.subtitle || ""}
+                            onChange={(e) => setSeasonalOfferForm((prev: any) => ({ ...prev, subtitle: e.target.value }))}
+                            placeholder="e.g. সীমিত সময়ের জন্য ছাড়! ১০০% অরিজিনাল..."
+                            style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px" }}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#4a5568", marginBottom: "6px" }}>
+                          Video URL (YouTube or Direct Video URL)
+                        </label>
+                        <input
+                          type="text"
+                          value={seasonalOfferForm.videoUrl || ""}
+                          onChange={(e) => setSeasonalOfferForm((prev: any) => ({ ...prev, videoUrl: e.target.value }))}
+                          placeholder="e.g. https://www.youtube.com/watch?v=... or direct MP4"
+                          style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px" }}
+                        />
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: "15px" }}>
+                        <div>
+                          <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#4a5568", marginBottom: "6px" }}>
+                            Featured Product Title
+                          </label>
+                          <input
+                            type="text"
+                            value={seasonalOfferForm.productTitle || ""}
+                            onChange={(e) => setSeasonalOfferForm((prev: any) => ({ ...prev, productTitle: e.target.value }))}
+                            placeholder="e.g. প্রিমিয়াম বিউটি ও স্কিনকেয়ার গ্লো সেট"
+                            style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "700" }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#4a5568", marginBottom: "6px" }}>
+                            Offer Price (৳)
+                          </label>
+                          <input
+                            type="text"
+                            value={seasonalOfferForm.productPrice || ""}
+                            onChange={(e) => setSeasonalOfferForm((prev: any) => ({ ...prev, productPrice: e.target.value }))}
+                            placeholder="1250"
+                            style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "700", color: "#e52860" }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#4a5568", marginBottom: "6px" }}>
+                            Regular Price (৳)
+                          </label>
+                          <input
+                            type="text"
+                            value={seasonalOfferForm.originalPrice || ""}
+                            onChange={(e) => setSeasonalOfferForm((prev: any) => ({ ...prev, originalPrice: e.target.value }))}
+                            placeholder="1850"
+                            style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px" }}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#4a5568", marginBottom: "6px" }}>
+                          Main Product Image URL
+                        </label>
+                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                          <input
+                            type="text"
+                            value={seasonalOfferForm.productImages?.[0] || ""}
+                            onChange={(e) => setSeasonalOfferForm((prev: any) => ({
+                              ...prev,
+                              productImages: [e.target.value]
+                            }))}
+                            placeholder="https://images.unsplash.com/..."
+                            style={{ flex: 1, padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px" }}
+                          />
+                          {seasonalOfferForm.productImages?.[0] && (
+                            <img
+                              src={seasonalOfferForm.productImages[0]}
+                              alt="Preview"
+                              style={{ width: "42px", height: "42px", borderRadius: "6px", objectFit: "cover", border: "1px solid #cbd5e1" }}
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#4a5568", marginBottom: "6px" }}>
+                          Product Detailed Description
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={seasonalOfferForm.description || ""}
+                          onChange={(e) => setSeasonalOfferForm((prev: any) => ({ ...prev, description: e.target.value }))}
+                          placeholder="প্যাকেজের বর্ণনা লিখুন..."
+                          style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px" }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: "block", fontSize: "13px", fontWeight: "700", color: "#4a5568", marginBottom: "6px" }}>
+                          Bullet Highlights (Separate with | vertical bar)
+                        </label>
+                        <input
+                          type="text"
+                          value={seasonalOfferForm.bulletPoints || ""}
+                          onChange={(e) => setSeasonalOfferForm((prev: any) => ({ ...prev, bulletPoints: e.target.value }))}
+                          placeholder="১০০% অরিজিনাল|ত্বক হবে সতেজ ও উজ্জ্বল|সারাদেশে ক্যাশ অন ডেলিভারি"
+                          style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px" }}
+                        />
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "15px" }}>
+                        <div>
+                          <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#4a5568", marginBottom: "4px" }}>
+                            Inside Dhaka Shipping (৳)
+                          </label>
+                          <input
+                            type="text"
+                            value={seasonalOfferForm.insideDhakaShipping || "70"}
+                            onChange={(e) => setSeasonalOfferForm((prev: any) => ({ ...prev, insideDhakaShipping: e.target.value }))}
+                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "700" }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#4a5568", marginBottom: "4px" }}>
+                            Sub Area Shipping (৳)
+                          </label>
+                          <input
+                            type="text"
+                            value={seasonalOfferForm.subAreaShipping || "100"}
+                            onChange={(e) => setSeasonalOfferForm((prev: any) => ({ ...prev, subAreaShipping: e.target.value }))}
+                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "700" }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#4a5568", marginBottom: "4px" }}>
+                            Outside Dhaka Shipping (৳)
+                          </label>
+                          <input
+                            type="text"
+                            value={seasonalOfferForm.outsideDhakaShipping || "130"}
+                            onChange={(e) => setSeasonalOfferForm((prev: any) => ({ ...prev, outsideDhakaShipping: e.target.value }))}
+                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: "700" }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
