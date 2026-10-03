@@ -1457,19 +1457,22 @@ export default function ValobasaAdminPanel() {
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "high";
 
-        // Center cover crop
-        const scale = Math.max(targetW / img.width, targetH / img.height);
+        // Auto-fit / CONTAIN mode: scale image to fit inside targetW × targetH
+        // without cropping — maintains full image, fills extra space with white
+        const scale = Math.min(targetW / img.width, targetH / img.height);
         const scaledW = Math.round(img.width * scale);
         const scaledH = Math.round(img.height * scale);
         const offsetX = Math.round((targetW - scaledW) / 2);
         const offsetY = Math.round((targetH - scaledH) / 2);
 
+        // Fill background white (letterbox / pillarbox areas)
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, targetW, targetH);
+
+        // Draw image centered, fully visible — no cropping
         ctx.drawImage(img, offsetX, offsetY, scaledW, scaledH);
 
-        // Convert to high-quality compressed WebP (or fallback to JPEG)
-        // Drastically compresses 5MB PNGs to ~60KB-100KB with crisp visual clarity!
+        // Compress to WebP (or JPEG fallback) — drastically reduces 5MB PNGs to ~60-100KB
         try {
           const webpData = canvas.toDataURL("image/webp", 0.85);
           if (webpData && webpData.startsWith("data:image/webp")) {
