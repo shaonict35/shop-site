@@ -399,6 +399,8 @@ export default function ChatWidget() {
               <Camera size={20} />
             </button>
             <input
+              id="chat-file-input"
+              name="chatFile"
               type="file"
               ref={fileInputRef}
               onChange={handleImageUpload}
@@ -406,7 +408,10 @@ export default function ChatWidget() {
               style={{ display: "none" }}
             />
             <input
+              id="chat-message-input"
+              name="chatMessage"
               type="text"
+              aria-label="Type your message"
               placeholder="Type a message..."
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}

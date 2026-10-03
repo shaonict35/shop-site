@@ -6,8 +6,8 @@ import { sendCapiEvent } from "../services/capi";
 
 const router = Router();
 
-// POST /api/marketing/capi (Send frontend events to Meta Conversion API)
-router.post("/capi", async (req: Request, res: Response) => {
+// POST /api/marketing/capi and /api/capi (Send frontend events to Meta Conversion API)
+router.post(["/capi", "/marketing/capi"], async (req: Request, res: Response) => {
   try {
     const { eventName, customData, userData } = req.body;
     if (!eventName) {

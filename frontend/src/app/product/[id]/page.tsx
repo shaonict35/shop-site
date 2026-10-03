@@ -155,10 +155,48 @@ export default async function Page({ params }: Props) {
               ratingValue: avgRating,
               reviewCount: reviewCount,
             },
+            review: reviews.map((rev: any) => ({
+              "@type": "Review",
+              author: {
+                "@type": "Person",
+                name: rev.customerName || "Customer",
+              },
+              datePublished: rev.createdAt,
+              reviewBody: rev.comment || "",
+              reviewRating: {
+                "@type": "Rating",
+                ratingValue: rev.rating || 5,
+              },
+            })),
           }
         : {}),
     };
   }
+
+  const breadcrumbJsonLd = product ? {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://shop.glowgoodly.com"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": product.category?.name || "Shop",
+        "item": `https://shop.glowgoodly.com/shop?category=${encodeURIComponent(product.category?.slug || product.category?.name || "all")}`
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": product.name,
+        "item": `https://shop.glowgoodly.com/product/${product.slug || product.id}`
+      }
+    ]
+  } : null;
 
   return (
     <>
@@ -166,6 +204,12 @@ export default async function Page({ params }: Props) {
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
+      {breadcrumbJsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
         />
       )}
       <ProductClient initialProduct={product} />

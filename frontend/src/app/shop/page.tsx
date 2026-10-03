@@ -694,7 +694,14 @@ function ShopPageContent() {
           Filter by Brand
         </h3>
         <div style={{ position: "relative", marginBottom: "10px" }}>
-          <input type="text" placeholder="Search brand..." value={brandSearchQuery} onChange={(e) => setBrandSearchQuery(e.target.value)}
+          <input
+            id="brand-search-filter"
+            name="brandSearch"
+            type="search"
+            aria-label="Filter brands"
+            placeholder="Search brand..."
+            value={brandSearchQuery}
+            onChange={(e) => setBrandSearchQuery(e.target.value)}
             style={{ width: "100%", padding: "8px 32px 8px 11px", fontSize: "12px", fontWeight: "600", border: "1.5px solid #edf2f7", borderRadius: "7px", outline: "none" }} />
           <span style={{ position: "absolute", right: "9px", top: "50%", transform: "translateY(-50%)", color: "#a0aec0", fontSize: "12px" }}>🔍</span>
         </div>
@@ -852,9 +859,21 @@ function ShopPageContent() {
 
             {/* Controls */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "14px", marginBottom: "22px", flexWrap: "wrap" }}>
-              <input type="text" placeholder="Search here..." value={searchVal} onChange={(e) => setSearchVal(e.target.value)}
+              <input
+                id="shop-product-search"
+                name="shopSearch"
+                type="search"
+                aria-label="Search products in catalog"
+                placeholder="Search here..."
+                value={searchVal}
+                onChange={(e) => setSearchVal(e.target.value)}
                 style={{ flex: 1, minWidth: "140px", padding: "10px 16px", fontSize: "13.5px", fontWeight: "600", border: "1.5px solid #e2e8f0", borderRadius: "8px", outline: "none" }} />
-              <select value={sortVal} onChange={(e) => setSortVal(e.target.value)}
+              <select
+                id="shop-product-sort"
+                name="sortOrder"
+                aria-label="Sort products"
+                value={sortVal}
+                onChange={(e) => setSortVal(e.target.value)}
                 style={{ padding: "10px 14px", fontSize: "13.5px", fontWeight: "700", border: "1.5px solid #e2e8f0", borderRadius: "8px", outline: "none", backgroundColor: "#fff", cursor: "pointer", color: "#334155" }}>
                 <option value="">Default sorting</option>
                 <option value="popularity">Sort by popularity</option>

@@ -189,7 +189,7 @@ export default function RootLayout({
         </Script>
 
         {/* Google Analytics 4 */}
-        <Script src="https://www.googletagmanager.com/gtag/js?id=G-533220314" strategy="afterInteractive" />
+        <Script src="https://www.googletagmanager.com/gtag/js?id=G-533220314" strategy="lazyOnload" />
         <Script id="ga4-script" strategy="afterInteractive">
           {`
             window.dataLayer = window.dataLayer || [];

@@ -357,6 +357,9 @@ export default function DynamicLandingPage() {
                 <div style={{ position: "relative" }}>
                   <User size={18} color="#a0aec0" style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }} />
                   <input 
+                    id="landing-customer-name"
+                    name="name"
+                    autoComplete="name"
                     type="text"
                     required
                     placeholder="আপনার নাম লিখুন"
@@ -369,12 +372,15 @@ export default function DynamicLandingPage() {
 
               {/* Phone */}
               <div>
-                <label style={{ display: "block", fontSize: "14px", fontWeight: "700", color: "#1a202c", marginBottom: "6px" }}>
+                <label htmlFor="landing-customer-phone" style={{ display: "block", fontSize: "14px", fontWeight: "700", color: "#1a202c", marginBottom: "6px" }}>
                   মোবাইল নম্বর *
                 </label>
                 <div style={{ position: "relative" }}>
                   <Phone size={18} color="#a0aec0" style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }} />
                   <input 
+                    id="landing-customer-phone"
+                    name="phone"
+                    autoComplete="tel"
                     type="tel"
                     required
                     placeholder="১১ ডিজিটের সঠিক মোবাইল নম্বর দিন"
@@ -387,12 +393,15 @@ export default function DynamicLandingPage() {
 
               {/* Address */}
               <div>
-                <label style={{ display: "block", fontSize: "14px", fontWeight: "700", color: "#1a202c", marginBottom: "6px" }}>
+                <label htmlFor="landing-customer-address" style={{ display: "block", fontSize: "14px", fontWeight: "700", color: "#1a202c", marginBottom: "6px" }}>
                   পূর্ণাঙ্গ ঠিকানা *
                 </label>
                 <div style={{ position: "relative" }}>
                   <MapPin size={18} color="#a0aec0" style={{ position: "absolute", left: "14px", top: "14px" }} />
                   <textarea 
+                    id="landing-customer-address"
+                    name="address"
+                    autoComplete="street-address"
                     required
                     rows={2}
                     placeholder="বাসা/রোড নম্বর, এলাকা, থানা ও জেলা লিখুন"

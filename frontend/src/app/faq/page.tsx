@@ -121,7 +121,10 @@ export default function FAQPage() {
             {/* Interactive Live FAQ Search Input */}
             <div style={{ marginTop: "22px", maxWidth: "550px" }}>
               <input
-                type="text"
+                id="faq-search-input"
+                name="search"
+                type="search"
+                aria-label="Search FAQ questions"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search questions (e.g., delivery charges, authentic, return)..."

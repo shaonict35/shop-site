@@ -354,88 +354,7 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        suppressHydrationWarning
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "Product",
-            "name": product.name,
-            "image": product.images.map((img) => img.url),
-            "description": product.description || "Authentic product available at GlowGoodly",
-            "sku": selectedVariant?.sku || product.variants[0]?.sku || product.id,
-            "mpn": product.id,
-            "brand": {
-              "@type": "Brand",
-              "name": product.brand?.name || "GlowGoodly"
-            },
-            "offers": {
-              "@type": "Offer",
-              // Use static canonical URL — avoids SSR/client window.location mismatch
-              "url": `https://shop.glowgoodly.com/product/${product.slug || product.id}`,
-              "priceCurrency": "BDT",
-              "price": product.variants[0]?.discountPrice || product.variants[0]?.price || 0,
-              "priceValidUntil": "2027-12-31",
-              "itemCondition": "https://schema.org/NewCondition",
-              "availability": (product.variants[0]?.stock ?? 1) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
-              "seller": {
-                "@type": "Organization",
-                "name": "GlowGoodly"
-              }
-            },
-            "aggregateRating": (product.reviews && product.reviews.length > 0) ? {
-              "@type": "AggregateRating",
-              "ratingValue": (product.reviews.reduce((acc, r) => acc + r.rating, 0) / product.reviews.length).toFixed(1),
-              "reviewCount": product.reviews.length
-            } : undefined,
-            "review": (product.reviews || []).map((rev) => ({
-              "@type": "Review",
-              "author": {
-                "@type": "Person",
-                "name": rev.customerName
-              },
-              "datePublished": rev.createdAt,
-              "reviewBody": rev.comment,
-              "reviewRating": {
-                "@type": "Rating",
-                "ratingValue": rev.rating
-              }
-            }))
-          })
-        }}
-      />
-      <script
-        type="application/ld+json"
-        suppressHydrationWarning
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "BreadcrumbList",
-            "itemListElement": [
-              {
-                "@type": "ListItem",
-                "position": 1,
-                "name": "Home",
-                "item": "https://shop.glowgoodly.com"
-              },
-              {
-                "@type": "ListItem",
-                "position": 2,
-                "name": product.category?.name || "Shop",
-                "item": `https://shop.glowgoodly.com/shop?category=${encodeURIComponent(product.category?.name || "")}`
-              },
-              {
-                "@type": "ListItem",
-                "position": 3,
-                "name": product.name,
-                "item": `https://shop.glowgoodly.com/product/${product.id}`
-              }
-            ]
-          })
-        }}
-      />
-      <Header />
+<Header />
 
       <main className="container" style={{ padding: "30px 20px 60px 20px" }}>
         
@@ -1039,7 +958,7 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
                 </label>
                 <input
                   type="text"
-                  placeholder="Enter your name"
+                  id="reviewCustomerName" name="customerName" autoComplete="name" placeholder="Enter your name"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   style={{
@@ -1054,10 +973,12 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
               </div>
 
               <div>
-                <label style={{ fontSize: "12px", fontWeight: "700", color: "var(--gray-700)", display: "block", marginBottom: "4px" }}>
+                <label htmlFor="reviewRating" style={{ fontSize: "12px", fontWeight: "700", color: "var(--gray-700)", display: "block", marginBottom: "4px" }}>
                   Rating
                 </label>
                 <select
+                  id="reviewRating"
+                  name="rating"
                   value={rating}
                   onChange={(e) => setRating(e.target.value)}
                   style={{
@@ -1079,10 +1000,12 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
               </div>
 
               <div>
-                <label style={{ fontSize: "12px", fontWeight: "700", color: "var(--gray-700)", display: "block", marginBottom: "4px" }}>
+                <label htmlFor="reviewComment" style={{ fontSize: "12px", fontWeight: "700", color: "var(--gray-700)", display: "block", marginBottom: "4px" }}>
                   Comments
                 </label>
                 <textarea
+                  id="reviewComment"
+                  name="comment"
                   rows={4}
                   placeholder="Write your product experience..."
                   value={comment}

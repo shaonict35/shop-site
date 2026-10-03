@@ -521,7 +521,10 @@ export default function Header() {
                   </svg>
                 </button>
                 <input
-                  type="text"
+                  id="header-search-input"
+                  name="search"
+                  type="search"
+                  aria-label="Search products"
                   placeholder={currentPlaceholder}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}

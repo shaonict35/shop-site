@@ -227,6 +227,9 @@ export default function LoginPage() {
                     </svg>
                   </span>
                   <input
+                    id="login-username"
+                    name="username"
+                    autoComplete="username"
                     type="text"
                     placeholder="ইমেইল লিখুন (যেমন: someone@example.com)"
                     value={phone}
@@ -250,7 +253,7 @@ export default function LoginPage() {
               {/* Password Field */}
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                  <label style={{ fontSize: "13px", fontWeight: "700", color: "#334155" }}>
+                  <label htmlFor="login-password" style={{ fontSize: "13px", fontWeight: "700", color: "#334155" }}>
                     পাসওয়ার্ড <span style={{ color: "#ef4444" }}>*</span>
                   </label>
                   <a 
@@ -268,6 +271,9 @@ export default function LoginPage() {
                     </svg>
                   </span>
                   <input
+                    id="login-password"
+                    name="password"
+                    autoComplete="current-password"
                     type={showPassword ? "text" : "password"}
                     placeholder="পাসওয়ার্ড লিখুন"
                     value={password}
@@ -370,10 +376,13 @@ export default function LoginPage() {
             <form onSubmit={handleCustomerSignup} style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
               {/* Full Name */}
               <div>
-                <label style={{ fontSize: "13px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "6px" }}>
+                <label htmlFor="signup-name" style={{ fontSize: "13px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "6px" }}>
                   পূর্ণ নাম <span style={{ color: "#ef4444" }}>*</span>
                 </label>
                 <input
+                  id="signup-name"
+                  name="name"
+                  autoComplete="name"
                   type="text"
                   placeholder="আপনার সম্পূর্ণ নাম লিখুন"
                   value={name}
@@ -394,10 +403,13 @@ export default function LoginPage() {
 
               {/* Mobile Phone */}
               <div>
-                <label style={{ fontSize: "13px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "6px" }}>
+                <label htmlFor="signup-phone" style={{ fontSize: "13px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "6px" }}>
                   মোবাইল নাম্বার <span style={{ color: "#ef4444" }}>*</span>
                 </label>
                 <input
+                  id="signup-phone"
+                  name="phone"
+                  autoComplete="tel"
                   type="tel"
                   placeholder="e.g. 017XXXXXXXX"
                   value={phone}
@@ -418,10 +430,13 @@ export default function LoginPage() {
 
               {/* Optional Email */}
               <div>
-                <label style={{ fontSize: "13px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "6px" }}>
+                <label htmlFor="signup-email" style={{ fontSize: "13px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "6px" }}>
                   ইমেইল অ্যাড্রেস (ঐচ্ছিক)
                 </label>
                 <input
+                  id="signup-email"
+                  name="email"
+                  autoComplete="email"
                   type="email"
                   placeholder="someone@example.com"
                   value={email}
@@ -441,10 +456,13 @@ export default function LoginPage() {
 
               {/* Password */}
               <div>
-                <label style={{ fontSize: "13px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "6px" }}>
+                <label htmlFor="signup-password" style={{ fontSize: "13px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "6px" }}>
                   পাসওয়ার্ড তৈরি করুন <span style={{ color: "#ef4444" }}>*</span>
                 </label>
                 <input
+                  id="signup-password"
+                  name="newPassword"
+                  autoComplete="new-password"
                   type="password"
                   placeholder="কমপক্ষে ৬ অক্ষরের পাসওয়ার্ড"
                   value={password}

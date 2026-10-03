@@ -249,10 +249,13 @@ export default function ContactPage() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
                 <div>
-                  <label style={{ fontSize: "12px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "5px" }}>
+                  <label htmlFor="contact-name" style={{ fontSize: "12px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "5px" }}>
                     Your Name (নাম) *
                   </label>
                   <input
+                    id="contact-name"
+                    name="name"
+                    autoComplete="name"
                     type="text"
                     placeholder="Enter full name"
                     value={name}
@@ -271,10 +274,13 @@ export default function ContactPage() {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: "12px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "5px" }}>
+                  <label htmlFor="contact-phone" style={{ fontSize: "12px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "5px" }}>
                     Phone Number (মোবাইল) *
                   </label>
                   <input
+                    id="contact-phone"
+                    name="phone"
+                    autoComplete="tel"
                     type="tel"
                     placeholder="016XXXXXXXX"
                     value={phone}
@@ -294,10 +300,13 @@ export default function ContactPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: "12px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "5px" }}>
+                <label htmlFor="contact-email" style={{ fontSize: "12px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "5px" }}>
                   Email Address (ইমেইল - Optional)
                 </label>
                 <input
+                  id="contact-email"
+                  name="email"
+                  autoComplete="email"
                   type="email"
                   placeholder="yourname@gmail.com"
                   value={email}
@@ -315,10 +324,12 @@ export default function ContactPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: "12px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "5px" }}>
+                <label htmlFor="contact-subject" style={{ fontSize: "12px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "5px" }}>
                   Inquiry Topic (বিষয়)
                 </label>
                 <select
+                  id="contact-subject"
+                  name="subject"
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
                   style={{
@@ -343,10 +354,12 @@ export default function ContactPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: "12px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "5px" }}>
+                <label htmlFor="contact-message" style={{ fontSize: "12px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "5px" }}>
                   Message (বার্তা) *
                 </label>
                 <textarea
+                  id="contact-message"
+                  name="message"
                   rows={4}
                   placeholder="Tell us about the cosmetic products or questions you have..."
                   value={message}

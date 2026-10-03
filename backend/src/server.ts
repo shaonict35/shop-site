@@ -122,6 +122,16 @@ app.use("/api/orders", ordersRouter);
 app.use("/api/settings", settingsRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/bkash", bkashRouter);
+app.use("/api", marketingRouter); // Meta CAPI, Facebook Conversions API events
+app.use("/api", bannersRouter);
+app.use("/api", notificationsRouter);
+app.use("/api", chatRouter);
+app.use("/api", auditRouter);
+app.use("/api", ticketsRouter);
+app.use("/api", feedsRouter);
+app.use("/api", enterpriseRouter);
+app.use("/api", menuRouter);
+app.use("/api", pagesRouter);
 
 // ─── GLOWGOODLY WP-JSON & WOOCOMMERCE COMPATIBILITY MIRROR ENDPOINTS ───
 app.use("/wp-json/wp/v2/posts", (req, res) => res.redirect("/api/blogs"));
@@ -421,16 +431,8 @@ app.post("/api/admin/contact-messages/:id/reply", async (req: express.Request, r
   }
 });
 
-app.use("/api", bannersRouter); // For /banners CRUD
-app.use("/api", notificationsRouter); // For daily offer notifications
-app.use("/api", chatRouter);
-app.use("/api", marketingRouter);
-app.use("/api", auditRouter);
-app.use("/api", ticketsRouter);
-app.use("/api", feedsRouter);
-app.use("/api", enterpriseRouter);
-app.use("/api", menuRouter);
-app.use("/api", pagesRouter);
+// NOTE: Routes above (lines 125-134) use specific paths e.g. /api/banners, /api/marketing
+// The old generic /api/* registrations below have been removed to avoid routing conflicts
 
 // ─── Public Blog Articles API (100% Database-Driven) ───
 app.get("/api/blogs", async (req: express.Request, res: express.Response) => {

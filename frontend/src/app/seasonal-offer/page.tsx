@@ -369,12 +369,15 @@ export default function SeasonalOfferPage() {
               
               {/* Name */}
               <div>
-                <label style={{ display: "block", fontSize: "14px", fontWeight: "700", color: "#1a202c", marginBottom: "6px" }}>
+                <label htmlFor="seasonal-customer-name" style={{ display: "block", fontSize: "14px", fontWeight: "700", color: "#1a202c", marginBottom: "6px" }}>
                   আপনার নাম *
                 </label>
                 <div style={{ position: "relative" }}>
                   <User size={18} color="#a0aec0" style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }} />
                   <input 
+                    id="seasonal-customer-name"
+                    name="name"
+                    autoComplete="name"
                     type="text"
                     required
                     placeholder="আপনার নাম লিখুন"
@@ -387,12 +390,15 @@ export default function SeasonalOfferPage() {
 
               {/* Phone */}
               <div>
-                <label style={{ display: "block", fontSize: "14px", fontWeight: "700", color: "#1a202c", marginBottom: "6px" }}>
+                <label htmlFor="seasonal-customer-phone" style={{ display: "block", fontSize: "14px", fontWeight: "700", color: "#1a202c", marginBottom: "6px" }}>
                   মোবাইল নম্বর *
                 </label>
                 <div style={{ position: "relative" }}>
                   <Phone size={18} color="#a0aec0" style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }} />
                   <input 
+                    id="seasonal-customer-phone"
+                    name="phone"
+                    autoComplete="tel"
                     type="tel"
                     required
                     placeholder="১১ ডিজিটের সঠিক মোবাইল নম্বর দিন"
@@ -405,12 +411,15 @@ export default function SeasonalOfferPage() {
 
               {/* Address */}
               <div>
-                <label style={{ display: "block", fontSize: "14px", fontWeight: "700", color: "#1a202c", marginBottom: "6px" }}>
+                <label htmlFor="seasonal-customer-address" style={{ display: "block", fontSize: "14px", fontWeight: "700", color: "#1a202c", marginBottom: "6px" }}>
                   পূর্ণাঙ্গ ঠিকানা *
                 </label>
                 <div style={{ position: "relative" }}>
                   <MapPin size={18} color="#a0aec0" style={{ position: "absolute", left: "14px", top: "14px" }} />
                   <textarea 
+                    id="seasonal-customer-address"
+                    name="address"
+                    autoComplete="street-address"
                     required
                     rows={2}
                     placeholder="বাসা/রোড নম্বর, এলাকা, থানা ও জেলা লিখুন"

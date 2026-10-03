@@ -240,9 +240,12 @@ export default function CheckoutPage() {
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
                   <div>
-                    <label style={{ fontSize: "13px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "4px" }}>Full Name *</label>
+                    <label htmlFor="checkout-name" style={{ fontSize: "13px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "4px" }}>Full Name *</label>
                     <input
+                      id="checkout-name"
+                      name="name"
                       type="text"
+                      autoComplete="name"
                       required
                       placeholder="e.g. Nusrat Jahan"
                       value={checkoutName}
@@ -253,9 +256,12 @@ export default function CheckoutPage() {
 
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                     <div>
-                      <label style={{ fontSize: "13px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "4px" }}>Mobile Number *</label>
+                      <label htmlFor="checkout-phone" style={{ fontSize: "13px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "4px" }}>Mobile Number *</label>
                       <input
+                        id="checkout-phone"
+                        name="phone"
                         type="tel"
+                        autoComplete="tel"
                         required
                         placeholder="017XXXXXXXX"
                         value={checkoutPhone}
@@ -264,9 +270,12 @@ export default function CheckoutPage() {
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: "13px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "4px" }}>Email (Optional)</label>
+                      <label htmlFor="checkout-email" style={{ fontSize: "13px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "4px" }}>Email (Optional)</label>
                       <input
+                        id="checkout-email"
+                        name="email"
                         type="email"
+                        autoComplete="email"
                         placeholder="name@gmail.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -276,8 +285,11 @@ export default function CheckoutPage() {
                   </div>
 
                   <div>
-                    <label style={{ fontSize: "13px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "4px" }}>Full Delivery Address *</label>
+                    <label htmlFor="checkout-address" style={{ fontSize: "13px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "4px" }}>Full Delivery Address *</label>
                     <textarea
+                      id="checkout-address"
+                      name="address"
+                      autoComplete="street-address"
                       required
                       rows={3}
                       placeholder="House No, Road No, Area, Thana, District..."
@@ -512,6 +524,8 @@ export default function CheckoutPage() {
                 </h3>
                 <div style={{ display: "flex", gap: "10px" }}>
                   <input
+                    id="checkout-coupon-code"
+                    name="couponCode"
                     type="text"
                     placeholder="Enter promo code (e.g. GLOW15)"
                     value={couponCode}
