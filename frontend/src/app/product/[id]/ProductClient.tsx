@@ -356,6 +356,7 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
     <>
       <script
         type="application/ld+json"
+        suppressHydrationWarning
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             "@context": "https://schema.org",
@@ -371,12 +372,13 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
             },
             "offers": {
               "@type": "Offer",
-              "url": typeof window !== "undefined" ? window.location.href : "",
+              // Use static canonical URL — avoids SSR/client window.location mismatch
+              "url": `https://shop.glowgoodly.com/product/${product.slug || product.id}`,
               "priceCurrency": "BDT",
-              "price": selectedVariant ? (selectedVariant.discountPrice || selectedVariant.price) : (product.variants[0]?.discountPrice || product.variants[0]?.price || 0),
+              "price": product.variants[0]?.discountPrice || product.variants[0]?.price || 0,
               "priceValidUntil": "2027-12-31",
               "itemCondition": "https://schema.org/NewCondition",
-              "availability": selectedVariant && selectedVariant.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+              "availability": (product.variants[0]?.stock ?? 1) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
               "seller": {
                 "@type": "Organization",
                 "name": "GlowGoodly"
@@ -405,6 +407,7 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
       />
       <script
         type="application/ld+json"
+        suppressHydrationWarning
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             "@context": "https://schema.org",
