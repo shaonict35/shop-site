@@ -325,7 +325,7 @@ export default function AdminPage() {
 
   const fetchBanners = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/banners/all");
+      const res = await fetch(`${API_BASE}/banners/all`);
       if (res.ok) setBanners(await res.json());
     } catch (e) {}
   };
@@ -1316,6 +1316,7 @@ export default function AdminPage() {
                   </div>
                   <input type="text" placeholder="Link URL (e.g. /shop?category=skin-care)" value={bannerForm.linkUrl} onChange={(e) => setBannerForm({ ...bannerForm, linkUrl: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #e2e8f0", borderRadius: "4px", fontSize: "13px" }} />
                   <select value={bannerForm.page} onChange={(e) => setBannerForm({ ...bannerForm, page: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #e2e8f0", borderRadius: "4px", fontSize: "13px" }}>
+                    <option value="Hero Slides">Hero Slides Carousel (Main Slider)</option>
                     <option value="Homepage">Hero Banner (Slider)</option>
                     <option value="Banner Promotion">Banner Promotion</option>
                     <option value="Deals you cannot miss">Deals You Cannot Miss</option>
@@ -1364,17 +1365,22 @@ export default function AdminPage() {
                       return;
                     }
                     const method = isEditingBanner ? "PATCH" : "POST";
-                    const url = isEditingBanner ? `http://localhost:5000/api/banners/${bannerForm.id}` : "http://localhost:5000/api/banners";
+                    const url = isEditingBanner ? `${API_BASE}/banners/${bannerForm.id}` : `${API_BASE}/banners`;
+                    const reqHeaders: Record<string, string> = { "Content-Type": "application/json" };
+                    if (token) {
+                      reqHeaders["Authorization"] = `Bearer ${token}`;
+                    }
                     try {
-                      const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...bannerForm, sortOrder: Number(bannerForm.sortOrder) }) });
+                      const res = await fetch(url, { method, headers: reqHeaders, body: JSON.stringify({ ...bannerForm, sortOrder: Number(bannerForm.sortOrder) }) });
                       if (res.ok) {
                         setBannerMessage(isEditingBanner ? "Updated!" : "Created!");
-                        setBannerForm({ id: "", title: "", imageUrl: "", linkUrl: "", bgColor: "#1a1a2e", page: "Homepage", isActive: true, sortOrder: "0" });
+                        setBannerForm({ id: "", title: "", imageUrl: "", linkUrl: "", bgColor: "#1a1a2e", page: "Hero Slides", isActive: true, sortOrder: "0" });
                         setIsEditingBanner(false);
+                        triggerGlobalDataSync();
                         await fetchBanners();
                         setTimeout(() => setBannerMessage(""), 3000);
                       } else {
-                        const errorData = await res.json();
+                        const errorData = await res.json().catch(() => ({}));
                         setBannerMessage("Error: " + (errorData.error || "Failed to save banner"));
                       }
                     } catch (err) {

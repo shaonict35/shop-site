@@ -2023,6 +2023,65 @@ button, input, select, textarea {
   flex-wrap: wrap;
 }
 
+/* Footer Payments Accepted - title stays in original place, icons slightly shifted left */
+.footer-payments-container {
+  margin-top: 20px;
+  width: 100%;
+}
+
+.footer-payments-cards-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: nowrap;
+  align-items: center;
+  width: 100%;
+}
+
+@media (min-width: 992px) {
+  .footer-payments-container {
+    margin-left: 0;
+    width: 100%;
+  }
+  .footer-payments-cards-row {
+    margin-left: -40px;
+    width: calc(100% + 40px);
+    max-width: 250px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 991px) {
+  .footer-payments-container {
+    margin-left: 0;
+    width: 100%;
+  }
+  .footer-payments-cards-row {
+    margin-left: -30px;
+    width: calc(100% + 30px);
+    max-width: 235px;
+  }
+}
+
+@media (max-width: 768px) {
+  .footer-payments-container {
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .footer-payments-cards-row {
+    margin-left: 0 !important;
+    width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+  .footer-payments-cards-row > div {
+    flex: 1 1 calc(33.333% - 6px) !important;
+    min-width: 50px !important;
+    max-width: calc(33.333% - 6px) !important;
+    height: 36px !important;
+  }
+}
+
 /* Login page responsive */
 .login-page-container {
   max-width: 440px;

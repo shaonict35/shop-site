@@ -103,6 +103,12 @@ export default function BlogMagazinePage() {
             </span>
           </div>
 
+          <div style={{ marginBottom: "14px" }}>
+            <Link href="/magazine" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "linear-gradient(135deg, #1a0a2e, #e63b7a)", color: "#ffffff", padding: "8px 20px", borderRadius: "30px", textDecoration: "none", fontWeight: "800", fontSize: "12.5px", boxShadow: "0 4px 14px rgba(230,59,122,0.3)" }}>
+              <span>📖 GlowGoodly অফিশিয়াল ডিজিটাল ম্যাগাজিন (২৫ পাতা) পড়তে এখানে ক্লিক করুন →</span>
+            </Link>
+          </div>
+
           <h1
             style={{
               fontSize: "34px",

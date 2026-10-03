@@ -148,42 +148,59 @@ app.get("/wp-json", (req, res) => {
 // Socket.io Real-Time Promotional Broadcasting System (100% Free WebSockets)
 let activeSocketsCount = 0;
 let lastPromoBroadcast: any = null;
+let inMemoryPromos: any[] = [];
 
 io.on("connection", (socket) => {
   activeSocketsCount++;
   console.log(`⚡ Socket connected: ${socket.id}. Active clients: ${activeSocketsCount}`);
+  io.emit("clients:count", activeSocketsCount);
 
   // Send last active promo on connect if available
   if (lastPromoBroadcast) {
     socket.emit("promo:message", lastPromoBroadcast);
   }
 
-  socket.on("admin:send-promo", (promoData) => {
-    lastPromoBroadcast = {
+  socket.on("admin:send-promo", async (promoData) => {
+    const promoPayload = {
       ...promoData,
-      id: "promo_" + Date.now(),
+      id: promoData.id || ("promo_" + Date.now()),
       timestamp: new Date().toISOString()
     };
+    lastPromoBroadcast = promoPayload;
+    inMemoryPromos = [promoPayload, ...inMemoryPromos.filter(p => p.id !== promoPayload.id)];
+    if (db) {
+      try {
+        await db.collection("promotions").doc(promoPayload.id).set(promoPayload);
+      } catch (e) {
+        console.log("Promo DB save fallback:", e);
+      }
+    }
     console.log("📢 Admin broadcasting promo message via Socket.io:", lastPromoBroadcast);
     io.emit("promo:message", lastPromoBroadcast);
+  });
+
+  socket.on("admin:clear-promo", () => {
+    lastPromoBroadcast = null;
+    io.emit("promo:clear", {});
   });
 
   socket.on("disconnect", () => {
     activeSocketsCount = Math.max(0, activeSocketsCount - 1);
     console.log(`🔌 Socket disconnected: ${socket.id}. Active clients: ${activeSocketsCount}`);
+    io.emit("clients:count", activeSocketsCount);
   });
 });
 
 // Admin REST Endpoint to broadcast Socket.io promo message
 app.post("/api/admin/broadcast-promo", async (req: express.Request, res: express.Response) => {
   try {
-    const { title, message, code, discount, link, image } = req.body;
+    const { id, title, message, code, discount, link, image } = req.body;
     if (!message && !title) {
       return res.status(400).json({ error: "Promo title or message is required" });
     }
 
     const promoPayload = {
-      id: "promo_" + Date.now(),
+      id: id || ("promo_" + Date.now()),
       title: title || "🌸 Special Offer Alert!",
       message: message || "",
       code: code || "GLOW15",
@@ -194,12 +211,13 @@ app.post("/api/admin/broadcast-promo", async (req: express.Request, res: express
     };
 
     lastPromoBroadcast = promoPayload;
+    inMemoryPromos = [promoPayload, ...inMemoryPromos.filter(p => p.id !== promoPayload.id)];
     io.emit("promo:message", promoPayload);
 
     // Also persist in DB if available
     if (db) {
       try {
-        await db.collection("promotions").add(promoPayload);
+        await db.collection("promotions").doc(promoPayload.id).set(promoPayload);
       } catch (e) {
         console.log("Promo DB save fallback:", e);
       }
@@ -219,16 +237,109 @@ app.post("/api/admin/broadcast-promo", async (req: express.Request, res: express
 // GET /api/admin/broadcast-promo — Get history of promos
 app.get("/api/admin/broadcast-promo", async (req: express.Request, res: express.Response) => {
   try {
-    const list: any[] = [];
+    const listMap = new Map<string, any>();
+
+    // 1. In-memory promos
+    inMemoryPromos.forEach((p) => {
+      if (p && p.id) listMap.set(p.id, p);
+    });
+
+    // 2. From database
     if (db) {
-      const snapshot = await db.collection("promotions").get();
-      snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
-      list.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+      try {
+        const snapshot = await db.collection("promotions").get();
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          const pId = data.id || doc.id;
+          listMap.set(pId, { ...data, id: pId });
+        });
+      } catch (e) {
+        console.log("Error fetching DB promos:", e);
+      }
     }
-    if (list.length === 0 && lastPromoBroadcast) {
-      list.push(lastPromoBroadcast);
+
+    if (listMap.size === 0 && lastPromoBroadcast) {
+      listMap.set(lastPromoBroadcast.id, lastPromoBroadcast);
     }
+
+    const list = Array.from(listMap.values());
+    list.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
     res.json(list);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/admin/broadcast-promo/:id — Delete a specific promo
+app.delete("/api/admin/broadcast-promo/:id", async (req: express.Request, res: express.Response) => {
+  try {
+    const { id } = req.params;
+
+    // Remove from in-memory list
+    inMemoryPromos = inMemoryPromos.filter((p) => p.id !== id);
+
+    // If active broadcast matches, clear it and emit clear event
+    if (lastPromoBroadcast && (lastPromoBroadcast.id === id || id === "active" || id === "current")) {
+      lastPromoBroadcast = null;
+      io.emit("promo:clear", { id });
+    } else {
+      io.emit("promo:clear", { id });
+    }
+
+    if (db) {
+      try {
+        // Delete directly by doc ID
+        await db.collection("promotions").doc(id).delete();
+        // Also check if any document has id in data matching this id
+        const snapshot = await db.collection("promotions").where("id", "==", id).get();
+        if (!snapshot.empty) {
+          const batch = db.batch();
+          snapshot.forEach((doc) => batch.delete(doc.ref));
+          await batch.commit();
+        }
+      } catch (e) {
+        console.log("Error deleting from promotions collection:", e);
+      }
+    }
+
+    res.json({ success: true, message: `Promo ${id} deleted successfully!` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/admin/broadcast-promo/clear — Stop/clear live broadcast from visitor screens
+app.post("/api/admin/broadcast-promo/clear", async (req: express.Request, res: express.Response) => {
+  try {
+    lastPromoBroadcast = null;
+    io.emit("promo:clear", {});
+    res.json({ success: true, message: "Live promo cleared from all visitor screens!" });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/admin/broadcast-promo — Delete all promos
+app.delete("/api/admin/broadcast-promo", async (req: express.Request, res: express.Response) => {
+  try {
+    lastPromoBroadcast = null;
+    inMemoryPromos = [];
+    io.emit("promo:clear", {});
+
+    if (db) {
+      try {
+        const snapshot = await db.collection("promotions").get();
+        if (!snapshot.empty) {
+          const batch = db.batch();
+          snapshot.forEach((doc) => batch.delete(doc.ref));
+          await batch.commit();
+        }
+      } catch (e) {
+        console.log("Error clearing all promotions:", e);
+      }
+    }
+
+    res.json({ success: true, message: "All promos cleared successfully!" });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

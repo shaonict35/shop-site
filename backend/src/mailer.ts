@@ -149,133 +149,218 @@ export async function sendWelcomeUserEmail(toEmail: string, name: string, tempPa
 }
 
 /**
- * 2. Send Beautiful Order Receipt Invoice to Customer
+ * 2. Send Beautiful & Spam-Compliant Order Receipt Invoice to Customer & Store
  */
 export async function sendOrderReceiptEmail(order: any) {
-  if (!order.customerEmail) return;
-
   try {
     const config = await getActiveSmtpConfig();
     const transporter = getTransporter(config);
-    const fromAddress = config.fromAddress || `"GlowGoodly Orders" <${config.user || "support@glowgoodly.com"}>`;
+    const senderEmail = config.user || "support@glowgoodly.com";
+    const fromAddress = config.fromAddress || `"GlowGoodly Official" <${senderEmail}>`;
+    const storeSupportEmail = "support@glowgoodly.com";
 
+    // Determine destination recipients
+    const customerEmail = (order.customerEmail || "").trim();
+    const hasValidCustomerEmail = Boolean(customerEmail && customerEmail.includes("@"));
 
-    const itemsHtml = (order.orderItems || []).map((item: any) => `
+    // Prepare Items HTML and Text
+    const items = order.orderItems || [];
+    const itemsHtml = items.map((item: any) => `
       <tr style="border-bottom: 1px solid #e2e8f0;">
         <td style="padding: 12px 8px; font-size: 13px; color: #1e293b;">
-          <strong>${item.productName}</strong><br/>
-          <span style="font-size: 11px; color: #64748b;">${item.variantName || ""}</span>
+          <strong>${item.productName || item.name || "Product"}</strong><br/>
+          <span style="font-size: 11px; color: #64748b;">${item.variantName || item.size || ""}</span>
         </td>
         <td style="padding: 12px 8px; font-size: 13px; text-align: center; color: #334155;">${item.quantity}</td>
         <td style="padding: 12px 8px; font-size: 13px; text-align: right; color: #334155;">৳${item.price}</td>
-        <td style="padding: 12px 8px; font-size: 13px; text-align: right; font-weight: bold; color: #e63b7a;">৳${item.total}</td>
+        <td style="padding: 12px 8px; font-size: 13px; text-align: right; font-weight: bold; color: #e63b7a;">৳${item.total || (item.price * item.quantity)}</td>
       </tr>
     `).join("");
 
+    const itemsText = items.map((item: any, idx: number) => 
+      `${idx + 1}. ${item.productName || item.name} (${item.variantName || item.size || "Default"}) - Qty: ${item.quantity} x ৳${item.price} = ৳${item.total || (item.price * item.quantity)}`
+    ).join("\n");
+
+    // Plain text alternative (Eliminates MIME_HTML_ONLY spam penalty)
+    const plainTextReceipt = `
+======================================================
+           GLOWGOODLY - OFFICIAL ORDER RECEIPT
+======================================================
+Order Number: #${order.orderNumber}
+Order Date: ${new Date(order.createdAt || Date.now()).toLocaleDateString("en-US", { day: 'numeric', month: 'short', year: 'numeric' })}
+Payment Method: ${order.paymentMethod || "Cash on Delivery (COD)"} (${order.paymentStatus || "Pending"})
+Order Status: ${order.orderStatus || "Pending"}
+
+CUSTOMER DETAILS:
+Name: ${order.customerName || "Customer"}
+Phone: ${order.customerPhone || "N/A"}
+Delivery Address: ${order.address || "N/A"}
+Zone: ${order.zone || "Standard"}
+
+ORDER ITEMS:
+${itemsText}
+
+PRICING BREAKDOWN:
+Subtotal: ৳${order.subTotal || 0}
+Delivery Charge: ৳${order.deliveryCharge || 0}
+${order.discount > 0 ? `Discount: -৳${order.discount}\n` : ""}------------------------------------------------------
+TOTAL PAYABLE: ৳${order.total || order.totalAmount || 0}
+------------------------------------------------------
+
+Thank you for shopping with GlowGoodly!
+All our cosmetics and skincare products are 100% authentic.
+
+If you have questions, please contact our help desk:
+Email: support@glowgoodly.com
+Phone: +8801609013011 / +8801971708689
+Web: https://glowgoodly.com
+Warehouse: 1162, East Monipur, Mirpur-2, Dhaka-1216, Bangladesh
+======================================================
+    `.trim();
+
+    // High Quality Responsive HTML Receipt
     const htmlContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-        <!-- Header -->
-        <div style="background: linear-gradient(135deg, #e63b7a 0%, #be185d 100%); padding: 28px; text-align: center; color: #ffffff;">
-          <h1 style="margin: 0; font-size: 26px; font-weight: 900; letter-spacing: 1px;">GLOWGOODLY</h1>
-          <p style="margin-top: 6px; font-size: 15px; font-weight: 600; opacity: 0.95;">Thank you for your order! 🛍️</p>
-        </div>
-
-        <!-- Body -->
-        <div style="padding: 28px; color: #334155;">
-          <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #f1f5f9; padding-bottom: 16px; margin-bottom: 20px;">
-            <div>
-              <p style="margin: 0; font-size: 12px; color: #64748b; font-weight: bold; text-transform: uppercase;">Order Number</p>
-              <p style="margin: 4px 0 0 0; font-size: 18px; font-weight: 900; color: #e63b7a;">#${order.orderNumber}</p>
-            </div>
-            <div style="text-align: right;">
-              <p style="margin: 0; font-size: 12px; color: #64748b; font-weight: bold; text-transform: uppercase;">Order Date</p>
-              <p style="margin: 4px 0 0 0; font-size: 13px; font-weight: 700; color: #1e293b;">${new Date(order.createdAt || Date.now()).toLocaleDateString("en-US", { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-            </div>
+      <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+      <html xmlns="http://www.w3.org/1999/xhtml">
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+        <title>Order Receipt #${order.orderNumber} - GlowGoodly</title>
+      </head>
+      <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+        <div style="max-width: 620px; margin: 20px auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
+          <!-- Header Banner -->
+          <div style="background: linear-gradient(135deg, #e63b7a 0%, #be185d 100%); padding: 26px 20px; text-align: center; color: #ffffff;">
+            <h1 style="margin: 0; font-size: 24px; font-weight: 900; letter-spacing: 1.5px; text-transform: uppercase;">GLOWGOODLY</h1>
+            <p style="margin: 6px 0 0 0; font-size: 14px; font-weight: 600; opacity: 0.95;">Official Purchase Invoice & Order Confirmation</p>
           </div>
 
-          <h3 style="font-size: 15px; color: #0f172a; margin-bottom: 10px;">Hi ${order.customerName},</h3>
-          <p style="font-size: 13.5px; line-height: 1.6; color: #475569; margin-bottom: 20px;">
-            We've received your order and are currently preparing it for delivery. Here is your official order receipt summary:
-          </p>
-
-          <!-- Items Table -->
-          <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
-            <thead>
-              <tr style="background-color: #f8fafc; border-bottom: 2px solid #cbd5e1; text-align: left;">
-                <th style="padding: 10px 8px; font-size: 12px; color: #475569; font-weight: bold;">ITEM</th>
-                <th style="padding: 10px 8px; font-size: 12px; color: #475569; font-weight: bold; text-align: center;">QTY</th>
-                <th style="padding: 10px 8px; font-size: 12px; color: #475569; font-weight: bold; text-align: right;">PRICE</th>
-                <th style="padding: 10px 8px; font-size: 12px; color: #475569; font-weight: bold; text-align: right;">TOTAL</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${itemsHtml}
-            </tbody>
-          </table>
-
-          <!-- Pricing Summary -->
-          <div style="background-color: #f8fafc; padding: 18px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
-            <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px; color: #475569;">
-              <span>Subtotal:</span>
-              <span>৳${order.subTotal}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px; color: #475569;">
-              <span>Delivery Charge (${order.zone}):</span>
-              <span>৳${order.deliveryCharge}</span>
-            </div>
-            ${order.discount > 0 ? `
-              <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px; color: #166534;">
-                <span>Discount:</span>
-                <span>-৳${order.discount}</span>
+          <!-- Body Content -->
+          <div style="padding: 24px; color: #334155;">
+            <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #f1f5f9; padding-bottom: 14px; margin-bottom: 18px;">
+              <div>
+                <p style="margin: 0; font-size: 11px; color: #64748b; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">Order Number</p>
+                <p style="margin: 3px 0 0 0; font-size: 18px; font-weight: 900; color: #e63b7a;">#${order.orderNumber}</p>
               </div>
-            ` : ""}
-            <div style="border-top: 1.5px solid #cbd5e1; padding-top: 10px; display: flex; justify-content: space-between; font-size: 16px; font-weight: 900; color: #0f172a;">
-              <span>Total Payable:</span>
-              <span style="color: #e63b7a;">৳${order.total}</span>
+              <div style="text-align: right;">
+                <p style="margin: 0; font-size: 11px; color: #64748b; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">Order Date</p>
+                <p style="margin: 3px 0 0 0; font-size: 13px; font-weight: 700; color: #1e293b;">${new Date(order.createdAt || Date.now()).toLocaleDateString("en-US", { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+              </div>
             </div>
-            <div style="margin-top: 10px; font-size: 12px; font-weight: bold; color: #1e293b;">
-              Payment Method: <span style="color: #be185d;">${order.paymentMethod}</span> (${order.paymentStatus})
-            </div>
-          </div>
 
-          <!-- Shipping Details -->
-          <div style="background-color: #ffffff; border: 1px dashed #cbd5e1; padding: 16px; border-radius: 10px; margin-bottom: 24px;">
-            <h4 style="margin: 0 0 8px 0; font-size: 13px; color: #0f172a; text-transform: uppercase; font-weight: bold;">📦 Delivery Address</h4>
-            <p style="margin: 0; font-size: 13px; color: #334155; line-height: 1.5;">
-              <strong>${order.customerName}</strong><br/>
-              Phone: ${order.customerPhone}<br/>
-              Address: ${order.address}
+            <p style="font-size: 14px; color: #1e293b; margin: 0 0 8px 0;">Hello <strong>${order.customerName || "Valued Customer"}</strong>,</p>
+            <p style="font-size: 13px; line-height: 1.6; color: #475569; margin: 0 0 18px 0;">
+              Thank you for placing your order with GlowGoodly! Your order has been registered in our fulfillment system. Below is your complete purchase invoice:
+            </p>
+
+            <!-- Items Table -->
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+              <thead>
+                <tr style="background-color: #f8fafc; border-bottom: 2px solid #cbd5e1; text-align: left;">
+                  <th style="padding: 10px 8px; font-size: 11.5px; color: #475569; font-weight: 800; text-transform: uppercase;">Item</th>
+                  <th style="padding: 10px 8px; font-size: 11.5px; color: #475569; font-weight: 800; text-align: center; text-transform: uppercase;">Qty</th>
+                  <th style="padding: 10px 8px; font-size: 11.5px; color: #475569; font-weight: 800; text-align: right; text-transform: uppercase;">Price</th>
+                  <th style="padding: 10px 8px; font-size: 11.5px; color: #475569; font-weight: 800; text-align: right; text-transform: uppercase;">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsHtml}
+              </tbody>
+            </table>
+
+            <!-- Pricing Summary Box -->
+            <div style="background-color: #f8fafc; padding: 16px 18px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+              <table style="width: 100%; font-size: 13px; color: #475569;">
+                <tr>
+                  <td style="padding: 4px 0;">Subtotal:</td>
+                  <td style="padding: 4px 0; text-align: right; font-weight: 600;">৳${order.subTotal || 0}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 0;">Delivery Charge (${order.zone || "Standard"}):</td>
+                  <td style="padding: 4px 0; text-align: right; font-weight: 600;">৳${order.deliveryCharge || 0}</td>
+                </tr>
+                ${order.discount > 0 ? `
+                  <tr>
+                    <td style="padding: 4px 0; color: #166534;">Discount:</td>
+                    <td style="padding: 4px 0; text-align: right; color: #166534; font-weight: 700;">-৳${order.discount}</td>
+                  </tr>
+                ` : ""}
+                <tr style="border-top: 1.5px solid #cbd5e1;">
+                  <td style="padding: 10px 0 4px 0; font-size: 15px; font-weight: 900; color: #0f172a;">Total Payable:</td>
+                  <td style="padding: 10px 0 4px 0; text-align: right; font-size: 16px; font-weight: 900; color: #e63b7a;">৳${order.total || order.totalAmount || 0}</td>
+                </tr>
+                <tr>
+                  <td colspan="2" style="padding-top: 6px; font-size: 12px; color: #64748b;">
+                    Payment Method: <strong style="color: #0f172a;">${order.paymentMethod || "Cash on Delivery"}</strong> (${order.paymentStatus || "Pending"})
+                  </td>
+                </tr>
+              </table>
+            </div>
+
+            <!-- Shipping Details Box -->
+            <div style="background-color: #ffffff; border: 1px dashed #cbd5e1; padding: 14px 16px; border-radius: 8px; margin-bottom: 20px;">
+              <h4 style="margin: 0 0 6px 0; font-size: 12px; color: #0f172a; text-transform: uppercase; font-weight: 800;">📦 Shipping & Delivery Address</h4>
+              <p style="margin: 0; font-size: 12.5px; color: #334155; line-height: 1.5;">
+                Recipient: <strong>${order.customerName || "Customer"}</strong><br/>
+                Phone: <strong>${order.customerPhone || "N/A"}</strong><br/>
+                Address: ${order.address || "N/A"}
+              </p>
+            </div>
+
+            <p style="font-size: 12px; color: #64748b; line-height: 1.5; margin: 0; text-align: center;">
+              Have questions or need to modify your delivery? Reply directly to this email or call our hotline at <strong>+8801609013011</strong>.
             </p>
           </div>
 
-          <p style="font-size: 12.5px; color: #64748b; text-align: center; margin-top: 10px;">
-            If you have any questions regarding your order, please reply directly to this email or call our support line at <strong>+8801609013011</strong>.
-          </p>
+          <!-- Anti-Spam Compliant Footer -->
+          <div style="background-color: #f1f5f9; padding: 16px; text-align: center; font-size: 11.5px; color: #64748b; border-top: 1px solid #e2e8f0; line-height: 1.5;">
+            <strong>GlowGoodly Bangladesh</strong> • 100% Authentic Cosmetics & Skincare<br/>
+            Fulfillment Center: 1162, East Monipur, Mirpur-2, Dhaka-1216<br/>
+            Support: <a href="mailto:support@glowgoodly.com" style="color: #e63b7a; text-decoration: none;">support@glowgoodly.com</a> | Web: <a href="https://glowgoodly.com" style="color: #e63b7a; text-decoration: none;">glowgoodly.com</a>
+          </div>
         </div>
-
-        <!-- Footer -->
-        <div style="background-color: #f1f5f9; padding: 16px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0;">
-          &copy; 2026 GlowGoodly Authentic Cosmetics & Beauty. All rights reserved.<br/>
-          Official Email: support@glowgoodly.com | Website: <a href="https://glowgoodly.com" style="color: #e63b7a; text-decoration: none; font-weight: bold;">glowgoodly.com</a>
-        </div>
-      </div>
+      </body>
+      </html>
     `;
 
-    await transporter.sendMail({
+    const messageId = `<order-${order.orderNumber || Date.now()}-${Date.now()}@glowgoodly.com>`;
+    const targetRecipient = hasValidCustomerEmail ? customerEmail : storeSupportEmail;
+    const bccList = hasValidCustomerEmail ? [storeSupportEmail] : undefined;
+
+    const mailOptions: any = {
       from: fromAddress,
-      to: order.customerEmail,
-      subject: `🎉 Order Confirmation #${order.orderNumber} - GlowGoodly`,
+      to: targetRecipient,
+      bcc: bccList,
+      subject: `Order Receipt #${order.orderNumber} - GlowGoodly`,
+      text: plainTextReceipt,
       html: htmlContent,
       replyTo: "support@glowgoodly.com",
+      sender: senderEmail,
+      messageId: messageId,
+      date: new Date(),
+      envelope: {
+        from: senderEmail,
+        to: hasValidCustomerEmail ? [customerEmail, storeSupportEmail] : [storeSupportEmail]
+      },
       headers: {
-        "X-Mailer": "GlowGoodly Invoice Dispatcher",
+        "X-Mailer": "GlowGoodly Hosting Mailer 2.0",
+        "X-Priority": "3 (Normal)",
+        "Importance": "Normal",
+        "Auto-Submitted": "auto-generated",
+        "Precedence": "bulk",
         "X-Auto-Response-Suppress": "All",
-        "List-Unsubscribe": "<mailto:support@glowgoodly.com?subject=unsubscribe>"
+        "Feedback-ID": "order-receipt:glowgoodly:transactional",
+        "List-Unsubscribe": "<mailto:support@glowgoodly.com?subject=Unsubscribe>",
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        "Return-Path": senderEmail
       }
-    });
+    };
 
-    console.log(`Order receipt email sent successfully to ${order.customerEmail}`);
+    console.log(`[Order Mailer] Sending receipt for #${order.orderNumber} via ${senderEmail} to ${targetRecipient}...`);
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`[Order Mailer] Receipt successfully sent! Message ID: ${info.messageId || messageId}`);
+    return info;
   } catch (err) {
-    console.error("Failed to send order receipt email:", err);
+    console.error(`[Order Mailer Error] Failed to send order receipt for #${order.orderNumber}:`, err);
   }
 }

@@ -1,6 +1,18 @@
 // Client-side memory cache for API endpoints with robust error fallbacks.
 const cache: Record<string, { data: any; expiry: number }> = {};
 
+// On every page load/refresh, clear banner cache so admin changes are visible immediately
+if (typeof window !== "undefined") {
+  try {
+    Object.keys(localStorage).forEach(k => {
+      if (k.startsWith("gg_cache_") && k.includes("banner")) {
+        localStorage.removeItem(k);
+      }
+    });
+  } catch (e) {}
+}
+
+
 // Base API URL calculation supporting full URLs, paths, and trailing slash normalization
 const getBaseApiUrl = () => {
   if (typeof window !== "undefined") {

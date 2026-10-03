@@ -91,6 +91,61 @@ export default function Footer() {
           fontSize: "12.5px",
         }}
       >
+        <style dangerouslySetInnerHTML={{ __html: `
+          .footer-payments-container {
+            margin-top: 20px;
+            width: 100%;
+          }
+          .footer-payments-cards-row {
+            display: flex;
+            gap: 4px;
+            flex-wrap: nowrap;
+            align-items: center;
+            width: 100%;
+          }
+          @media (min-width: 992px) {
+            .footer-payments-container {
+              margin-left: 0;
+              width: 100%;
+            }
+            .footer-payments-cards-row {
+              margin-left: -40px;
+              width: calc(100% + 40px);
+              max-width: 250px;
+            }
+          }
+          @media (min-width: 769px) and (max-width: 991px) {
+            .footer-payments-container {
+              margin-left: 0;
+              width: 100%;
+            }
+            .footer-payments-cards-row {
+              margin-left: -30px;
+              width: calc(100% + 30px);
+              max-width: 235px;
+            }
+          }
+          @media (max-width: 768px) {
+            .footer-payments-container {
+              margin-left: 0 !important;
+              width: 100% !important;
+              max-width: 100% !important;
+            }
+            .footer-payments-cards-row {
+              margin-left: 0 !important;
+              width: 100% !important;
+              display: flex !important;
+              flex-wrap: wrap !important;
+              gap: 8px !important;
+            }
+            .footer-payments-cards-row > div {
+              flex: 1 1 calc(33.333% - 6px) !important;
+              min-width: 50px !important;
+              max-width: calc(33.333% - 6px) !important;
+              height: 36px !important;
+            }
+          }
+        ` }} />
         <div className="container" style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 20px" }}>
           {/* Main Columns Grid */}
           <div className="footer-columns">
@@ -110,7 +165,7 @@ export default function Footer() {
               </h3>
               <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontWeight: "700" }}>
                 <Link href="/about" style={{ color: "#ffffff", textDecoration: "none", textTransform: "uppercase" }}>Our Story</Link>
-                <Link href="/blog" style={{ color: "#ffffff", textDecoration: "none", textTransform: "uppercase" }}>GlowGoodly Magazine</Link>
+                <Link href="/magazine" style={{ color: "#ffffff", textDecoration: "none", textTransform: "uppercase" }}>GlowGoodly Magazine</Link>
                 <Link href="/join-our-team" style={{ color: "#ffffff", textDecoration: "none", textTransform: "uppercase" }}>Join Our Team</Link>
                 <Link href="/authenticity" style={{ color: "#ffffff", textDecoration: "none", textTransform: "uppercase" }}>Authenticity</Link>
               </div>
@@ -200,8 +255,8 @@ export default function Footer() {
               </div>
             </div>
 
-            {/* Column 5: Help */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            {/* Column 5: Help & Payments Accepted */}
+            <div className="footer-col-help" style={{ display: "flex", flexDirection: "column", gap: "12px", minWidth: 0, position: "relative" }}>
               <h4 style={{ fontSize: "12px", fontWeight: "800", color: "#e52860", textTransform: "uppercase", letterSpacing: "0.5px", cursor: "default", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#ff6ba8")} onMouseLeave={(e) => (e.currentTarget.style.color = "#e52860")}>
                 Help
               </h4>
@@ -215,29 +270,202 @@ export default function Footer() {
                 <Link href="/privacy-policy" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>PRIVACY POLICY</Link>
               </div>
 
-              <div style={{ marginTop: "15px" }}>
-                <h4 style={{ fontSize: "11px", fontWeight: "800", color: "#ffffff", textTransform: "uppercase", marginBottom: "10px" }}>
-                  Payments Accepted
+              <div className="footer-payments-container">
+                <div style={{ width: "100%", height: "1px", backgroundColor: "rgba(255,255,255,0.18)", marginBottom: "14px" }} />
+                <h4 style={{ fontSize: "13px", fontWeight: "800", color: "#ffffff", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "12px", fontFamily: "'Outfit', 'Montserrat', sans-serif" }}>
+                  PAYMENTS ACCEPTED
                 </h4>
-                <div style={{ display: "flex", gap: "8px", flexWrap: "nowrap", alignItems: "center" }}>
-                  {/* bKash - Official Logo */}
-                  <div style={{ backgroundColor: "#e2136e", display: "flex", alignItems: "center", justifyContent: "center", height: "36px", width: "60px", flexShrink: 0, borderRadius: "8px", boxShadow: "0 2px 6px rgba(226,19,110,0.35)", transition: "transform 0.2s, box-shadow 0.2s", overflow: "hidden", padding: "4px" }} onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(226,19,110,0.5)"; }} onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 6px rgba(226,19,110,0.35)"; }}>
-                    <img src="/bkash-logo.png" alt="bKash" style={{ height: "28px", width: "28px", objectFit: "contain" }} />
+                {/* All 6 cards in ONE SINGLE LINE */}
+                <div className="footer-payments-cards-row">
+                  {/* 1. bKash Card (Official Vector) */}
+                  <div
+                    title="bKash"
+                    style={{
+                      backgroundColor: "#ffffff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "35px",
+                      flex: "1 1 0",
+                      minWidth: "0",
+                      borderRadius: "6px",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.16)",
+                      border: "1px solid #e2e8f0",
+                      padding: "2px 3px",
+                      transition: "transform 0.2s, box-shadow 0.2s",
+                      cursor: "pointer",
+                      overflow: "hidden"
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 6px 14px rgba(0,0,0,0.28)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.16)"; }}
+                  >
+                    <img src="/payments/bkash.svg" alt="bKash" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                   </div>
 
-                  {/* Mastercard */}
-                  <div style={{ backgroundColor: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center", height: "36px", width: "60px", flexShrink: 0, borderRadius: "8px", boxShadow: "0 2px 6px rgba(0,0,0,0.3)", transition: "transform 0.2s, box-shadow 0.2s" }} onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.5)"; }} onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.3)"; }}>
-                    <svg viewBox="0 0 52 32" width="46" height="28" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="18" cy="16" r="12" fill="#eb001b" />
-                      <circle cx="34" cy="16" r="12" fill="#f79e1b" />
-                      <ellipse cx="26" cy="16" rx="5" ry="12" fill="#ff5f00" />
+                  {/* 2. VISA Card */}
+                  <div
+                    title="VISA"
+                    style={{
+                      backgroundColor: "#ffffff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "35px",
+                      flex: "1 1 0",
+                      minWidth: "0",
+                      borderRadius: "6px",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.16)",
+                      border: "1px solid #e2e8f0",
+                      padding: "3px 4px",
+                      transition: "transform 0.2s, box-shadow 0.2s",
+                      cursor: "pointer",
+                      overflow: "hidden"
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 6px 14px rgba(0,0,0,0.28)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.16)"; }}
+                  >
+                    <svg viewBox="0 0 64 26" style={{ width: "100%", height: "auto", maxHeight: "20px" }}>
+                      <text x="32" y="20" textAnchor="middle" fontFamily="'Impact', 'Arial Black', sans-serif" fontStyle="italic" fontWeight="900" fontSize="22" fill="#1434cb" letterSpacing="0.8px">
+                        VISA
+                      </text>
+                      <polygon points="10,4 14.5,4 12,9.5 9.5,9.5" fill="#f7b600" />
                     </svg>
                   </div>
-                  {/* VISA - Official Uploaded Image */}
-                  <div style={{ backgroundColor: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", height: "36px", width: "60px", flexShrink: 0, borderRadius: "8px", border: "1px solid #e2e8f0", boxShadow: "0 2px 6px rgba(0,0,0,0.12)", transition: "transform 0.2s, box-shadow 0.2s", padding: "2px" }} onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.2)"; }} onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.12)"; }}>
-                    <img src="/visa-logo.png" alt="VISA" style={{ height: "26px", maxWidth: "90%", objectFit: "contain" }} />
+
+                  {/* 3. MasterCard */}
+                  <div
+                    title="MasterCard"
+                    style={{
+                      backgroundColor: "#ffffff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "35px",
+                      flex: "1 1 0",
+                      minWidth: "0",
+                      borderRadius: "6px",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.16)",
+                      border: "1px solid #e2e8f0",
+                      padding: "2px 3px",
+                      transition: "transform 0.2s, box-shadow 0.2s",
+                      cursor: "pointer",
+                      overflow: "hidden"
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 6px 14px rgba(0,0,0,0.28)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.16)"; }}
+                  >
+                    <svg viewBox="0 0 60 38" style={{ width: "100%", height: "auto", maxHeight: "24px" }}>
+                      <circle cx="21" cy="19" r="14" fill="#eb001b" />
+                      <circle cx="39" cy="19" r="14" fill="#f79e1b" />
+                      <path d="M 30,7.8 A 14 14 0 0 0 30,30.2 A 14 14 0 0 0 30,7.8" fill="#ff5f00" />
+                      <text x="30" y="21.5" textAnchor="middle" fontFamily="'Helvetica Neue', Arial, sans-serif" fontStyle="italic" fontWeight="800" fontSize="7.5" fill="#ffffff" filter="drop-shadow(0 1px 1px rgba(0,0,0,0.7))">
+                        MasterCard
+                      </text>
+                    </svg>
                   </div>
 
+                  {/* 4. American Express Card */}
+                  <div
+                    title="American Express"
+                    style={{
+                      backgroundColor: "#ffffff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "35px",
+                      flex: "1 1 0",
+                      minWidth: "0",
+                      borderRadius: "6px",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.16)",
+                      border: "1px solid #e2e8f0",
+                      padding: "2px 2px",
+                      transition: "transform 0.2s, box-shadow 0.2s",
+                      cursor: "pointer",
+                      overflow: "hidden"
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 6px 14px rgba(0,0,0,0.28)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.16)"; }}
+                  >
+                    <div style={{ backgroundColor: "#007bc1", width: "100%", height: "26px", borderRadius: "3px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "1px" }}>
+                      <span style={{ color: "#ffffff", fontSize: "5.5px", fontWeight: "900", fontFamily: "'Arial Black', sans-serif", letterSpacing: "0.2px", lineHeight: "1" }}>
+                        AMERICAN
+                      </span>
+                      <span style={{ color: "#ffffff", fontSize: "5.5px", fontWeight: "900", fontFamily: "'Arial Black', sans-serif", letterSpacing: "0.2px", lineHeight: "1.2" }}>
+                        EXPRESS
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 5. নগদ (Nagad) Card */}
+                  <div
+                    title="নগদ (Nagad)"
+                    style={{
+                      backgroundColor: "#ffffff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "35px",
+                      flex: "1 1 0",
+                      minWidth: "0",
+                      borderRadius: "6px",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.16)",
+                      border: "1px solid #e2e8f0",
+                      padding: "2px 2px",
+                      transition: "transform 0.2s, box-shadow 0.2s",
+                      cursor: "pointer",
+                      overflow: "hidden"
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 6px 14px rgba(0,0,0,0.28)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.16)"; }}
+                  >
+                    <svg viewBox="0 0 60 48" style={{ width: "100%", height: "100%" }}>
+                      <g transform="translate(18, 1)">
+                        <circle cx="12" cy="11" r="10" fill="none" stroke="#ed1c24" strokeWidth="2.8" strokeDasharray="48" strokeDashoffset="10" />
+                        <path d="M 6 11 C 6 7, 14 4, 17 8 C 20 12, 14 17, 10 15 C 8 14, 7 12, 7 11" fill="#f7941d" />
+                        <circle cx="13" cy="9" r="2.6" fill="#ffffff" />
+                        <circle cx="13" cy="9" r="1.4" fill="#ed1c24" />
+                      </g>
+                      <text x="30" y="36" textAnchor="middle" fontFamily="'Hind Siliguri', 'Kalpurush', 'SolaimanLipi', 'Noto Sans Bengali', sans-serif" fontWeight="900" fontSize="13.5" fill="#d2151e">
+                        নগদ
+                      </text>
+                      <text x="30" y="44" textAnchor="middle" fontFamily="'Hind Siliguri', sans-serif" fontWeight="500" fontSize="3.8" fill="#888888">
+                        ডাক বিভাগের ডিজিটাল লেনদেন
+                      </text>
+                    </svg>
+                  </div>
+
+                  {/* 6. উপায় (Upay) Card */}
+                  <div
+                    title="উপায় (Upay)"
+                    style={{
+                      backgroundColor: "#ffffff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "35px",
+                      flex: "1 1 0",
+                      minWidth: "0",
+                      borderRadius: "6px",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.16)",
+                      border: "1px solid #e2e8f0",
+                      padding: "2px 2px",
+                      transition: "transform 0.2s, box-shadow 0.2s",
+                      cursor: "pointer",
+                      overflow: "hidden"
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 6px 14px rgba(0,0,0,0.28)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.16)"; }}
+                  >
+                    <svg viewBox="0 0 60 48" style={{ width: "100%", height: "100%" }}>
+                      <circle cx="18" cy="8" r="3.4" fill="#fed000" />
+                      <circle cx="42" cy="8" r="3.4" fill="#003566" />
+                      <path d="M 16 13 C 16 25, 29 28, 30 28 C 29 23, 22 20, 22 13 Z" fill="#fed000" />
+                      <path d="M 44 13 C 44 25, 31 28, 30 28 C 31 23, 38 20, 38 13 Z" fill="#003566" />
+                      <text x="30" y="41" textAnchor="middle" fontFamily="'Hind Siliguri', 'Kalpurush', 'SolaimanLipi', 'Noto Sans Bengali', sans-serif" fontWeight="900" fontSize="13" fill="#003566">
+                        উপায়
+                      </text>
+                    </svg>
+                  </div>
                 </div>
               </div>
             </div>

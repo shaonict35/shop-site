@@ -19,7 +19,17 @@ interface PromoData {
 
 export default function PromoSocketListener() {
   const [promo, setPromo] = useState<PromoData | null>(null);
-  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+  const [dismissedIds, setDismissedIds] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = sessionStorage.getItem("gg_dismissed_promos");
+        return saved ? JSON.parse(saved) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -37,8 +47,24 @@ export default function PromoSocketListener() {
       }
     });
 
+    socket.on("promo:clear", (data?: { id?: string }) => {
+      if (!data || !data.id) {
+        setPromo(null);
+      } else {
+        setPromo((curr) => (curr && curr.id === data.id ? null : curr));
+      }
+    });
+
+    const handleTestPromo = (e: any) => {
+      if (e.detail) {
+        setPromo(e.detail);
+      }
+    };
+    window.addEventListener("gg_test_promo", handleTestPromo);
+
     return () => {
       socket.disconnect();
+      window.removeEventListener("gg_test_promo", handleTestPromo);
     };
   }, []);
 
@@ -51,7 +77,13 @@ export default function PromoSocketListener() {
   };
 
   const handleDismiss = () => {
-    setDismissedIds((prev) => [...prev, promo.id]);
+    if (promo?.id) {
+      setDismissedIds((prev) => {
+        const next = [...prev, promo.id];
+        try { sessionStorage.setItem("gg_dismissed_promos", JSON.stringify(next)); } catch (e) {}
+        return next;
+      });
+    }
     setPromo(null);
   };
 

@@ -310,6 +310,12 @@ export default function Header() {
                 <span>🏷️ Authentic Brands ({dbBrands.length})</span>
               </Link>
 
+              {/* 10. Beauty Magazine */}
+              <Link href="/magazine" className="mobile-menu-row-single" onClick={() => setMobileMenuOpen(false)} style={{ background: "linear-gradient(135deg, #fff0f6, #fce7f3)", borderLeft: "3px solid #e63b7a", fontWeight: "800", color: "#e63b7a", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span>📖 Beauty Magazine (৫০ পাতা)</span>
+                <span style={{ fontSize: "9px", background: "#e63b7a", color: "#fff", padding: "2px 7px", borderRadius: "10px", fontWeight: "900" }}>NEW</span>
+              </Link>
+
               <div className="mobile-menu-section-title" style={{ marginTop: "20px" }}>ACCOUNT & HELP</div>
               <Link href={user ? "/account" : "/login"} className="mobile-menu-row-single" onClick={() => setMobileMenuOpen(false)}>
                 <span>👤 {user ? "My Account & Orders" : "Login / Signup"}</span>

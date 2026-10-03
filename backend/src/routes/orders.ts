@@ -365,13 +365,131 @@ router.post("/:id/send-pathao", authenticateJWT as any, requireRole(["SuperAdmin
     const settings: Record<string, string> = {};
     snapshot.forEach(d => { settings[d.data().key] = d.data().value; });
 
-    const clientId = settings["PATHAO_CLIENT_ID"] || "pathao_client_id_demo";
-    const storeId = settings["PATHAO_STORE_ID"] || "default_store";
-    const senderName = settings["PATHAO_SENDER_NAME"] || "GlowGoodly Store";
-    const senderPhone = settings["PATHAO_SENDER_PHONE"] || "01700000000";
+    const clientId = settings["PATHAO_CLIENT_ID"] || "";
+    const clientSecret = settings["PATHAO_CLIENT_SECRET"] || "";
+    const username = settings["PATHAO_CLIENT_EMAIL"] || "";
+    const password = settings["PATHAO_CLIENT_PASSWORD"] || "";
+    const storeId = settings["PATHAO_STORE_ID"] || "";
+    const baseUrl = (settings["PATHAO_BASE_URL"] || "https://api-hermes.pathao.com").replace(/\/$/, "");
 
-    const consignmentId = "PTH-" + Math.floor(10000000 + Math.random() * 90000000);
-    const trackingLink = `https://pathao.com/courier/tracking?consignment_id=${consignmentId}`;
+    let consignmentId = "";
+    let trackingLink = "";
+    let dispatchMethod = "simulation";
+    let liveError = "";
+
+    // If live credentials are provided, attempt real Pathao Aladdin API call
+    if (clientId && clientSecret && username && password) {
+      try {
+        console.log(`[Pathao API] Requesting issue-token for Order #${order.orderNumber}...`);
+        const tokenRes = await fetch(`${baseUrl}/aladdin/api/v1/issue-token`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) GlowGoodly/1.0"
+          },
+          body: JSON.stringify({
+            client_id: clientId,
+            client_secret: clientSecret,
+            grant_type: "password",
+            username,
+            password
+          })
+        });
+
+        const tokenData: any = await tokenRes.json().catch(() => ({}));
+        if (tokenRes.ok && tokenData.access_token) {
+          const accessToken = tokenData.access_token;
+          console.log(`[Pathao API] Token obtained. Creating order consignment...`);
+
+          const recipientPhone = (order.customerPhone || order.phone || "").replace(/^\+88/, "").trim();
+          const amountToCollect = (order.paymentMethod === "COD" || order.paymentStatus !== "Paid")
+            ? Math.round(Number(order.total || order.totalAmount || 0))
+            : 0;
+
+          const itemDesc = (order.orderItems && order.orderItems.length > 0)
+            ? order.orderItems.map((i: any) => `${i.productName || i.name} x${i.quantity || 1}`).join(", ")
+            : "Cosmetics & Beauty Care";
+
+          const orderPayload = {
+            store_id: storeId ? (isNaN(Number(storeId)) ? storeId : Number(storeId)) : undefined,
+            merchant_order_id: String(order.orderNumber || order.id),
+            recipient_name: order.customerName || order.name || "Customer",
+            recipient_phone: recipientPhone,
+            recipient_address: order.address || order.customerAddress || "Dhaka, Bangladesh",
+            recipient_city: Number(settings["PATHAO_CITY_ID"]) || 1,
+            recipient_zone: Number(settings["PATHAO_ZONE_ID"]) || 1,
+            delivery_type: 48,
+            item_type: 2,
+            special_instruction: order.notes || "",
+            item_quantity: (order.orderItems && order.orderItems.length) ? order.orderItems.length : 1,
+            item_weight: 0.5,
+            amount_to_collect: amountToCollect,
+            item_description: itemDesc.slice(0, 250)
+          };
+
+          const createOrderRes = await fetch(`${baseUrl}/aladdin/api/v1/orders`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": `Bearer ${accessToken}`,
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) GlowGoodly/1.0"
+            },
+            body: JSON.stringify(orderPayload)
+          });
+
+          const createOrderData: any = await createOrderRes.json().catch(() => ({}));
+          if (createOrderRes.ok && (createOrderData.data?.consignment_id || createOrderData.consignment_id)) {
+            consignmentId = createOrderData.data?.consignment_id || createOrderData.consignment_id;
+            trackingLink = `https://pathao.com/courier/tracking?consignment_id=${consignmentId}`;
+            dispatchMethod = "live_api";
+            console.log(`[Pathao API] Order #${order.orderNumber} successfully created via Live API! Consignment: ${consignmentId}`);
+          } else {
+            console.warn(`[Pathao API] Order creation returned error:`, createOrderData);
+            liveError = createOrderData.message || (createOrderData.errors ? JSON.stringify(createOrderData.errors) : "Pathao rejected the order payload.");
+          }
+        } else {
+          console.warn(`[Pathao API] Token acquisition failed:`, tokenData);
+          liveError = tokenData.message || "Failed to authenticate with Pathao API.";
+        }
+      } catch (err: any) {
+        console.error(`[Pathao API Error]`, err);
+        liveError = err.message || "Failed to connect to Pathao API server.";
+      }
+    }
+
+    // If live API succeeded, save and return live consignment
+    if (dispatchMethod === "live_api") {
+      const updates = {
+        courierName: "Pathao Courier",
+        consignmentId,
+        courierStatus: "Dispatched",
+        trackingLink,
+        orderStatus: "Shipped",
+        courierDispatchedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      await docRef.update(updates);
+      return res.json({
+        message: `Order #${order.orderNumber} successfully sent to Pathao Courier via Live API! Consignment ID: ${consignmentId}`,
+        consignmentId,
+        trackingLink,
+        isLive: true,
+        order: { id, ...order, ...updates }
+      });
+    }
+
+    // If live credentials WERE provided and failed: return error so admin can adjust
+    if (clientId && username && liveError) {
+      return res.status(400).json({
+        error: `Pathao API Error: ${liveError}. Please verify Store ID, Phone number, or credentials in Settings -> Courier.`
+      });
+    }
+
+    // Fallback if credentials not entered yet
+    consignmentId = "PTH-" + Math.floor(10000000 + Math.random() * 90000000);
+    trackingLink = `https://pathao.com/courier/tracking?consignment_id=${consignmentId}`;
 
     const updates = {
       courierName: "Pathao Courier",
@@ -379,17 +497,17 @@ router.post("/:id/send-pathao", authenticateJWT as any, requireRole(["SuperAdmin
       courierStatus: "Dispatched",
       trackingLink,
       orderStatus: "Shipped",
+      courierDispatchedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
     await docRef.update(updates);
 
-    console.log(`[Pathao Courier Dispatch] Sent Order #${order.orderNumber} to Pathao Courier. Consignment ID: ${consignmentId}`);
-
     res.json({
-      message: `Order #${order.orderNumber} successfully sent to Pathao Courier!`,
+      message: `Order #${order.orderNumber} dispatched! Consignment ID: ${consignmentId}. (Tip: Add your Pathao Store ID & Account Password in Settings -> Courier for live sync).`,
       consignmentId,
       trackingLink,
+      isLive: false,
       order: { id, ...order, ...updates }
     });
   } catch (error: any) {

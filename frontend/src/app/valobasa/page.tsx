@@ -37,10 +37,17 @@ export default function ValobasaAdminPanel() {
   const navigateTo = (tab: string) => {
     let target = tab;
     if (target === "orders") target = "recent-orders";
-    if (target === "categories") target = "category-list";
-    if (target === "home-slides") target = "home-banner-list";
-    if (target === "available-offers") target = "offers-coupons";
-    if (target === "socket-live-promo") target = "socket-promo";
+    if (target === "categories" || target === "category") target = "category-list";
+    if (target === "home-slides" || target === "slides") target = "home-banner-list";
+    if (target === "available-offers" || target === "available-offers-codes" || target === "offers-codes") target = "offers-coupons";
+    if (target === "socket-live-promo" || target === "socket.io-live-promo" || target === "socket-io-live-promo") target = "socket-promo";
+    if (target === "menu-management" || target === "menu") target = "menu-builder";
+    if (target === "seasonal-offer" || target === "seasonal-offer-page") target = "seasonal-offer-settings";
+    if (target === "dynamic-pages" || target === "cms" || target === "cms-page") target = "cms-pages";
+    if (target === "top-selling-products") target = "top-selling";
+    if (target === "customer-messages" || target === "messages") target = "customer-messages";
+    if (target === "damage" || target === "returns" || target === "damage-and-returns") target = "damage-returns";
+    if (target === "live-chat" || target === "chat") target = "live-chat";
 
     if (target !== activeTab) {
       setTabHistory(prev => [...prev, activeTab]);
@@ -55,10 +62,10 @@ export default function ValobasaAdminPanel() {
       if ((target === "category-list" || target === "sub-category-list" || target === "add-category" || target === "add-sub-category") && adminCategories.length === 0) {
         fetchAdminCategories();
       }
-      if ((target === "home-banner-list" || target === "add-home-banner") && banners.length === 0) {
+      if ((target === "home-banner-list" || target === "add-home-banner" || target === "home-slides") && banners.length === 0) {
         fetchAdminBanners();
       }
-      if ((target === "recent-orders" || target === "sales-report" || target === "top-selling" || target === "top-customers") && orders.length === 0) {
+      if ((target === "recent-orders" || target === "sales-report" || target === "top-selling" || target === "top-customers" || target === "orders") && orders.length === 0) {
         fetchAdminOrders();
       }
     }
@@ -80,6 +87,8 @@ export default function ValobasaAdminPanel() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [editingBanner, setEditingBanner] = useState<any | null>(null);
+  const [cardLinks, setCardLinks] = useState<Record<string, string>>({});
+  const [savingCardLinkId, setSavingCardLinkId] = useState<string | null>(null);
 
   // Modals & Damage Log State
   const [selectedOrderDetails, setSelectedOrderDetails] = useState<any | null>(null);
@@ -590,6 +599,7 @@ export default function ValobasaAdminPanel() {
   const [orders, setOrders] = useState<any[]>([]);
   const [selectedVoucherOrder, setSelectedVoucherOrder] = useState<any | null>(null);
   const [voucherPrintSize, setVoucherPrintSize] = useState<"A4" | "POS-80mm" | "POS-58mm" | "Letter">("A4");
+  const [sendingCourierOrderId, setSendingCourierOrderId] = useState<string | null>(null);
 
   // Settings
   const [settingsSubTab, setSettingsSubTab] = useState<string>("shipping");
@@ -854,38 +864,31 @@ export default function ValobasaAdminPanel() {
     }
   };
 
-  // Check admin session
+  // Check admin session — strict auth guard (no auto-heal bypass)
   useEffect(() => {
-    const savedToken = typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : null;
-    const savedUserStr = typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_user") || localStorage.getItem("gg_user")) : null;
+    if (typeof window === "undefined") return;
+    const savedToken = localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token");
+    const savedUserStr = localStorage.getItem("glowgoodly_user") || localStorage.getItem("gg_user");
+    const isLoggedOut = sessionStorage.getItem("glowgoodly_admin_logged_out") === "true";
+
+    // If user explicitly logged out, always show login screen
+    if (isLoggedOut) {
+      setIsAdmin(false);
+      return;
+    }
+
     let savedUser = user;
     if (!savedUser && savedUserStr) {
       try { savedUser = JSON.parse(savedUserStr); } catch (e) {}
     }
 
-    // Auto-heal missing token in local dev or admin session
-    if (!savedToken && typeof window !== "undefined") {
-      fetch(`${API_BASE}/auth/admin-token`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.token && data.user) {
-            localStorage.setItem("glowgoodly_token", data.token);
-            localStorage.setItem("gg_token", data.token);
-            localStorage.setItem("glowgoodly_user", JSON.stringify(data.user));
-            localStorage.setItem("gg_user", JSON.stringify(data.user));
-            if (login) login(data.user, data.token);
-            setIsAdmin(true);
-          }
-        })
-        .catch(() => {});
-    }
-
-    const isSessionActive = typeof window !== "undefined" && (sessionStorage.getItem("glowgoodly_admin_session") === "active" || Boolean(savedToken));
     const userRole = (savedUser?.role || "").toLowerCase();
-    if (savedUser && ["superadmin", "manager", "salesman", "admin"].includes(userRole)) {
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("glowgoodly_admin_session", "active");
-      }
+    const isAdminRole = ["superadmin", "manager", "salesman", "admin"].includes(userRole);
+    const isSessionActive = sessionStorage.getItem("glowgoodly_admin_session") === "active";
+
+    if (savedUser && isAdminRole && savedToken) {
+      sessionStorage.setItem("glowgoodly_admin_session", "active");
+      sessionStorage.removeItem("glowgoodly_admin_logged_out");
       setIsAdmin(true);
     } else if (isSessionActive && (token || savedToken)) {
       setIsAdmin(true);
@@ -910,9 +913,9 @@ export default function ValobasaAdminPanel() {
       const url = `${API_BASE}/products?all=true` + (bypass ? `&t=${Date.now()}` : "");
       let prods = await fetchWithCache(url, bypass);
       if (!prods || !Array.isArray(prods) || prods.length === 0) {
-        const directRes = await fetch(`${API_BASE}/products?all=true`);
-        if (directRes.ok) {
-          prods = await directRes.json();
+        const directRes = await fetch(`${API_BASE}/products?all=true`).catch(() => null);
+        if (directRes && directRes.ok) {
+          prods = await directRes.json().catch(() => null);
         }
       }
       if (prods && Array.isArray(prods) && prods.length > 0) {
@@ -930,7 +933,7 @@ export default function ValobasaAdminPanel() {
         setInventoryPrices(priceMap);
       }
     } catch (e) {
-      console.error("Error fetching admin products list:", e);
+      console.warn("Could not fetch admin products list:", e);
     } finally {
       setIsProductsLoading(false);
     }
@@ -941,15 +944,15 @@ export default function ValobasaAdminPanel() {
       const url = `${API_BASE}/categories` + (bypass ? `?t=${Date.now()}` : "");
       let cData = await fetchWithCache(url, bypass);
       if (!cData || !Array.isArray(cData) || cData.length === 0) {
-        const directRes = await fetch(`${API_BASE}/admin/categories`);
-        if (directRes.ok) cData = await directRes.json();
+        const directRes = await fetch(`${API_BASE}/admin/categories`).catch(() => null);
+        if (directRes && directRes.ok) cData = await directRes.json().catch(() => null);
       }
       if (cData && Array.isArray(cData) && cData.length > 0) {
         setAdminCategories(cData);
         setSubCategories(cData.filter((c: any) => c.parentId));
       }
     } catch (e) {
-      console.error("Error fetching admin categories:", e);
+      console.warn("Could not fetch admin categories:", e);
     }
   };
 
@@ -958,12 +961,12 @@ export default function ValobasaAdminPanel() {
       const url = `${API_BASE}/banners?t=${Date.now()}`;
       let bnData = await fetchWithCache(url, true);
       if (!bnData || !Array.isArray(bnData) || bnData.length === 0) {
-        const directRes = await fetch(`${API_BASE}/admin/banners?t=${Date.now()}`);
-        if (directRes.ok) bnData = await directRes.json();
+        const directRes = await fetch(`${API_BASE}/admin/banners?t=${Date.now()}`).catch(() => null);
+        if (directRes && directRes.ok) bnData = await directRes.json().catch(() => null);
       }
       setBanners(mergeBannersWithMaster(bnData && Array.isArray(bnData) ? bnData : []));
     } catch (e) {
-      console.error("Error fetching admin banners:", e);
+      console.warn("Could not fetch admin banners:", e);
       setBanners(mergeBannersWithMaster([]));
     }
   };
@@ -984,7 +987,7 @@ export default function ValobasaAdminPanel() {
         setOrders(oData);
       }
     } catch (e) {
-      console.error("Error fetching admin orders:", e);
+      console.warn("Could not fetch admin orders:", e);
     }
   };
 
@@ -994,16 +997,16 @@ export default function ValobasaAdminPanel() {
       const url = `${API_BASE}/brands` + (bypass ? `?t=${Date.now()}` : "");
       let bData = await fetchWithCache(url, bypass);
       if (!bData || !Array.isArray(bData) || bData.length === 0) {
-        const directRes = await fetch(`${API_BASE}/brands`);
-        if (directRes.ok) {
-          bData = await directRes.json();
+        const directRes = await fetch(`${API_BASE}/brands`).catch(() => null);
+        if (directRes && directRes.ok) {
+          bData = await directRes.json().catch(() => null);
         }
       }
       if (bData && Array.isArray(bData) && bData.length > 0) {
         setAdminBrands(bData);
       }
     } catch (e) {
-      console.error("Error fetching admin brands list:", e);
+      console.warn("Could not fetch admin brands:", e);
     } finally {
       setIsBrandsLoading(false);
     }
@@ -1270,7 +1273,17 @@ export default function ValobasaAdminPanel() {
 
 
   const handleAdminLogout = () => {
-    if (typeof window !== "undefined") sessionStorage.removeItem("glowgoodly_admin_session");
+    if (typeof window !== "undefined") {
+      // Clear all session & token data so login screen shows
+      sessionStorage.removeItem("glowgoodly_admin_session");
+      sessionStorage.setItem("glowgoodly_admin_logged_out", "true");
+      localStorage.removeItem("glowgoodly_token");
+      localStorage.removeItem("glowgoodly_user");
+      localStorage.removeItem("glowgoodly_auth_token");
+      localStorage.removeItem("gg_token");
+      localStorage.removeItem("gg_user");
+      localStorage.removeItem("token");
+    }
     setIsAdmin(false);
     logout();
   };
@@ -1702,18 +1715,32 @@ export default function ValobasaAdminPanel() {
   };
 
   const handleSendCourier = async (orderId: string, provider: string) => {
-    if (!token) return;
+    if (!token) {
+      alert("Admin authorization token missing. Please re-login.");
+      return;
+    }
+    setSendingCourierOrderId(orderId);
     try {
       const res = await fetch(`${API_BASE}/orders/${orderId}/send-${provider.toLowerCase()}`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
       });
       const data = await res.json();
       if (res.ok) {
         setOrders((prev) => prev.map((o) => (o.id === orderId ? data.order : o)));
-        alert(data.message);
-      } else alert(data.error || `Failed to send order to ${provider}.`);
-    } catch (e) { alert("Error dispatching order."); }
+        setSelectedOrderDetails((prev: any) => (prev && prev.id === orderId ? data.order : prev));
+        alert(data.message || `Successfully dispatched order to ${provider}!`);
+      } else {
+        alert(data.error || `Failed to dispatch order via ${provider}. Please check courier credentials.`);
+      }
+    } catch (e: any) { 
+      alert(e.message || "Error dispatching order."); 
+    } finally {
+      setSendingCourierOrderId(null);
+    }
   };
 
   const handlePrintVoucher = () => { window.print(); };
@@ -2075,7 +2102,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
             <Grid size={18} /><span>Dashboard</span>
           </div>
 
-          <div onClick={() => navigateTo("recent-orders")} className={`admin-menu-item ${activeTab === "recent-orders" ? "active" : ""}`} style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", color: activeTab === "recent-orders" ? "#fff" : "inherit" }}>
+          <div onClick={() => navigateTo("recent-orders")} className={`admin-menu-item ${(activeTab === "recent-orders" || activeTab === "orders") ? "active" : ""}`} style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", color: (activeTab === "recent-orders" || activeTab === "orders") ? "#fff" : "inherit" }}>
             <ShoppingCart size={18} /><span>Orders</span>
           </div>
 
@@ -2083,7 +2110,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
             <FileText size={18} /><span>Sales Report</span>
           </div>
 
-          <div onClick={() => navigateTo("top-selling")} className={`admin-menu-item ${activeTab === "top-selling" ? "active" : ""}`} style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", color: activeTab === "top-selling" ? "#fff" : "inherit" }}>
+          <div onClick={() => navigateTo("top-selling")} className={`admin-menu-item ${(activeTab === "top-selling" || activeTab === "top-selling-products") ? "active" : ""}`} style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", color: (activeTab === "top-selling" || activeTab === "top-selling-products") ? "#fff" : "inherit" }}>
             <TrendingUp size={18} /><span>Top Selling Products</span>
           </div>
 
@@ -2093,14 +2120,21 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
 
           {/* Home Slides Accordion */}
           <div>
-            <div onClick={() => setHomeSlidesOpen(!homeSlidesOpen)} style={{ padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
+            <div 
+              onClick={() => {
+                setHomeSlidesOpen(!homeSlidesOpen);
+                navigateTo("home-slides");
+              }} 
+              className={`admin-menu-item ${(activeTab === "home-slides" || activeTab === "home-banner-list" || activeTab === "add-home-banner") ? "active" : ""}`} 
+              style={{ padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", color: (activeTab === "home-slides" || activeTab === "home-banner-list" || activeTab === "add-home-banner") ? "#fff" : "inherit" }}
+            >
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}><ImageIcon size={18} /><span>Home Slides</span></div>
               <ChevronDown size={14} style={{ transform: homeSlidesOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
             </div>
             {homeSlidesOpen && (
               <div style={{ backgroundColor: "rgba(0,0,0,0.2)", padding: "5px 0" }}>
-                <div onClick={() => navigateTo("home-banner-list")} style={{ padding: "8px 20px 8px 50px", fontSize: "13px", cursor: "pointer", color: activeTab === "home-banner-list" ? "#fff" : "inherit" }}>Home Banners List</div>
-                <div onClick={() => navigateTo("add-home-banner")} style={{ padding: "8px 20px 8px 50px", fontSize: "13px", cursor: "pointer", color: activeTab === "add-home-banner" ? "#fff" : "inherit" }}>Add Home Banner</div>
+                <div onClick={() => navigateTo("home-banner-list")} className={`admin-menu-item ${(activeTab === "home-banner-list" || activeTab === "home-slides") ? "active" : ""}`} style={{ padding: "8px 20px 8px 50px", fontSize: "13px", cursor: "pointer", color: (activeTab === "home-banner-list" || activeTab === "home-slides") ? "#fff" : "inherit" }}>Home Banners List</div>
+                <div onClick={() => navigateTo("add-home-banner")} className={`admin-menu-item ${activeTab === "add-home-banner" ? "active" : ""}`} style={{ padding: "8px 20px 8px 50px", fontSize: "13px", cursor: "pointer", color: activeTab === "add-home-banner" ? "#fff" : "inherit" }}>Add Home Banner</div>
               </div>
             )}
           </div>
@@ -2111,27 +2145,27 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
           </div>
 
           {/* Socket.io Promo Broadcast Menu Item */}
-          <div onClick={() => navigateTo("socket-promo")} className={`admin-menu-item ${activeTab === "socket-promo" ? "active" : ""}`} style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", color: activeTab === "socket-promo" ? "#fff" : "inherit" }}>
+          <div onClick={() => navigateTo("socket-promo")} className={`admin-menu-item ${(activeTab === "socket-promo" || activeTab === "socket-live-promo") ? "active" : ""}`} style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", color: (activeTab === "socket-promo" || activeTab === "socket-live-promo") ? "#fff" : "inherit" }}>
             <Radio size={18} /><span>Socket.io Live Promo</span>
           </div>
 
           {/* Menu Management Menu Item */}
-          <div onClick={() => navigateTo("menu-builder")} className={`admin-menu-item ${activeTab === "menu-builder" ? "active" : ""}`} style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", color: activeTab === "menu-builder" ? "#fff" : "inherit" }}>
+          <div onClick={() => navigateTo("menu-builder")} className={`admin-menu-item ${(activeTab === "menu-builder" || activeTab === "menu-management") ? "active" : ""}`} style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", color: (activeTab === "menu-builder" || activeTab === "menu-management") ? "#fff" : "inherit" }}>
             <Layers size={18} /><span>Menu Management</span>
           </div>
 
           {/* Seasonal Offer Landing Page Menu Item */}
-          <div onClick={() => navigateTo("seasonal-offer-settings")} className={`admin-menu-item ${activeTab === "seasonal-offer-settings" ? "active" : ""}`} style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", color: activeTab === "seasonal-offer-settings" ? "#fff" : "inherit" }}>
+          <div onClick={() => navigateTo("seasonal-offer-settings")} className={`admin-menu-item ${(activeTab === "seasonal-offer-settings" || activeTab === "seasonal-offer") ? "active" : ""}`} style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", color: (activeTab === "seasonal-offer-settings" || activeTab === "seasonal-offer") ? "#fff" : "inherit" }}>
             <Sparkles size={18} color="#e63b7a" /><span>Seasonal Offer Page</span>
           </div>
 
           {/* Dynamic CMS Pages Builder */}
-          <div onClick={() => navigateTo("cms-pages")} className={`admin-menu-item ${activeTab === "cms-pages" ? "active" : ""}`} style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", color: activeTab === "cms-pages" ? "#fff" : "inherit" }}>
+          <div onClick={() => navigateTo("cms-pages")} className={`admin-menu-item ${(activeTab === "cms-pages" || activeTab === "dynamic-pages") ? "active" : ""}`} style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", color: (activeTab === "cms-pages" || activeTab === "dynamic-pages") ? "#fff" : "inherit" }}>
             <FileText size={18} /><span>Dynamic Pages (CMS)</span>
           </div>
 
           {/* Customer Messages & Support Tickets */}
-          <div onClick={() => navigateTo("customer-messages")} className={`admin-menu-item ${activeTab === "customer-messages" ? "active" : ""}`} style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", color: activeTab === "customer-messages" ? "#fff" : "inherit" }}>
+          <div onClick={() => navigateTo("customer-messages")} className={`admin-menu-item ${(activeTab === "customer-messages" || activeTab === "messages") ? "active" : ""}`} style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", color: (activeTab === "customer-messages" || activeTab === "messages") ? "#fff" : "inherit" }}>
             <MessageSquare size={18} />
             <span>Customer Messages</span>
             {contactMessages.filter(m => m.status === "Unread").length > 0 && (
@@ -2154,16 +2188,23 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
 
           {/* Categories Accordion */}
           <div>
-            <div onClick={() => setCategoryOpen(!categoryOpen)} style={{ padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
+            <div 
+              onClick={() => {
+                setCategoryOpen(!categoryOpen);
+                navigateTo("category-list");
+              }} 
+              className={`admin-menu-item ${(activeTab === "categories" || activeTab === "category-list" || activeTab === "add-category" || activeTab === "sub-category-list" || activeTab === "add-sub-category") ? "active" : ""}`} 
+              style={{ padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", color: (activeTab === "categories" || activeTab === "category-list" || activeTab === "add-category" || activeTab === "sub-category-list" || activeTab === "add-sub-category") ? "#fff" : "inherit" }}
+            >
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}><Layers size={18} /><span>Categories</span></div>
               <ChevronDown size={14} style={{ transform: categoryOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
             </div>
             {categoryOpen && (
               <div style={{ backgroundColor: "rgba(0,0,0,0.2)", padding: "5px 0" }}>
-                <div onClick={() => navigateTo("category-list")} style={{ padding: "8px 20px 8px 50px", fontSize: "13px", cursor: "pointer", color: activeTab === "category-list" ? "#fff" : "inherit" }}>Category List</div>
-                <div onClick={() => navigateTo("add-category")} style={{ padding: "8px 20px 8px 50px", fontSize: "13px", cursor: "pointer", color: activeTab === "add-category" ? "#fff" : "inherit" }}>Add A Category</div>
-                <div onClick={() => navigateTo("sub-category-list")} style={{ padding: "8px 20px 8px 50px", fontSize: "13px", cursor: "pointer", color: activeTab === "sub-category-list" ? "#fff" : "inherit" }}>Sub Category List</div>
-                <div onClick={() => navigateTo("add-sub-category")} style={{ padding: "8px 20px 8px 50px", fontSize: "13px", cursor: "pointer", color: activeTab === "add-sub-category" ? "#fff" : "inherit" }}>Add A Sub Category</div>
+                <div onClick={() => navigateTo("category-list")} className={`admin-menu-item ${(activeTab === "category-list" || activeTab === "categories") ? "active" : ""}`} style={{ padding: "8px 20px 8px 50px", fontSize: "13px", cursor: "pointer", color: (activeTab === "category-list" || activeTab === "categories") ? "#fff" : "inherit" }}>Category List</div>
+                <div onClick={() => navigateTo("add-category")} className={`admin-menu-item ${activeTab === "add-category" ? "active" : ""}`} style={{ padding: "8px 20px 8px 50px", fontSize: "13px", cursor: "pointer", color: activeTab === "add-category" ? "#fff" : "inherit" }}>Add A Category</div>
+                <div onClick={() => navigateTo("sub-category-list")} className={`admin-menu-item ${activeTab === "sub-category-list" ? "active" : ""}`} style={{ padding: "8px 20px 8px 50px", fontSize: "13px", cursor: "pointer", color: activeTab === "sub-category-list" ? "#fff" : "inherit" }}>Sub Category List</div>
+                <div onClick={() => navigateTo("add-sub-category")} className={`admin-menu-item ${activeTab === "add-sub-category" ? "active" : ""}`} style={{ padding: "8px 20px 8px 50px", fontSize: "13px", cursor: "pointer", color: activeTab === "add-sub-category" ? "#fff" : "inherit" }}>Add A Sub Category</div>
               </div>
             )}
           </div>
@@ -2195,7 +2236,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
             <Box size={18} /><span>Damage & Returns</span>
           </div>
 
-          <div onClick={() => navigateTo("offers-coupons")} className={`admin-menu-item ${activeTab === "offers-coupons" ? "active" : ""}`} style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", color: activeTab === "offers-coupons" ? "#fff" : "inherit" }}>
+          <div onClick={() => navigateTo("offers-coupons")} className={`admin-menu-item ${(activeTab === "offers-coupons" || activeTab === "available-offers") ? "active" : ""}`} style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", color: (activeTab === "offers-coupons" || activeTab === "available-offers") ? "#fff" : "inherit" }}>
             <Tag size={18} /><span>Available Offers & Codes</span>
           </div>
 
@@ -2205,7 +2246,25 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
         </div>
 
         <div style={{ padding: "15px 20px", borderTop: "1px solid #2b2b40", display: "flex", gap: "10px" }}>
-          <Link href="/" style={{ flex: 1, fontSize: "12px", display: "flex", alignItems: "center", gap: "6px", color: "#a2a3b7", textDecoration: "none" }}><ExternalLink size={14} /> View Store</Link>
+          <a
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open GlowGoodly Storefront in New Tab"
+            style={{
+              flex: 1,
+              fontSize: "12.5px",
+              display: "flex",
+              alignItems: "center",
+              gap: "7px",
+              color: "#38bdf8",
+              textDecoration: "none",
+              fontWeight: "700",
+              cursor: "pointer"
+            }}
+          >
+            <ExternalLink size={15} /> View Store
+          </a>
           <button onClick={handleAdminLogout} style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "12px", display: "flex", alignItems: "center", gap: "4px" }}><LogOut size={14} /> Logout</button>
         </div>
       </div>
@@ -3791,7 +3850,257 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
           {/* 0.6 HOME BANNERS & CARD IMAGES MASTER LIST SUB-VIEW */}
           {(activeTab === "home-banner-list" || activeTab === "home-slides") && (
             <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+
+              {/* ═══════════ CATEGORY & CONCERN QUICK UPLOAD & LINK MANAGER SECTION ═══════════ */}
+              {(() => {
+                const CARD_SLOTS = [
+                  { id: "Category: Makeup", label: "Makeup", emoji: "💄", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=makeup" },
+                  { id: "Category: Skin", label: "Skin Care", emoji: "🌸", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=skincare" },
+                  { id: "Category: Hair", label: "Hair Care", emoji: "💇", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=haircare" },
+                  { id: "Category: Personal Care", label: "Personal Care", emoji: "🧴", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=personal-care" },
+                  { id: "Category: Mom & Baby", label: "Mom & Baby", emoji: "👶", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=mom-baby" },
+                  { id: "Category: Fragrance", label: "Fragrance", emoji: "🌺", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=fragrance" },
+                  { id: "Category: Undergarments", label: "Undergarments", emoji: "👗", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=undergarments" },
+                  { id: "Category: Combo", label: "Combo", emoji: "📦", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=combo" },
+                  { id: "Concern: Acne", label: "Acne Treatment", emoji: "🌿", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare&sub=Acne%20Treatment" },
+                  { id: "Concern: Anti Aging", label: "Anti Aging", emoji: "✨", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare&sub=Anti%20Aging" },
+                  { id: "Concern: Dandruff", label: "Dandruff", emoji: "💧", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=haircare&sub=Dandruff" },
+                  { id: "Concern: Dry Skin", label: "Dry Skin", emoji: "🧴", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare&sub=Dry%20Skin" },
+                  { id: "Concern: Hair Fall", label: "Hair Fall", emoji: "💇‍♀️", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=haircare&sub=Hair%20Fall" },
+                  { id: "Concern: Oil Control", label: "Oil Control", emoji: "🍃", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare" },
+                  { id: "Concern: Pore Care", label: "Pore Care", emoji: "🫧", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare&sub=Pore%20Care" },
+                  { id: "Concern: Spot Treatment", label: "Spot Treatment", emoji: "🎯", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare" },
+                  { id: "Concern: Hair Thinning", label: "Hair Thinning", emoji: "🌾", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=haircare" },
+                  { id: "Concern: Sun Burn", label: "Sun Burn", emoji: "☀️", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare" },
+                ];
+
+                const handleCardImageUpload = async (slotId: string, slotLabel: string, file: File, defaultSlotLink?: string) => {
+                  const reader = new FileReader();
+                  reader.onload = async (ev) => {
+                    const dataUrl = ev.target?.result as string;
+                    if (!dataUrl) return;
+                    // Resize to 400x400
+                    const canvas = document.createElement("canvas");
+                    canvas.width = 400; canvas.height = 400;
+                    const ctx = canvas.getContext("2d");
+                    const img = new Image();
+                    img.onload = async () => {
+                      if (ctx) {
+                        const scale = Math.max(400 / img.width, 400 / img.height);
+                        const sw = Math.round(img.width * scale), sh = Math.round(img.height * scale);
+                        ctx.fillStyle = "#ffffff";
+                        ctx.fillRect(0, 0, 400, 400);
+                        ctx.drawImage(img, Math.round((400 - sw) / 2), Math.round((400 - sh) / 2), sw, sh);
+                      }
+                      const resized = canvas.toDataURL("image/jpeg", 0.88);
+                      // Find existing banner for this slot
+                      const slotSlug = slotLabel.toLowerCase().replace(/\s+/g, "-");
+                      const existing = banners.find((b: any) => {
+                        const p = (b.page || "").toLowerCase().trim();
+                        const id = (b.id || "").toLowerCase().trim();
+                        const s = slotId.toLowerCase().trim();
+                        return p === s || id === s || id === `cat-card-${slotSlug}` || id === `concern-card-${slotSlug}`;
+                      });
+                      const targetLink = (cardLinks[slotId] !== undefined ? cardLinks[slotId] : (existing?.linkUrl || defaultSlotLink || `/shop?category=${encodeURIComponent(slotSlug)}`)).trim();
+                      const payload = {
+                        title: slotLabel + " Card",
+                        imageUrl: resized,
+                        mobileImageUrl: resized,
+                        tabletImageUrl: resized,
+                        linkUrl: targetLink,
+                        page: slotId,
+                        isActive: true,
+                        sortOrder: existing?.sortOrder || 99,
+                        bgColor: "#ffffff"
+                      };
+                      try {
+                        let res;
+                        if (existing?.id) {
+                          res = await fetch(`${API_BASE}/banners/${existing.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", ...getAuthHeader() }, body: JSON.stringify(payload) });
+                          if (!res.ok) res = await fetch(`${API_BASE}/admin/banners/${existing.id}`, { method: "PUT", headers: { "Content-Type": "application/json", ...getAuthHeader() }, body: JSON.stringify(payload) });
+                        } else {
+                          res = await fetch(`${API_BASE}/banners`, { method: "POST", headers: { "Content-Type": "application/json", ...getAuthHeader() }, body: JSON.stringify(payload) });
+                        }
+                        if (res.ok) {
+                          clearAllCache();
+                          triggerGlobalDataSync();
+                          fetchData(true);
+                          alert(`✅ "${slotLabel}" image updated! Homepage will show new image.`);
+                        } else {
+                          alert("❌ Failed to save. Please try again.");
+                        }
+                      } catch (err) {
+                        alert("❌ Network error. Please check connection.");
+                      }
+                    };
+                    img.src = dataUrl;
+                  };
+                  reader.readAsDataURL(file);
+                };
+
+                const handleUpdateCardLink = async (slotId: string, slotLabel: string, targetLink: string, defaultSlotLink: string) => {
+                  const linkToSave = (targetLink || defaultSlotLink || "/shop").trim();
+                  setSavingCardLinkId(slotId);
+                  try {
+                    const slotSlug = slotLabel.toLowerCase().replace(/\s+/g, "-");
+                    const existing = banners.find((b: any) => {
+                      const p = (b.page || "").toLowerCase().trim();
+                      const id = (b.id || "").toLowerCase().trim();
+                      const s = slotId.toLowerCase().trim();
+                      return p === s || id === s || id === `cat-card-${slotSlug}` || id === `concern-card-${slotSlug}`;
+                    });
+
+                    let res;
+                    if (existing?.id) {
+                      const payload = {
+                        ...existing,
+                        linkUrl: linkToSave
+                      };
+                      res = await fetch(`${API_BASE}/banners/${existing.id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+                        body: JSON.stringify(payload)
+                      });
+                      if (!res.ok) {
+                        res = await fetch(`${API_BASE}/admin/banners/${existing.id}`, {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json", ...getAuthHeader() },
+                          body: JSON.stringify(payload)
+                        });
+                      }
+                    } else {
+                      const targetId = slotId.startsWith("Category:") ? `cat-card-${slotSlug}` : `concern-card-${slotSlug}`;
+                      const payload = {
+                        id: targetId,
+                        title: slotLabel + " Card",
+                        imageUrl: "",
+                        mobileImageUrl: "",
+                        tabletImageUrl: "",
+                        linkUrl: linkToSave,
+                        page: slotId,
+                        isActive: true,
+                        sortOrder: 99,
+                        bgColor: "#ffffff"
+                      };
+                      res = await fetch(`${API_BASE}/banners`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+                        body: JSON.stringify(payload)
+                      });
+                    }
+
+                    if (res.ok) {
+                      clearAllCache();
+                      triggerGlobalDataSync();
+                      await fetchData(true);
+                      alert(`✅ "${slotLabel}" link saved successfully!\n\n🔗 URL: ${linkToSave}\nWebsite visitors clicking this card will now go to this link.`);
+                    } else {
+                      const err = await res.json().catch(() => ({}));
+                      alert(`❌ Failed to update link: ${err.error || "Server error"}`);
+                    }
+                  } catch (err: any) {
+                    alert(`❌ Network error saving link: ${err.message || err}`);
+                  } finally {
+                    setSavingCardLinkId(null);
+                  }
+                };
+
+                const sections = ["🛍️ SHOP BY CATEGORY", "🩺 SHOP BY CONCERN"];
+                return (
+                  <div style={{ backgroundColor: "#fff", padding: "24px", borderRadius: "12px", boxShadow: "0 2px 10px rgba(0,0,0,0.05)", borderTop: "4px solid #7c3aed" }}>
+                    <div style={{ marginBottom: "20px" }}>
+                      <h2 style={{ fontSize: "18px", fontWeight: "800", color: "#1e293b", margin: "0 0 4px" }}>🖼️ Category & Concern Card Images & Links — Manager</h2>
+                      <p style={{ color: "#64748b", fontSize: "13px", margin: 0 }}>Upload or replace card images and set custom destination links (URLs) for each category and concern card on the homepage.</p>
+                    </div>
+                    {sections.map(sec => (
+                      <div key={sec} style={{ marginBottom: "28px" }}>
+                        <div style={{ fontSize: "13px", fontWeight: "800", color: "#7c3aed", letterSpacing: "1px", marginBottom: "14px", paddingBottom: "8px", borderBottom: "2px solid #ede9fe" }}>{sec}</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(195px, 1fr))", gap: "16px" }}>
+                          {CARD_SLOTS.filter(s => s.section === sec).map(slot => {
+                            const slotSlug = slot.label.toLowerCase().replace(/\s+/g, "-");
+                            const existing = banners.find((b: any) => {
+                              const p = (b.page || "").toLowerCase().trim();
+                              const id = (b.id || "").toLowerCase().trim();
+                              const s = slot.id.toLowerCase().trim();
+                              return p === s || id === s || id === `cat-card-${slotSlug}` || id === `concern-card-${slotSlug}`;
+                            });
+                            const currentImg = existing?.imageUrl;
+                            const currentLink = cardLinks[slot.id] !== undefined ? cardLinks[slot.id] : (existing?.linkUrl || slot.defaultLink);
+
+                            return (
+                              <div key={slot.id} style={{ border: `1.5px solid ${currentImg ? "#a78bfa" : "#cbd5e1"}`, borderRadius: "10px", overflow: "hidden", backgroundColor: "#ffffff", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", display: "flex", flexDirection: "column" }}>
+                                {/* Image Preview */}
+                                <div style={{ height: "115px", background: currentImg ? `url(${currentImg}) center/cover` : "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", borderBottom: "1px solid #f1f5f9" }}>
+                                  {!currentImg && (
+                                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", color: "#94a3b8" }}>
+                                      <span style={{ fontSize: "32px", marginBottom: "2px" }}>{slot.emoji}</span>
+                                      <span style={{ fontSize: "11px", fontWeight: "700" }}>No Image Set</span>
+                                    </div>
+                                  )}
+                                  {currentImg && (
+                                    <div style={{ position: "absolute", top: "6px", right: "6px", background: "#16a34a", color: "#fff", fontSize: "9.5px", fontWeight: "900", padding: "2px 7px", borderRadius: "8px", boxShadow: "0 1px 4px rgba(0,0,0,0.2)" }}>✓ ACTIVE</div>
+                                  )}
+                                </div>
+
+                                {/* Info & Controls */}
+                                <div style={{ padding: "12px", display: "flex", flexDirection: "column", gap: "10px", flex: 1 }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <div style={{ fontSize: "13px", fontWeight: "800", color: "#0f172a" }}>{slot.label}</div>
+                                    <span style={{ fontSize: "10px", color: "#64748b", fontWeight: "700" }}>400×400px</span>
+                                  </div>
+
+                                  {/* Upload Button */}
+                                  <label style={{ display: "block", backgroundColor: currentImg ? "#7c3aed" : "#e63b7a", color: "#fff", textAlign: "center", padding: "7px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "800", cursor: "pointer", letterSpacing: "0.3px" }}>
+                                    {currentImg ? "🔄 Replace Image" : "📤 Upload Image"}
+                                    <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => {
+                                      const f = e.target.files?.[0];
+                                      if (f) handleCardImageUpload(slot.id, slot.label, f, slot.defaultLink);
+                                      e.target.value = "";
+                                    }} />
+                                  </label>
+
+                                  {/* Link Edit Section */}
+                                  <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: "8px" }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                                      <label style={{ fontSize: "11px", fontWeight: "800", color: "#334155" }}>
+                                        🔗 Target Link (URL):
+                                      </label>
+                                      {existing?.linkUrl && existing.linkUrl !== slot.defaultLink && (
+                                        <span style={{ fontSize: "9px", backgroundColor: "#e0f2fe", color: "#0369a1", padding: "1px 5px", borderRadius: "4px", fontWeight: "800" }}>Custom Link</span>
+                                      )}
+                                    </div>
+                                    <div style={{ display: "flex", gap: "4px" }}>
+                                      <input
+                                        type="text"
+                                        value={currentLink}
+                                        onChange={(e) => setCardLinks(prev => ({ ...prev, [slot.id]: e.target.value }))}
+                                        placeholder={slot.defaultLink}
+                                        style={{ flex: 1, minWidth: 0, padding: "6px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "11.5px", color: "#0f172a", backgroundColor: "#f8fafc" }}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdateCardLink(slot.id, slot.label, currentLink, slot.defaultLink)}
+                                        disabled={savingCardLinkId === slot.id}
+                                        style={{ padding: "6px 10px", backgroundColor: "#0284c7", color: "#ffffff", border: "none", borderRadius: "6px", fontSize: "11px", fontWeight: "800", cursor: "pointer", whiteSpace: "nowrap" }}
+                                      >
+                                        {savingCardLinkId === slot.id ? "⏳" : "💾 Save Link"}
+                                      </button>
+                                    </div>
+                                    <div style={{ fontSize: "9.5px", color: "#94a3b8", marginTop: "3px" }}>Default: {slot.defaultLink}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
               <div style={{ backgroundColor: "#ffffff", padding: "24px", borderRadius: "12px", boxShadow: "0 2px 10px rgba(0,0,0,0.05)", borderTop: "4px solid #e63b7a" }}>
+
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
                   <div>
                     <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e293b", margin: 0 }}>Home Banners & Card Images Master List</h2>
@@ -3892,7 +4201,14 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                       return (
                         <div key={b.id ? `${b.id}-${idx}` : idx} style={{ border: "1px solid #e2e8f0", borderRadius: "10px", overflow: "hidden", backgroundColor: "#ffffff", boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
                           <div style={{ height: "140px", width: "100%", backgroundColor: "#f1f5f9", overflow: "hidden", position: "relative" }}>
-                            <img src={b.imageUrl} alt={b.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            {b.imageUrl && b.imageUrl.trim() ? (
+                              <img src={b.imageUrl} alt={b.title || "Banner"} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            ) : (
+                              <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: "12px", fontWeight: "700" }}>
+                                <span style={{ fontSize: "24px", marginBottom: "4px" }}>🖼️</span>
+                                No Image Uploaded
+                              </div>
+                            )}
                             <span style={{ position: "absolute", top: "10px", left: "10px", backgroundColor: "#0f172a", color: "#fff", padding: "3px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: "800" }}>
                               {b.page || "Homepage"}
                             </span>
@@ -3926,27 +4242,52 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                               🔗 Redirect Link: {b.linkUrl || "/shop"}
                             </div>
 
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px", paddingTop: "10px", borderTop: "1px solid #f1f5f9" }}>
-                              <button
-                                onClick={() => {
-                                  setBannerForm({
-                                    id: b.id,
-                                    title: b.title,
-                                    imageUrl: b.imageUrl,
-                                    mobileImageUrl: b.mobileImageUrl || b.imageUrl,
-                                    tabletImageUrl: b.tabletImageUrl || b.imageUrl,
-                                    linkUrl: b.linkUrl || "/",
-                                    bgColor: b.bgColor || "#1a1a2e",
-                                    page: b.page || "Hero Slides",
-                                    isActive: b.isActive ?? true,
-                                    sortOrder: String(b.sortOrder || "1")
-                                  });
-                                  setEditingBannerModal(true);
-                                }}
-                                style={{ backgroundColor: "#eff6ff", color: "#2563eb", border: "none", padding: "6px 14px", borderRadius: "6px", fontWeight: "800", fontSize: "12px", cursor: "pointer" }}
-                              >
-                                ✏️ Replace Image & Link
-                              </button>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px", paddingTop: "10px", borderTop: "1px solid #f1f5f9", gap: "6px", flexWrap: "wrap" }}>
+                              <div style={{ display: "flex", gap: "6px" }}>
+                                <button
+                                  onClick={() => {
+                                    setBannerForm({
+                                      id: b.id,
+                                      title: b.title,
+                                      imageUrl: b.imageUrl,
+                                      mobileImageUrl: b.mobileImageUrl || b.imageUrl,
+                                      tabletImageUrl: b.tabletImageUrl || b.imageUrl,
+                                      linkUrl: b.linkUrl || "/",
+                                      bgColor: b.bgColor || "#1a1a2e",
+                                      page: b.page || "Hero Slides",
+                                      isActive: b.isActive ?? true,
+                                      sortOrder: String(b.sortOrder || "1")
+                                    });
+                                    setEditingBannerModal(true);
+                                  }}
+                                  style={{ backgroundColor: "#eff6ff", color: "#2563eb", border: "none", padding: "6px 12px", borderRadius: "6px", fontWeight: "800", fontSize: "12px", cursor: "pointer" }}
+                                >
+                                  ✏️ Edit Slide & Link
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    const newL = prompt(`Enter new destination URL / link for "${b.title}":`, b.linkUrl || "/shop");
+                                    if (newL !== null && newL.trim() && newL.trim() !== b.linkUrl) {
+                                      const res = await fetch(`${API_BASE}/banners/${b.id}`, {
+                                        method: "PATCH",
+                                        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+                                        body: JSON.stringify({ linkUrl: newL.trim() })
+                                      });
+                                      if (res.ok) {
+                                        clearAllCache();
+                                        triggerGlobalDataSync();
+                                        await fetchData(true);
+                                        alert(`✅ Link updated for "${b.title}"!\n🔗 New URL: ${newL.trim()}`);
+                                      } else {
+                                        alert("❌ Failed to update link.");
+                                      }
+                                    }
+                                  }}
+                                  style={{ backgroundColor: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0", padding: "6px 10px", borderRadius: "6px", fontWeight: "800", fontSize: "12px", cursor: "pointer" }}
+                                >
+                                  🔗 Change Link
+                                </button>
+                              </div>
                               <button
                                 onClick={() => handleDeleteBanner(b.id)}
                                 style={{ backgroundColor: "#fee2e2", color: "#991b1b", border: "none", padding: "6px 12px", borderRadius: "6px", fontWeight: "800", fontSize: "12px", cursor: "pointer" }}
@@ -5101,11 +5442,50 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                         <td onClick={() => setSelectedOrderDetails(o)} style={{ cursor: "pointer", fontWeight: "900", color: "#059669" }}>৳{o.totalAmount || o.total || 0}</td>
                         <td><span className="badge badge-success">{o.orderStatus || o.status || "Pending"}</span></td>
                         <td>
-                          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                            <button onClick={() => handleSendCourier(o.id, "steadfast")} style={{ padding: "4px 8px", backgroundColor: "#2563eb", color: "#fff", border: "none", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Steadfast</button>
-                            <button onClick={() => handleSendCourier(o.id, "redx")} style={{ padding: "4px 8px", backgroundColor: "#ef4444", color: "#fff", border: "none", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>REDX</button>
-                            <button onClick={() => handleSendCourier(o.id, "pathao")} style={{ padding: "4px 8px", backgroundColor: "#059669", color: "#fff", border: "none", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Pathao</button>
-                            <button onClick={() => handleSendCourier(o.id, "carrybee")} style={{ padding: "4px 8px", backgroundColor: "#d97706", color: "#fff", border: "none", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>CarryBee</button>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "6px", minWidth: "160px" }}>
+                            {/* Main Send to Pathao Button (Always Visible) */}
+                            <button 
+                              onClick={() => handleSendCourier(o.id, "pathao")} 
+                              disabled={sendingCourierOrderId === o.id}
+                              style={{ 
+                                padding: "6px 12px", 
+                                backgroundColor: sendingCourierOrderId === o.id ? "#9ca3af" : "#059669", 
+                                color: "#ffffff", 
+                                border: "none", 
+                                borderRadius: "6px", 
+                                fontSize: "11.5px", 
+                                fontWeight: "800", 
+                                cursor: sendingCourierOrderId === o.id ? "not-allowed" : "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "6px",
+                                boxShadow: "0 2px 5px rgba(5,150,105,0.25)"
+                              }}
+                            >
+                              {sendingCourierOrderId === o.id ? "⏳ Sending to Pathao..." : (o.consignmentId && o.courierName?.toLowerCase().includes("pathao") ? "🔄 Send to Pathao (Re-send)" : "🚀 Send to Pathao")}
+                            </button>
+
+                            {/* Dispatched Consignment Badge & Live Tracking Link */}
+                            {o.consignmentId && (
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", fontSize: "11px" }}>
+                                <span style={{ backgroundColor: "#dcfce7", color: "#15803d", border: "1px solid #86efac", padding: "2px 6px", borderRadius: "4px", fontWeight: "800" }}>
+                                  ID: {o.consignmentId}
+                                </span>
+                                {o.trackingLink && (
+                                  <a href={o.trackingLink} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb", fontWeight: "700", textDecoration: "underline" }}>
+                                    Track ↗
+                                  </a>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Other couriers (Steadfast, REDX, CarryBee) */}
+                            <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "2px" }}>
+                              <button onClick={() => handleSendCourier(o.id, "steadfast")} style={{ padding: "2px 6px", backgroundColor: "#2563eb", color: "#fff", border: "none", borderRadius: "3px", fontSize: "10px", fontWeight: "700", cursor: "pointer" }}>Steadfast</button>
+                              <button onClick={() => handleSendCourier(o.id, "redx")} style={{ padding: "2px 6px", backgroundColor: "#ef4444", color: "#fff", border: "none", borderRadius: "3px", fontSize: "10px", fontWeight: "700", cursor: "pointer" }}>REDX</button>
+                              <button onClick={() => handleSendCourier(o.id, "carrybee")} style={{ padding: "2px 6px", backgroundColor: "#d97706", color: "#fff", border: "none", borderRadius: "3px", fontSize: "10px", fontWeight: "700", cursor: "pointer" }}>CarryBee</button>
+                            </div>
                           </div>
                         </td>
                         <td style={{ textAlign: "center" }}>
@@ -5194,6 +5574,50 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: "12px", color: "#64748b", fontWeight: "700" }}>TOTAL BILL (মোট বিল)</div>
                     <div style={{ fontSize: "22px", fontWeight: "900", color: "#e63b7a" }}>৳{selectedOrderDetails.totalAmount || selectedOrderDetails.total || 0}</div>
+                  </div>
+                </div>
+                {/* 1-Click Pathao Courier Dispatch Box */}
+                <div style={{ marginTop: "16px", padding: "14px 18px", backgroundColor: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: "10px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+                  <div>
+                    <div style={{ fontSize: "13px", fontWeight: "800", color: "#166534", display: "flex", alignItems: "center", gap: "6px" }}>
+                      🚴 Pathao Courier API Dispatch (১-ক্লিকে পাঠাও কুরিয়ারে পাঠান)
+                    </div>
+                    {selectedOrderDetails.consignmentId ? (
+                      <div style={{ fontSize: "12px", color: "#15803d", marginTop: "4px" }}>
+                        Consignment ID: <strong>{selectedOrderDetails.consignmentId}</strong> ({selectedOrderDetails.courierStatus || "Dispatched"})
+                        {selectedOrderDetails.trackingLink && (
+                          <a href={selectedOrderDetails.trackingLink} target="_blank" rel="noopener noreferrer" style={{ marginLeft: "8px", color: "#2563eb", fontWeight: "700", textDecoration: "underline" }}>
+                            Live Tracking Link ↗
+                          </a>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: "12px", color: "#475569", marginTop: "4px" }}>
+                        Directly sends customer address, phone, item list & COD collection amount via Pathao API.
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <button
+                      onClick={() => handleSendCourier(selectedOrderDetails.id, "pathao")}
+                      disabled={sendingCourierOrderId === selectedOrderDetails.id}
+                      style={{
+                        backgroundColor: sendingCourierOrderId === selectedOrderDetails.id ? "#9ca3af" : "#16a34a",
+                        color: "#ffffff",
+                        border: "none",
+                        padding: "9px 18px",
+                        borderRadius: "8px",
+                        fontWeight: "800",
+                        fontSize: "12.5px",
+                        cursor: sendingCourierOrderId === selectedOrderDetails.id ? "not-allowed" : "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        boxShadow: "0 2px 6px rgba(22,163,74,0.3)"
+                      }}
+                    >
+                      {sendingCourierOrderId === selectedOrderDetails.id ? "⏳ Dispatching to Pathao..." : (selectedOrderDetails.consignmentId ? "🔄 Re-send to Pathao" : "🚀 1-Click Send to Pathao")}
+                    </button>
                   </div>
                 </div>
 
@@ -6774,10 +7198,7 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
             <TopCustomersPanel customerList={customerList} orders={orders} />
           )}
 
-          {/* MENU MANAGEMENT (HEADER & FOOTER LINK BUILDER) */}
-          {activeTab === "menu-builder" && (
-            <MenuManagementPanel token={token} />
-          )}
+
 
           {/* DAMAGE & RETURNED PRODUCTS LOSS LOG */}
           {activeTab === "damage-returns" && (

@@ -1,7 +1,0 @@
-User-Agent: *
-Allow: /
-Disallow: /admin/
-Disallow: /api/
-Disallow: /account/
-
-Sitemap: https://shop.glowgoodly.com/sitemap.xml
