@@ -1447,30 +1447,22 @@ export default function ValobasaAdminPanel() {
       const pageType = (currentSlotPage || bannerForm.page || "").toLowerCase();
       const titleType = (bannerForm.title || "").toLowerCase();
 
-      const renderCanvas = (img: HTMLImageElement, targetW: number, targetH: number): string => {
+      // Scale image to exactly targetW wide, canvas height = auto (preserves aspect ratio)
+      // → Zero white space, zero cropping, full image always visible, fills full width
+      const renderCanvas = (img: HTMLImageElement, targetW: number): string => {
+        const scale = targetW / img.width;
+        const scaledW = Math.round(img.width * scale);
+        const scaledH = Math.round(img.height * scale);
+
         const canvas = document.createElement("canvas");
-        canvas.width = targetW;
-        canvas.height = targetH;
+        canvas.width = scaledW;
+        canvas.height = scaledH;
         const ctx = canvas.getContext("2d");
         if (!ctx) return img.src;
 
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "high";
-
-        // Auto-fit / CONTAIN mode: scale image to fit inside targetW × targetH
-        // without cropping — maintains full image, fills extra space with white
-        const scale = Math.min(targetW / img.width, targetH / img.height);
-        const scaledW = Math.round(img.width * scale);
-        const scaledH = Math.round(img.height * scale);
-        const offsetX = Math.round((targetW - scaledW) / 2);
-        const offsetY = Math.round((targetH - scaledH) / 2);
-
-        // Fill background white (letterbox / pillarbox areas)
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, targetW, targetH);
-
-        // Draw image centered, fully visible — no cropping
-        ctx.drawImage(img, offsetX, offsetY, scaledW, scaledH);
+        ctx.drawImage(img, 0, 0, scaledW, scaledH);
 
         // Compress to WebP (or JPEG fallback) — drastically reduces 5MB PNGs to ~60-100KB
         try {
@@ -1499,22 +1491,23 @@ export default function ValobasaAdminPanel() {
               let mobile = src;
 
               if (isHero) {
-                desktop = renderCanvas(img, 1920, 500);
-                tablet = renderCanvas(img, 1024, 450);
-                mobile = renderCanvas(img, 750, 750);
+                // Each version scaled to target width, height auto — no white space, no crop
+                desktop = renderCanvas(img, 1920);
+                tablet  = renderCanvas(img, 1024);
+                mobile  = renderCanvas(img, 750);
               } else if (isWide) {
-                desktop = renderCanvas(img, 1200, 300);
-                tablet = renderCanvas(img, 1024, 300);
-                mobile = renderCanvas(img, 750, 350);
+                desktop = renderCanvas(img, 1200);
+                tablet  = renderCanvas(img, 1024);
+                mobile  = renderCanvas(img, 750);
               } else if (isCategoryOrConcern) {
-                desktop = renderCanvas(img, 400, 400);
-                tablet = renderCanvas(img, 400, 400);
-                mobile = renderCanvas(img, 400, 400);
+                desktop = renderCanvas(img, 400);
+                tablet  = renderCanvas(img, 400);
+                mobile  = renderCanvas(img, 400);
               } else {
                 // Square 1:1 cards (deals, brand offers, bogo, combos, offers, clearance)
-                desktop = renderCanvas(img, 600, 600);
-                tablet = renderCanvas(img, 600, 600);
-                mobile = renderCanvas(img, 600, 600);
+                desktop = renderCanvas(img, 600);
+                tablet  = renderCanvas(img, 600);
+                mobile  = renderCanvas(img, 600);
               }
 
               resolve({ desktop, mobile, tablet });
