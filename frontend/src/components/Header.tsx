@@ -15,6 +15,8 @@ function BrandLogo({ src, alt, fallbackText }: { src: string; alt: string; fallb
     <img
       src={src}
       alt={alt}
+      loading="lazy"
+      fetchPriority="low"
       onError={() => setError(true)}
       style={{ maxHeight: "35px", maxWidth: "90%", objectFit: "contain" }}
     />
@@ -66,6 +68,8 @@ function CategoryMenuItem({ title, href, className, columns, arches }: CategoryM
                   <img 
                     src={img} 
                     alt="Beauty Model" 
+                    loading="lazy"
+                    fetchPriority="low"
                     suppressHydrationWarning
                     onError={(e) => {
                       e.currentTarget.src = "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&auto=format&fit=crop&q=80";
