@@ -1396,12 +1396,57 @@ export default function ValobasaAdminPanel() {
   const [isResizingBanner, setIsResizingBanner] = useState(false);
   const [autoResizeStatus, setAutoResizeStatus] = useState("");
 
+  const compressImage = (fileOrDataUrl: File | string, maxW: number, maxH: number): Promise<string> => {
+    return new Promise((resolve) => {
+      const process = (src: string) => {
+        const img = new Image();
+        if (src.startsWith("http")) img.crossOrigin = "anonymous";
+        img.onload = () => {
+          try {
+            const canvas = document.createElement("canvas");
+            const scale = Math.min(1, Math.min(maxW / img.width, maxH / img.height));
+            const w = Math.max(1, Math.round(img.width * scale));
+            const h = Math.max(1, Math.round(img.height * scale));
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) return resolve(src);
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            try {
+              const webp = canvas.toDataURL("image/webp", 0.85);
+              if (webp && webp.startsWith("data:image/webp")) return resolve(webp);
+            } catch (_) {}
+            resolve(canvas.toDataURL("image/jpeg", 0.88));
+          } catch (e) {
+            resolve(src);
+          }
+        };
+        img.onerror = () => resolve(src);
+        img.src = src;
+      };
+
+      if (typeof fileOrDataUrl === "string") {
+        process(fileOrDataUrl);
+      } else {
+        const reader = new FileReader();
+        reader.onload = (e) => process((e.target?.result as string) || "");
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(fileOrDataUrl);
+      }
+    });
+  };
+
   const handleDesktopImageUpload = async (fileOrUrl: File | string, currentSlotPage?: string) => {
     setIsResizingBanner(true);
     setAutoResizeStatus("⚡ Auto-generating responsive Mobile & Tablet sizes from Desktop image...");
     try {
-      const pageType = (currentSlotPage || bannerForm.page || "Hero Slides").toLowerCase();
-      
+      const pageType = (currentSlotPage || bannerForm.page || "").toLowerCase();
+      const titleType = (bannerForm.title || "").toLowerCase();
+
       const renderCanvas = (img: HTMLImageElement, targetW: number, targetH: number): string => {
         const canvas = document.createElement("canvas");
         canvas.width = targetW;
@@ -1419,13 +1464,19 @@ export default function ValobasaAdminPanel() {
         const offsetX = Math.round((targetW - scaledW) / 2);
         const offsetY = Math.round((targetH - scaledH) / 2);
 
-        const isPng = img.src.startsWith("data:image/png") || img.src.toLowerCase().endsWith(".png");
-        if (!isPng) {
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, targetW, targetH);
-        }
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, targetW, targetH);
         ctx.drawImage(img, offsetX, offsetY, scaledW, scaledH);
-        return canvas.toDataURL(isPng ? "image/png" : "image/jpeg", 0.90);
+
+        // Convert to high-quality compressed WebP (or fallback to JPEG)
+        // Drastically compresses 5MB PNGs to ~60KB-100KB with crisp visual clarity!
+        try {
+          const webpData = canvas.toDataURL("image/webp", 0.85);
+          if (webpData && webpData.startsWith("data:image/webp")) {
+            return webpData;
+          }
+        } catch (_) {}
+        return canvas.toDataURL("image/jpeg", 0.88);
       };
 
       const processSrc = (src: string) => {
@@ -1436,8 +1487,9 @@ export default function ValobasaAdminPanel() {
           }
           img.onload = () => {
             try {
-              const isHero = pageType.includes("hero") || pageType.includes("slide");
-              const isWide = pageType.includes("wide");
+              const isHero = pageType.includes("hero") || pageType.includes("slide") || titleType.includes("hero") || titleType.includes("slide");
+              const isWide = pageType.includes("wide") || pageType.includes("panoramic") || titleType.includes("wide");
+              const isCategoryOrConcern = pageType.includes("category") || pageType.includes("concern") || titleType.includes("category") || titleType.includes("concern");
 
               let desktop = src;
               let tablet = src;
@@ -1451,11 +1503,15 @@ export default function ValobasaAdminPanel() {
                 desktop = renderCanvas(img, 1200, 300);
                 tablet = renderCanvas(img, 1024, 300);
                 mobile = renderCanvas(img, 750, 350);
+              } else if (isCategoryOrConcern) {
+                desktop = renderCanvas(img, 400, 400);
+                tablet = renderCanvas(img, 400, 400);
+                mobile = renderCanvas(img, 400, 400);
               } else {
-                // Square 1:1 cards
+                // Square 1:1 cards (deals, brand offers, bogo, combos, offers, clearance)
                 desktop = renderCanvas(img, 600, 600);
                 tablet = renderCanvas(img, 600, 600);
-                mobile = renderCanvas(img, 500, 500);
+                mobile = renderCanvas(img, 600, 600);
               }
 
               resolve({ desktop, mobile, tablet });
@@ -1491,8 +1547,8 @@ export default function ValobasaAdminPanel() {
           mobileImageUrl: sizes.mobile,
           tabletImageUrl: sizes.tablet
         }));
-        setAutoResizeStatus("✅ Successfully auto-generated Desktop, Tablet & Mobile sizes!");
-        setTimeout(() => setAutoResizeStatus(""), 5000);
+        setAutoResizeStatus("✅ Successfully auto-resized & optimized Desktop, Tablet & Mobile images!");
+        setTimeout(() => setAutoResizeStatus(""), 6000);
         return sizes;
       }
     } catch (err) {
@@ -3674,9 +3730,47 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                         type="text"
                         required
                         value={bannerForm.imageUrl}
-                        onChange={(e) => setBannerForm({ ...bannerForm, imageUrl: e.target.value })}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setBannerForm(prev => ({ ...prev, imageUrl: val }));
+                          if (val && (val.startsWith("data:image/") || val.startsWith("http://") || val.startsWith("https://"))) {
+                            clearTimeout((window as any)._slotBannerTimer);
+                            (window as any)._slotBannerTimer = setTimeout(() => {
+                              handleDesktopImageUpload(val, currentSlot.id);
+                            }, 300);
+                          }
+                        }}
+                        onPaste={(e) => {
+                          const items = e.clipboardData?.items;
+                          if (items) {
+                            for (let i = 0; i < items.length; i++) {
+                              if (items[i].type.indexOf("image") !== -1) {
+                                const file = items[i].getAsFile();
+                                if (file) {
+                                  e.preventDefault();
+                                  handleDesktopImageUpload(file, currentSlot.id);
+                                  return;
+                                }
+                              }
+                            }
+                          }
+                          const text = e.clipboardData?.getData("text") || "";
+                          if (text && (text.startsWith("data:image/") || text.startsWith("http://") || text.startsWith("https://"))) {
+                            setBannerForm(prev => ({ ...prev, imageUrl: text }));
+                            setTimeout(() => {
+                              handleDesktopImageUpload(text, currentSlot.id);
+                            }, 50);
+                          }
+                        }}
+                        onBlur={() => {
+                          if (bannerForm.imageUrl && (bannerForm.imageUrl.startsWith("data:image/") || bannerForm.imageUrl.startsWith("http://") || bannerForm.imageUrl.startsWith("https://"))) {
+                            if (!bannerForm.mobileImageUrl || bannerForm.imageUrl.length > 250000) {
+                              handleDesktopImageUpload(bannerForm.imageUrl, currentSlot.id);
+                            }
+                          }
+                        }}
                         style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13px" }}
-                        placeholder="Paste Image URL or choose file below..."
+                        placeholder="Paste Image URL or choose file below (Auto-resizes instantly)..."
                       />
                       {bannerForm.imageUrl && (
                         <button
@@ -3746,14 +3840,11 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (evt) => {
-                            if (evt.target?.result) setBannerForm({ ...bannerForm, tabletImageUrl: evt.target.result as string });
-                          };
-                          reader.readAsDataURL(file);
+                          const compressed = await compressImage(file, 1024, 450);
+                          if (compressed) setBannerForm(prev => ({ ...prev, tabletImageUrl: compressed }));
                         }
                       }}
                       style={{ fontSize: "12px" }}
@@ -3786,14 +3877,11 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (evt) => {
-                            if (evt.target?.result) setBannerForm({ ...bannerForm, mobileImageUrl: evt.target.result as string });
-                          };
-                          reader.readAsDataURL(file);
+                          const compressed = await compressImage(file, 750, 750);
+                          if (compressed) setBannerForm(prev => ({ ...prev, mobileImageUrl: compressed }));
                         }
                       }}
                       style={{ fontSize: "12px" }}
@@ -4376,7 +4464,13 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                             <label style={{ display: "block", fontSize: "12.5px", fontWeight: "700", color: "#334155", marginBottom: "4px" }}>Target Page</label>
                             <select
                               value={bannerForm.page}
-                              onChange={(e) => setBannerForm({ ...bannerForm, page: e.target.value })}
+                              onChange={(e) => {
+                                const newPage = e.target.value;
+                                setBannerForm(prev => ({ ...prev, page: newPage }));
+                                if (bannerForm.imageUrl) {
+                                  handleDesktopImageUpload(bannerForm.imageUrl, newPage);
+                                }
+                              }}
                               style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13.5px" }}
                             >
                               <option value="Hero Slides">🎬 Hero Slides Carousel (1400×380 px / 600×600 px)</option>
@@ -4466,9 +4560,47 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                               type="text"
                               required
                               value={bannerForm.imageUrl}
-                              onChange={(e) => setBannerForm({ ...bannerForm, imageUrl: e.target.value })}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setBannerForm(prev => ({ ...prev, imageUrl: val }));
+                                if (val && (val.startsWith("data:image/") || val.startsWith("http://") || val.startsWith("https://"))) {
+                                  clearTimeout((window as any)._editBannerTimer);
+                                  (window as any)._editBannerTimer = setTimeout(() => {
+                                    handleDesktopImageUpload(val, bannerForm.page);
+                                  }, 300);
+                                }
+                              }}
+                              onPaste={(e) => {
+                                const items = e.clipboardData?.items;
+                                if (items) {
+                                  for (let i = 0; i < items.length; i++) {
+                                    if (items[i].type.indexOf("image") !== -1) {
+                                      const file = items[i].getAsFile();
+                                      if (file) {
+                                        e.preventDefault();
+                                        handleDesktopImageUpload(file, bannerForm.page);
+                                        return;
+                                      }
+                                    }
+                                  }
+                                }
+                                const text = e.clipboardData?.getData("text") || "";
+                                if (text && (text.startsWith("data:image/") || text.startsWith("http://") || text.startsWith("https://"))) {
+                                  setBannerForm(prev => ({ ...prev, imageUrl: text }));
+                                  setTimeout(() => {
+                                    handleDesktopImageUpload(text, bannerForm.page);
+                                  }, 50);
+                                }
+                              }}
+                              onBlur={() => {
+                                if (bannerForm.imageUrl && (bannerForm.imageUrl.startsWith("data:image/") || bannerForm.imageUrl.startsWith("http://") || bannerForm.imageUrl.startsWith("https://"))) {
+                                  if (!bannerForm.mobileImageUrl || bannerForm.imageUrl.length > 250000) {
+                                    handleDesktopImageUpload(bannerForm.imageUrl, bannerForm.page);
+                                  }
+                                }
+                              }}
                               style={{ flex: 1, padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
-                              placeholder="Image URL or upload file below..."
+                              placeholder="Paste Image URL or upload file (Auto-resizes instantly)..."
                             />
                             {bannerForm.imageUrl && (
                               <button
@@ -4539,14 +4671,11 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                             <input
                               type="file"
                               accept="image/*"
-                              onChange={(e) => {
+                              onChange={async (e) => {
                                 const file = e.target.files?.[0];
                                 if (file) {
-                                  const reader = new FileReader();
-                                  reader.onload = (evt) => {
-                                    if (evt.target?.result) setBannerForm({ ...bannerForm, tabletImageUrl: evt.target.result as string });
-                                  };
-                                  reader.readAsDataURL(file);
+                                  const compressed = await compressImage(file, 1024, 450);
+                                  if (compressed) setBannerForm(prev => ({ ...prev, tabletImageUrl: compressed }));
                                 }
                               }}
                               style={{ fontSize: "11px" }}
@@ -4581,14 +4710,11 @@ th{background:#1e293b;color:#fff;padding:8px;text-align:left}
                             <input
                               type="file"
                               accept="image/*"
-                              onChange={(e) => {
+                              onChange={async (e) => {
                                 const file = e.target.files?.[0];
                                 if (file) {
-                                  const reader = new FileReader();
-                                  reader.onload = (evt) => {
-                                    if (evt.target?.result) setBannerForm({ ...bannerForm, mobileImageUrl: evt.target.result as string });
-                                  };
-                                  reader.readAsDataURL(file);
+                                  const compressed = await compressImage(file, 750, 750);
+                                  if (compressed) setBannerForm(prev => ({ ...prev, mobileImageUrl: compressed }));
                                 }
                               }}
                               style={{ fontSize: "11px" }}

@@ -1307,7 +1307,35 @@ export default function AdminPage() {
                         const file = e.target.files?.[0];
                         if (file) {
                           const reader = new FileReader();
-                          reader.onloadend = () => setBannerForm({ ...bannerForm, imageUrl: reader.result as string });
+                          reader.onloadend = () => {
+                            const raw = reader.result as string;
+                            const img = new Image();
+                            img.onload = () => {
+                              const canvas = document.createElement("canvas");
+                              const isHero = bannerForm.page === "Hero Slides" || bannerForm.page === "Homepage";
+                              const maxW = isHero ? 1920 : 800;
+                              const maxH = isHero ? 500 : 800;
+                              const scale = Math.min(1, Math.min(maxW / img.width, maxH / img.height));
+                              canvas.width = Math.round(img.width * scale);
+                              canvas.height = Math.round(img.height * scale);
+                              const ctx = canvas.getContext("2d");
+                              if (ctx) {
+                                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                                try {
+                                  const webp = canvas.toDataURL("image/webp", 0.85);
+                                  if (webp && webp.startsWith("data:image/webp")) {
+                                    setBannerForm(prev => ({ ...prev, imageUrl: webp, mobileImageUrl: webp, tabletImageUrl: webp }));
+                                    return;
+                                  }
+                                } catch (_) {}
+                                const jpeg = canvas.toDataURL("image/jpeg", 0.88);
+                                setBannerForm(prev => ({ ...prev, imageUrl: jpeg, mobileImageUrl: jpeg, tabletImageUrl: jpeg }));
+                              } else {
+                                setBannerForm(prev => ({ ...prev, imageUrl: raw, mobileImageUrl: raw, tabletImageUrl: raw }));
+                              }
+                            };
+                            img.src = raw;
+                          };
                           reader.readAsDataURL(file);
                         }
                       }} style={{ width: "100%", padding: "6px", border: "1px solid #e2e8f0", borderRadius: "4px", fontSize: "12px", backgroundColor: "#fff" }} />
