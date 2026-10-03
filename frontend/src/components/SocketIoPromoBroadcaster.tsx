@@ -69,7 +69,12 @@ export default function SocketIoPromoBroadcaster({ token }: { token: string | nu
     fetchPromoHistory();
 
     const socket: Socket = io(API_ROOT, {
-      transports: ["websocket", "polling"]
+      transports: ["polling", "websocket"],
+      reconnection: true,
+      reconnectionAttempts: 3,
+      reconnectionDelay: 5000,
+      reconnectionDelayMax: 15000,
+      timeout: 8000,
     });
     socketRef.current = socket;
 
@@ -78,6 +83,16 @@ export default function SocketIoPromoBroadcaster({ token }: { token: string | nu
     });
 
     socket.on("disconnect", () => {
+      setSocketConnected(false);
+    });
+
+    socket.on("connect_error", () => {
+      // Silently suppress — backend may not be running locally
+      setSocketConnected(false);
+    });
+
+    socket.on("reconnect_failed", () => {
+      socket.disconnect();
       setSocketConnected(false);
     });
 

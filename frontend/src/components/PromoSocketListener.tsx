@@ -34,11 +34,26 @@ export default function PromoSocketListener() {
 
   useEffect(() => {
     const socket: Socket = io(API_ROOT, {
-      transports: ["websocket", "polling"]
+      transports: ["polling", "websocket"],   // polling first (more reliable), upgrade if possible
+      reconnection: true,
+      reconnectionAttempts: 3,               // max 3 retries — no infinite spam
+      reconnectionDelay: 5000,               // 5s between retries
+      reconnectionDelayMax: 15000,           // max 15s
+      timeout: 8000,
     });
 
     socket.on("connect", () => {
-      console.log("⚡ Connected to GlowGoodly Socket.io Promo Server");
+      if (process.env.NODE_ENV === "development") {
+        console.log("⚡ Connected to GlowGoodly Socket.io Promo Server");
+      }
+    });
+
+    socket.on("connect_error", () => {
+      // Silently suppress — backend may not be running locally
+    });
+
+    socket.on("reconnect_failed", () => {
+      socket.disconnect(); // Stop after max attempts
     });
 
     socket.on("promo:message", (data: PromoData) => {

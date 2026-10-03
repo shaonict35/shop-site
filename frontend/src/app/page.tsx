@@ -240,7 +240,7 @@ export default function Home() {
   const [categories, setCategories] = useState<any[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [dynamicSlides, setDynamicSlides] = useState<any[]>(DEFAULT_HERO_SLIDES);
+  const [dynamicSlides, setDynamicSlides] = useState<any[]>([]);  // empty until banners loaded
   const [homepageBanners, setHomepageBanners] = useState<any[]>([]);
 
   const getBannerForPage = (identifier: string, fallbackImg: string, fallbackTitle: string, fallbackLink: string = "#") => {
@@ -413,6 +413,9 @@ export default function Home() {
               tabletImg: b.tabletImageUrl || b.imageUrl || b.image || DEFAULT_HERO_SLIDES[idx % DEFAULT_HERO_SLIDES.length].tabletImg,
               link: b.linkUrl || b.link || "/shop"
             })));
+          } else {
+            // No hero banners in DB — show defaults
+            setDynamicSlides(DEFAULT_HERO_SLIDES);
           }
         }
 
@@ -428,6 +431,8 @@ export default function Home() {
       } catch (e) {
         console.error("Error setting metadata", e);
       } finally {
+        // Ensure slider always shows something even if fetch failed
+        setDynamicSlides(prev => prev.length === 0 ? DEFAULT_HERO_SLIDES : prev);
         setBannersLoaded(true);
       }
     };
@@ -513,7 +518,13 @@ export default function Home() {
       </h1>
 
       {/* Full-width Dynamic Promotional Banner Slider - Responsive Hero Slider */}
-      {(() => {
+      {!bannersLoaded ? (
+        /* Skeleton placeholder while banners load — prevents default PNGs from preloading */
+        <section style={{ width: "100%", backgroundColor: "#f1e8ef", minHeight: "200px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: "60px", height: "60px", borderRadius: "50%", border: "4px solid #e63b7a22", borderTop: "4px solid #e63b7a", animation: "spin 0.8s linear infinite" }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </section>
+      ) : (() => {
         const safeSlideIdx = activeSlide % (activeSlidesList.length || 1);
         const currentSlide = activeSlidesList[safeSlideIdx] || activeSlidesList[0] || DEFAULT_HERO_SLIDES[0];
         const slideImg = currentSlide?.img || DEFAULT_HERO_SLIDES[0].img;
