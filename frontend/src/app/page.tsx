@@ -191,6 +191,49 @@ const DEFAULT_CLEARANCE_PRODUCTS: Product[] = [
   }
 ];
 
+const DEFAULT_HAIR_PRODUCTS: Product[] = [
+  {
+    id: "prod-hair-1",
+    name: "Olaplex No. 3 Hair Perfector Repairing Treatment",
+    slug: "olaplex-no-3-hair-perfector-treatment",
+    description: "Concentrated treatment that strengthens hair from within, reducing breakage and improving look and feel.",
+    brand: { name: "Olaplex" },
+    category: { name: "Haircare" },
+    images: [{ url: "https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?w=500&q=80", isPrimary: true }],
+    variants: [{ id: "var-h1", name: "100ml", price: 3200, discountPrice: 2850, stock: 25, shadeColor: null, size: "100ml" }]
+  },
+  {
+    id: "prod-hair-2",
+    name: "L'Oreal Paris Elvive Extraordinary Oil Serum",
+    slug: "loreal-paris-elvive-extraordinary-oil-serum",
+    description: "Nourishing hair serum infused with 6 precious floral oils for brilliant shine and silky smoothness.",
+    brand: { name: "L'Oreal Paris" },
+    category: { name: "Haircare" },
+    images: [{ url: "https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?w=500&q=80", isPrimary: true }],
+    variants: [{ id: "var-h2", name: "100ml", price: 1250, discountPrice: 990, stock: 35, shadeColor: null, size: "100ml" }]
+  },
+  {
+    id: "prod-hair-3",
+    name: "Tresemme Keratin Smooth Anti-Frizz Pro Shampoo",
+    slug: "tresemme-keratin-smooth-anti-frizz-shampoo",
+    description: "Infused with keratin and marula oil, giving up to 72 hours of frizz control and salon smoothness.",
+    brand: { name: "Tresemme" },
+    category: { name: "Haircare" },
+    images: [{ url: "https://images.unsplash.com/photo-1608248597359-25f053ca2651?w=500&q=80", isPrimary: true }],
+    variants: [{ id: "var-h3", name: "400ml", price: 950, discountPrice: 780, stock: 40, shadeColor: null, size: "400ml" }]
+  },
+  {
+    id: "prod-hair-4",
+    name: "The Ordinary Multi-Peptide Serum for Hair Density",
+    slug: "the-ordinary-multi-peptide-serum-for-hair-density",
+    description: "Concentrated leave-in serum that supports scalp health for visibly thicker and healthier hair.",
+    brand: { name: "The Ordinary" },
+    category: { name: "Haircare" },
+    images: [{ url: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=500&q=80", isPrimary: true }],
+    variants: [{ id: "var-h4", name: "60ml", price: 2150, discountPrice: 1850, stock: 20, shadeColor: null, size: "60ml" }]
+  }
+];
+
 export default function Home() {
   const { addToCart, wishlist, toggleWishlist } = useApp();
   const [products, setProducts] = useState<Product[]>([]);
@@ -1282,27 +1325,29 @@ export default function Home() {
           );
         })()}
 
-        {/* CLEARANCE SALE Section */}
+        {/* HAIR CARE Section (Below SHOP BEAUTY PRODUCTS BY CATEGORY) */}
         {(() => {
-          const clearanceProducts = products
-            .filter(p => p.category?.name?.toLowerCase().includes("clearance") || p.name?.toLowerCase().includes("clearance") || p.campaignName === "CLEARANCE")
+          const filtered = products
+            .filter(p => p.category?.name?.toLowerCase().includes("hair") || p.name?.toLowerCase().includes("hair") || p.name?.toLowerCase().includes("shampoo") || p.name?.toLowerCase().includes("conditioner"))
             .slice(0, 4);
 
-          if (clearanceProducts.length === 0) return null;
+          const hairProducts = filtered.length > 0 ? filtered : DEFAULT_HAIR_PRODUCTS;
+
+          if (hairProducts.length === 0) return null;
 
           return (
             <section style={{ margin: "40px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
               <div style={{ position: "relative", marginBottom: "20px" }}>
                 <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", color: "#000", margin: 0 }}>
-                  CLEARANCE SALE
+                  HAIR CARE
                 </h2>
-                <Link href="/shop?category=clearance-sale" style={{ position: "absolute", right: "0", top: "50%", transform: "translateY(-50%)", backgroundColor: "#e2136e", color: "#ffffff", padding: "6px 14px", borderRadius: "20px", fontSize: "11.5px", fontWeight: "800", textDecoration: "none", boxShadow: "0 2px 8px rgba(226,19,110,0.25)" }}>
+                <Link href="/shop?category=haircare" style={{ position: "absolute", right: "0", top: "50%", transform: "translateY(-50%)", backgroundColor: "#e2136e", color: "#ffffff", padding: "6px 14px", borderRadius: "20px", fontSize: "11.5px", fontWeight: "800", textDecoration: "none", boxShadow: "0 2px 8px rgba(226,19,110,0.25)" }}>
                   SEE ALL ›
                 </Link>
               </div>
 
               <div className="homepage-product-grid mobile-limit-2">
-                {clearanceProducts.map((p, idx) => {
+                {hairProducts.map((p, idx) => {
                   const primaryImage = p.images?.find((img) => img.isPrimary)?.url || p.images?.[0]?.url || "";
                   const primaryVariant = p.variants?.[0];
                   const oldPrice = primaryVariant?.price || 0;
@@ -1332,7 +1377,7 @@ export default function Home() {
                           {p.name}
                         </Link>
                         <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
-                          CLEARANCE
+                          HAIR CARE
                         </span>
                         <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
                           {hasDiscount && (
@@ -1345,7 +1390,7 @@ export default function Home() {
                           </span>
                         </div>
                         <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
-                          ★ ★ ★ ★ <span style={{ color: "#cbd5e1" }}>★</span>
+                          ★ ★ ★ ★ ★
                         </div>
                         {sizeLabel && (
                           <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
