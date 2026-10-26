@@ -22,3 +22,8 @@ cpanel_updated_files/
 cpanel_updated_files.zip
 deploy/
 creds
+*.sql
+**/*.sql
+database_backup/
+*.bak
+*.backup
