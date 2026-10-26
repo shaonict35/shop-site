@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" width="200" height="60">
-  <rect width="200" height="60" fill="transparent"/>
-  <text x="100" y="38" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="800" fill="#004b91" text-anchor="middle" letter-spacing="-0.5">
-    Cera<tspan font-weight="900" fill="#008080">Ve</tspan>
-  </text>
-  <text x="100" y="49" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="7" font-weight="700" fill="#718096" text-anchor="middle" letter-spacing="1.5">
-    DEVELOPED WITH DERMATOLOGISTS
-  </text>
-</svg>
