@@ -4,6 +4,7 @@ import { authenticateJWT, requireRole, AuthenticatedRequest } from "../middlewar
 import bcrypt from "bcryptjs";
 import { sendWelcomeUserEmail } from "../mailer";
 import { clearProductsCache } from "./products";
+import { saveBase64Image } from "../services/imageStorage";
 
 const router = Router();
 
@@ -749,8 +750,10 @@ router.put("/brands/:id/logo", authenticateJWT as any, requireRole(["SuperAdmin"
       return res.status(404).json({ error: "Brand not found" });
     }
 
-    await docRef.update({ logoUrl, updatedAt: new Date().toISOString() });
-    res.json({ id, ...doc.data(), logoUrl });
+    const savedLogo = logoUrl ? saveBase64Image(logoUrl, "brands") : logoUrl;
+    await docRef.update({ logoUrl: savedLogo, updatedAt: new Date().toISOString() });
+    clearProductsCache();
+    res.json({ id, ...doc.data(), logoUrl: savedLogo });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -940,10 +943,11 @@ const handleUpdateBrand = async (req: any, res: any) => {
     const existingDoc = await docRef.get();
     const updateData: any = { updatedAt: new Date().toISOString() };
     if (name) updateData.name = name;
-    if (logoUrl !== undefined) updateData.logoUrl = logoUrl;
+    if (logoUrl !== undefined) updateData.logoUrl = logoUrl ? saveBase64Image(logoUrl, "brands") : "";
     if (originCountry !== undefined) updateData.originCountry = originCountry;
     
     await docRef.set(updateData, { merge: true });
+    clearProductsCache();
     const updated = existingDoc.exists ? { id, ...existingDoc.data(), ...updateData } : { id, ...updateData };
     res.json({ message: "Brand updated successfully", brand: updated });
   } catch (error: any) {

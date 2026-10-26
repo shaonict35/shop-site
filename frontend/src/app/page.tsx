@@ -58,181 +58,11 @@ const DEFAULT_HERO_SLIDES = [
 
 const FALLBACK_PRODUCT_IMG = "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=300&q=80";
 
-const DEFAULT_MAKEUP_PRODUCTS: Product[] = [
-  {
-    id: "prod-makeup-1",
-    name: "L'Oreal Paris Color Riche Intense Matte Lipstick",
-    slug: "loreal-paris-color-riche-intense-matte-lipstick",
-    description: "Iconic richly pigmented matte lipstick with hydrating oils.",
-    brand: { name: "L'Oreal Paris" },
-    category: { name: "Makeup" },
-    images: [{ url: "https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=500&q=80", isPrimary: true }],
-    variants: [{ id: "var-m1", name: "3.7g", price: 1150, discountPrice: 950, stock: 45, shadeColor: null, size: "3.7g" }]
-  },
-  {
-    id: "prod-makeup-2",
-    name: "Maybelline Fit Me Matte + Poreless Liquid Foundation",
-    slug: "maybelline-fit-me-matte-poreless-liquid-foundation",
-    description: "Oil-free lightweight liquid matte foundation for natural finish.",
-    brand: { name: "Maybelline" },
-    category: { name: "Makeup" },
-    images: [{ url: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&q=80", isPrimary: true }],
-    variants: [{ id: "var-m2", name: "30ml", price: 1350, discountPrice: 1150, stock: 35, shadeColor: null, size: "30ml" }]
-  },
-  {
-    id: "prod-makeup-3",
-    name: "MAC Studio Fix Powder Plus Foundation Compact",
-    slug: "mac-studio-fix-powder-plus-foundation-compact",
-    description: "One-step powder and foundation that gives skin a smooth finish.",
-    brand: { name: "M.A.C" },
-    category: { name: "Makeup" },
-    images: [{ url: "https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=500&q=80", isPrimary: true }],
-    variants: [{ id: "var-m3", name: "15g", price: 3600, discountPrice: 3250, stock: 20, shadeColor: null, size: "15g" }]
-  },
-  {
-    id: "prod-makeup-4",
-    name: "NYX Professional Butter Gloss Non-Sticky Lip Gloss",
-    slug: "nyx-professional-butter-gloss-non-sticky-lip-gloss",
-    description: "Silky-smooth, decadent butter gloss that melts on lips.",
-    brand: { name: "NYX" },
-    category: { name: "Makeup" },
-    images: [{ url: "https://images.unsplash.com/photo-1599733589046-10c005739ef9?w=500&q=80", isPrimary: true }],
-    variants: [{ id: "var-m4", name: "8ml", price: 850, discountPrice: 720, stock: 50, shadeColor: null, size: "8ml" }]
-  }
-];
+const DEFAULT_MAKEUP_PRODUCTS: Product[] = [];
 
-const DEFAULT_TOOL_PRODUCTS: Product[] = [
-  {
-    id: "prod-tool-1",
-    name: "Real Techniques Everyday Essentials 5-Piece Makeup Brush Set",
-    slug: "real-techniques-everyday-essentials-5-piece-brush-set",
-    description: "Professional face and eye makeup brush kit for seamless blending.",
-    brand: { name: "Real Techniques" },
-    category: { name: "Makeup Tools" },
-    images: [{ url: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&q=80", isPrimary: true }],
-    variants: [{ id: "var-t1", name: "Set of 5", price: 2450, discountPrice: 2150, stock: 25, shadeColor: null, size: "Set of 5" }]
-  },
-  {
-    id: "prod-tool-2",
-    name: "Beautyblender Original Pink Precision Makeup Blending Sponge",
-    slug: "beautyblender-original-pink-precision-makeup-blending-sponge",
-    description: "The edgeless, reusable makeup sponge for flawless application.",
-    brand: { name: "Beautyblender" },
-    category: { name: "Makeup Tools" },
-    images: [{ url: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=500&q=80", isPrimary: true }],
-    variants: [{ id: "var-t2", name: "1 Sponge", price: 1850, discountPrice: 1650, stock: 30, shadeColor: null, size: "1 Pc" }]
-  },
-  {
-    id: "prod-tool-3",
-    name: "Real Techniques Miracle Complexion Sponge Duo 2-Pack",
-    slug: "real-techniques-miracle-complexion-sponge-duo-2-pack",
-    description: "Multi-functional 3-in-1 miracle complexion sponge duo.",
-    brand: { name: "Real Techniques" },
-    category: { name: "Makeup Tools" },
-    images: [{ url: "https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=500&q=80", isPrimary: true }],
-    variants: [{ id: "var-t3", name: "2 Pcs", price: 1550, discountPrice: 1350, stock: 40, shadeColor: null, size: "2 Pcs" }]
-  },
-  {
-    id: "prod-tool-4",
-    name: "Revlon Extra Curl Professional Eyelash Curler With Pad Refill",
-    slug: "revlon-extra-curl-professional-eyelash-curler-with-pad-refill",
-    description: "Ergonomic lash curler engineered for dramatic, long-lasting curls.",
-    brand: { name: "Revlon" },
-    category: { name: "Makeup Tools" },
-    images: [{ url: "https://images.unsplash.com/photo-1599733589046-10c005739ef9?w=500&q=80", isPrimary: true }],
-    variants: [{ id: "var-t4", name: "1 Curler", price: 950, discountPrice: 790, stock: 25, shadeColor: null, size: "1 Curler" }]
-  }
-];
-
-const DEFAULT_CLEARANCE_PRODUCTS: Product[] = [
-  {
-    id: "prod-clearance-1",
-    name: "COSRX Low pH Good Morning Gel Cleanser (Clearance Sale)",
-    slug: "cosrx-low-ph-good-morning-gel-cleanser-clearance",
-    description: "Gentle morning gel cleanser formulated with purifying botanical ingredients.",
-    brand: { name: "COSRX" },
-    category: { name: "Clearance Sale" },
-    campaignName: "Clearance SALE",
-    images: [{ url: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=500&q=80", isPrimary: true }],
-    variants: [{ id: "var-c1", name: "150ml", price: 1350, discountPrice: 850, stock: 15, shadeColor: null, size: "150ml" }]
-  },
-  {
-    id: "prod-clearance-2",
-    name: "Beauty of Joseon Relief Sun Rice + Probiotics SPF50+ (Clearance Stock)",
-    slug: "beauty-of-joseon-relief-sun-clearance",
-    description: "Organic sunscreen enriched with 30% rice extract and grain fermented extracts.",
-    brand: { name: "Beauty of Joseon" },
-    category: { name: "Clearance Sale" },
-    campaignName: "Clearance SALE",
-    images: [{ url: "https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?w=500&q=80", isPrimary: true }],
-    variants: [{ id: "var-c2", name: "50ml", price: 1650, discountPrice: 1150, stock: 20, shadeColor: null, size: "50ml" }]
-  },
-  {
-    id: "prod-clearance-3",
-    name: "The Ordinary Niacinamide 10% + Zinc 1% High-Strength Serum (Special Clearance)",
-    slug: "the-ordinary-niacinamide-10-zinc-1-clearance",
-    description: "High-strength vitamin and mineral blemish formula with niacinamide and zinc.",
-    brand: { name: "The Ordinary" },
-    category: { name: "Clearance Sale" },
-    campaignName: "Clearance SALE",
-    images: [{ url: "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=500&q=80", isPrimary: true }],
-    variants: [{ id: "var-c3", name: "30ml", price: 1400, discountPrice: 990, stock: 12, shadeColor: null, size: "30ml" }]
-  },
-  {
-    id: "prod-clearance-4",
-    name: "Laneige Lip Sleeping Mask Intense Moisture Berry (Final Clearance)",
-    slug: "laneige-lip-sleeping-mask-berry-clearance",
-    description: "Leave-on lip mask that soothes and moisturizes for smoother, more supple lips overnight.",
-    brand: { name: "Laneige" },
-    category: { name: "Clearance Sale" },
-    campaignName: "Clearance SALE",
-    images: [{ url: "https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=500&q=80", isPrimary: true }],
-    variants: [{ id: "var-c4", name: "20g", price: 1950, discountPrice: 1250, stock: 18, shadeColor: null, size: "20g" }]
-  }
-];
-
-const DEFAULT_HAIR_PRODUCTS: Product[] = [
-  {
-    id: "prod-hair-1",
-    name: "Olaplex No. 3 Hair Perfector Repairing Treatment",
-    slug: "olaplex-no-3-hair-perfector-treatment",
-    description: "Concentrated treatment that strengthens hair from within, reducing breakage and improving look and feel.",
-    brand: { name: "Olaplex" },
-    category: { name: "Haircare" },
-    images: [{ url: "https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?w=500&q=80", isPrimary: true }],
-    variants: [{ id: "var-h1", name: "100ml", price: 3200, discountPrice: 2850, stock: 25, shadeColor: null, size: "100ml" }]
-  },
-  {
-    id: "prod-hair-2",
-    name: "L'Oreal Paris Elvive Extraordinary Oil Serum",
-    slug: "loreal-paris-elvive-extraordinary-oil-serum",
-    description: "Nourishing hair serum infused with 6 precious floral oils for brilliant shine and silky smoothness.",
-    brand: { name: "L'Oreal Paris" },
-    category: { name: "Haircare" },
-    images: [{ url: "https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?w=500&q=80", isPrimary: true }],
-    variants: [{ id: "var-h2", name: "100ml", price: 1250, discountPrice: 990, stock: 35, shadeColor: null, size: "100ml" }]
-  },
-  {
-    id: "prod-hair-3",
-    name: "Tresemme Keratin Smooth Anti-Frizz Pro Shampoo",
-    slug: "tresemme-keratin-smooth-anti-frizz-shampoo",
-    description: "Infused with keratin and marula oil, giving up to 72 hours of frizz control and salon smoothness.",
-    brand: { name: "Tresemme" },
-    category: { name: "Haircare" },
-    images: [{ url: "https://images.unsplash.com/photo-1608248597359-25f053ca2651?w=500&q=80", isPrimary: true }],
-    variants: [{ id: "var-h3", name: "400ml", price: 950, discountPrice: 780, stock: 40, shadeColor: null, size: "400ml" }]
-  },
-  {
-    id: "prod-hair-4",
-    name: "The Ordinary Multi-Peptide Serum for Hair Density",
-    slug: "the-ordinary-multi-peptide-serum-for-hair-density",
-    description: "Concentrated leave-in serum that supports scalp health for visibly thicker and healthier hair.",
-    brand: { name: "The Ordinary" },
-    category: { name: "Haircare" },
-    images: [{ url: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=500&q=80", isPrimary: true }],
-    variants: [{ id: "var-h4", name: "60ml", price: 2150, discountPrice: 1850, stock: 20, shadeColor: null, size: "60ml" }]
-  }
-];
+const DEFAULT_TOOL_PRODUCTS: Product[] = [];
+const DEFAULT_CLEARANCE_PRODUCTS: Product[] = [];
+const DEFAULT_HAIR_PRODUCTS: Product[] = [];
 
 export default function Home() {
   const { addToCart, wishlist, toggleWishlist } = useApp();
@@ -240,7 +70,7 @@ export default function Home() {
   const [categories, setCategories] = useState<any[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [dynamicSlides, setDynamicSlides] = useState<any[]>([]);  // empty until banners loaded
+  const [dynamicSlides, setDynamicSlides] = useState<any[]>(DEFAULT_HERO_SLIDES);
   const [homepageBanners, setHomepageBanners] = useState<any[]>([]);
 
   const getBannerForPage = (identifier: string, fallbackImg: string, fallbackTitle: string, fallbackLink: string = "#") => {
@@ -345,9 +175,31 @@ export default function Home() {
 
   // Slide Banner State
   const [activeSlide, setActiveSlide] = useState(0);
-  const [bannersLoaded, setBannersLoaded] = useState(false);
+  const [bannersLoaded, setBannersLoaded] = useState(true);
 
   const activeSlidesList = dynamicSlides;
+
+  // Instant 0ms Hero Banner cache hydration from localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cachedHero = localStorage.getItem("glowgoodly_cached_hero_banners");
+        if (cachedHero) {
+          const parsed = JSON.parse(cachedHero);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setDynamicSlides(parsed);
+          }
+        }
+        const cachedAll = localStorage.getItem("glowgoodly_cached_all_banners");
+        if (cachedAll) {
+          const parsedAll = JSON.parse(cachedAll);
+          if (Array.isArray(parsedAll) && parsedAll.length > 0) {
+            setHomepageBanners(parsedAll);
+          }
+        }
+      } catch (e) {}
+    }
+  }, []);
 
   // Auto rotate slides
   useEffect(() => {
@@ -384,10 +236,10 @@ export default function Home() {
 
     const fetchMetadata = async (bypass: boolean = false) => {
       try {
-        // Fetch real categories and promotional banners dynamically from backend database
+        // Fetch real categories and promotional banners dynamically with fast cache
         const [categoriesRes, bannersRes] = await Promise.all([
           fetchWithCache(`${API_BASE}/categories`, bypass).catch(() => null),
-          fetchWithCache(`${API_BASE}/banners?t=${Date.now()}`, true).catch(() => null),
+          fetchWithCache(`${API_BASE}/banners`, bypass).catch(() => null),
         ]);
 
         if (Array.isArray(categoriesRes) && categoriesRes.length > 0) {
@@ -396,6 +248,9 @@ export default function Home() {
         if (Array.isArray(bannersRes) && bannersRes.length > 0) {
           // Store ALL banners for getBannerForPage lookups (Category, Concern, etc.)
           setHomepageBanners(bannersRes);
+          if (typeof window !== "undefined") {
+            try { localStorage.setItem("glowgoodly_cached_all_banners", JSON.stringify(bannersRes)); } catch (e) {}
+          }
           // Extract dynamic hero slides from banners where page is Hero Slides or hero or Homepage
           const heroBanners = bannersRes.filter((b: any) => {
             const p = (b.page || "").toLowerCase().trim();
@@ -403,7 +258,7 @@ export default function Home() {
             return p.includes("hero") || t.includes("hero") || p === "homepage" || p === "hero slides";
           });
           if (heroBanners.length > 0) {
-            setDynamicSlides(heroBanners.map((b: any, idx: number) => ({
+            const mappedSlides = heroBanners.map((b: any, idx: number) => ({
               id: b.id || `hero-${idx}`,
               title: b.title || DEFAULT_HERO_SLIDES[idx % DEFAULT_HERO_SLIDES.length].title,
               desc: b.description || b.subTitle || DEFAULT_HERO_SLIDES[idx % DEFAULT_HERO_SLIDES.length].desc,
@@ -412,7 +267,11 @@ export default function Home() {
               mobileImg: b.mobileImageUrl || b.imageUrl || b.image || DEFAULT_HERO_SLIDES[idx % DEFAULT_HERO_SLIDES.length].mobileImg,
               tabletImg: b.tabletImageUrl || b.imageUrl || b.image || DEFAULT_HERO_SLIDES[idx % DEFAULT_HERO_SLIDES.length].tabletImg,
               link: b.linkUrl || b.link || "/shop"
-            })));
+            }));
+            setDynamicSlides(mappedSlides);
+            if (typeof window !== "undefined") {
+              try { localStorage.setItem("glowgoodly_cached_hero_banners", JSON.stringify(mappedSlides)); } catch (e) {}
+            }
           } else {
             // No hero banners in DB — show defaults
             setDynamicSlides(DEFAULT_HERO_SLIDES);
@@ -431,7 +290,6 @@ export default function Home() {
       } catch (e) {
         console.error("Error setting metadata", e);
       } finally {
-        // Ensure slider always shows something even if fetch failed
         setDynamicSlides(prev => prev.length === 0 ? DEFAULT_HERO_SLIDES : prev);
         setBannersLoaded(true);
       }
@@ -517,19 +375,14 @@ export default function Home() {
         GlowGoodly — 100% Authentic Cosmetics, Korean Skincare & Beauty Shop Bangladesh
       </h1>
 
-      {/* Full-width Dynamic Promotional Banner Slider - Responsive Hero Slider */}
-      {!bannersLoaded ? (
-        /* Skeleton placeholder while banners load — prevents default PNGs from preloading */
-        <section style={{ width: "100%", backgroundColor: "#f1e8ef", minHeight: "200px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ width: "60px", height: "60px", borderRadius: "50%", border: "4px solid #e63b7a22", borderTop: "4px solid #e63b7a", animation: "spin 0.8s linear infinite" }} />
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        </section>
-      ) : (() => {
+      {/* Full-width Dynamic Promotional Banner Slider - Responsive Hero Slider (0ms Instant Load) */}
+      {(() => {
         const safeSlideIdx = activeSlide % (activeSlidesList.length || 1);
         const currentSlide = activeSlidesList[safeSlideIdx] || activeSlidesList[0] || DEFAULT_HERO_SLIDES[0];
         const slideImg = currentSlide?.img || DEFAULT_HERO_SLIDES[0].img;
         const slideMobileImg = currentSlide?.mobileImg || slideImg;
         const slideTabletImg = currentSlide?.tabletImg || slideImg;
+        const isHeroVideo = slideImg && (slideImg.startsWith("data:video/") || slideImg.endsWith(".mp4") || slideImg.endsWith(".webm") || slideImg.endsWith(".mov"));
         return (
           <section
             style={{
@@ -547,38 +400,66 @@ export default function Home() {
                   rel="noopener noreferrer"
                   style={{ display: "block", width: "100%", cursor: "pointer" }}
                 >
-                  <picture style={{ display: "block", width: "100%" }}>
-                    <source media="(max-width: 640px)" srcSet={slideMobileImg} />
-                    <source media="(max-width: 1024px)" srcSet={slideTabletImg} />
-                    <img
+                  {isHeroVideo ? (
+                    <video
                       src={slideImg}
-                      alt={currentSlide?.title || "Hero Slider"}
-                      style={{
-                        width: "100%",
-                        height: "auto",
-                        display: "block",
-                      }}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      style={{ width: "100%", height: "auto", display: "block", objectFit: "cover" }}
                     />
-                  </picture>
+                  ) : (
+                    <picture style={{ display: "block", width: "100%" }}>
+                      <source media="(max-width: 640px)" srcSet={slideMobileImg} />
+                      <source media="(max-width: 1024px)" srcSet={slideTabletImg} />
+                      <img
+                        src={slideImg}
+                        alt={currentSlide?.title || "Hero Slider"}
+                        fetchPriority="high"
+                        loading="eager"
+                        decoding="async"
+                        style={{
+                          width: "100%",
+                          height: "auto",
+                          display: "block",
+                        }}
+                      />
+                    </picture>
+                  )}
                 </a>
               ) : (
                 <Link
                   href={currentSlide?.link || "/shop"}
                   style={{ display: "block", width: "100%", cursor: "pointer" }}
                 >
-                  <picture style={{ display: "block", width: "100%" }}>
-                    <source media="(max-width: 640px)" srcSet={slideMobileImg} />
-                    <source media="(max-width: 1024px)" srcSet={slideTabletImg} />
-                    <img
+                  {isHeroVideo ? (
+                    <video
                       src={slideImg}
-                      alt={currentSlide?.title || "Hero Slider"}
-                      style={{
-                        width: "100%",
-                        height: "auto",
-                        display: "block",
-                      }}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      style={{ width: "100%", height: "auto", display: "block", objectFit: "cover" }}
                     />
-                  </picture>
+                  ) : (
+                    <picture style={{ display: "block", width: "100%" }}>
+                      <source media="(max-width: 640px)" srcSet={slideMobileImg} />
+                      <source media="(max-width: 1024px)" srcSet={slideTabletImg} />
+                      <img
+                        src={slideImg}
+                        alt={currentSlide?.title || "Hero Slider"}
+                        fetchPriority="high"
+                        loading="eager"
+                        decoding="async"
+                        style={{
+                          width: "100%",
+                          height: "auto",
+                          display: "block",
+                        }}
+                      />
+                    </picture>
+                  )}
                 </Link>
               )}
 
@@ -650,12 +531,10 @@ export default function Home() {
         {/* CLEARANCE SALE Section (Top Section) */}
         {(() => {
           const filtered = products
-            .filter(p => p.category?.name?.toLowerCase().includes("clearance") || p.campaignName?.toLowerCase().includes("clearance") || p.name?.toLowerCase().includes("clearance"))
+            .filter(p => p.category?.name?.toLowerCase().includes("clearance") || p.campaignName?.toLowerCase().includes("clearance") || p.name?.toLowerCase().includes("clearance") || (p.variants?.[0]?.discountPrice && p.variants[0].discountPrice < p.variants[0].price))
             .slice(0, 4);
 
-          const clearanceProducts = filtered.length > 0 ? filtered : DEFAULT_CLEARANCE_PRODUCTS;
-
-          if (clearanceProducts.length === 0) return null;
+          const clearanceProducts = filtered.length > 0 ? filtered : products.slice(0, 4);
 
           return (
             <section style={{ margin: "30px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
@@ -668,65 +547,71 @@ export default function Home() {
                 </Link>
               </div>
 
-              <div className="homepage-product-grid mobile-limit-2">
-                {clearanceProducts.map((p) => {
-                  const primaryImage = p.images?.find((img) => img.isPrimary)?.url || p.images?.[0]?.url || "";
-                  const primaryVariant = p.variants?.[0];
-                  const oldPrice = primaryVariant?.price || 0;
-                  const currentPrice = primaryVariant?.discountPrice || primaryVariant?.price || 0;
-                  const hasDiscount = Boolean(primaryVariant?.discountPrice && primaryVariant.discountPrice < primaryVariant.price);
-                  const discountPercent = hasDiscount && oldPrice > 0 ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100) : 0;
-                  const sizeLabel = (primaryVariant as any)?.size || (primaryVariant?.name && !primaryVariant.name.toLowerCase().includes("default") ? primaryVariant.name : "");
+              {clearanceProducts.length === 0 ? (
+                <div style={{ padding: "35px 20px", textAlign: "center", color: "#64748b", backgroundColor: "#f8fafc", borderRadius: "12px", border: "1.5px dashed #e2e8f0", fontSize: "13px", fontWeight: "600" }}>
+                  Database Connected • Products will show here once added to database
+                </div>
+              ) : (
+                <div className="homepage-product-grid mobile-limit-2">
+                  {clearanceProducts.map((p) => {
+                    const primaryImage = p.images?.find((img) => img.isPrimary)?.url || p.images?.[0]?.url || "";
+                    const primaryVariant = p.variants?.[0];
+                    const oldPrice = primaryVariant?.price || 0;
+                    const currentPrice = primaryVariant?.discountPrice || primaryVariant?.price || 0;
+                    const hasDiscount = Boolean(primaryVariant?.discountPrice && primaryVariant.discountPrice < primaryVariant.price);
+                    const discountPercent = hasDiscount && oldPrice > 0 ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100) : 0;
+                    const sizeLabel = (primaryVariant as any)?.size || (primaryVariant?.name && !primaryVariant.name.toLowerCase().includes("default") ? primaryVariant.name : "");
 
-                  return (
-                    <div key={p.id} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
-                      {hasDiscount && discountPercent > 0 && (
-                        <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
-                          {discountPercent}% OFF
-                        </div>
-                      )}
-
-                      <div className={`wishlist-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)}>
-                        <svg fill={wishlist.includes(p.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-                        </svg>
-                      </div>
-                      <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
-                      </Link>
-                      <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
-                        <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                          {p.name}
-                        </Link>
-                        <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
-                          CLEARANCE
-                        </span>
-                        <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                          {hasDiscount && (
-                            <span className="old-price" style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "line-through", fontWeight: "600" }}>
-                              ৳{oldPrice.toFixed(2)}
-                            </span>
-                          )}
-                          <span className="price" style={{ fontSize: "16px", fontWeight: "800", color: "#e2136e" }}>
-                            ৳{currentPrice.toFixed(2)}
-                          </span>
-                        </div>
-                        <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
-                          ★ ★ ★ ★ ★
-                        </div>
-                        {sizeLabel && (
-                          <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
-                            {sizeLabel}
+                    return (
+                      <div key={p.id} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
+                        {hasDiscount && discountPercent > 0 && (
+                          <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
+                            {discountPercent}% OFF
                           </div>
                         )}
+
+                        <div className={`wishlist-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)}>
+                          <svg fill={wishlist.includes(p.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                          </svg>
+                        </div>
+                        <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
+                        </Link>
+                        <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
+                          <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                            {p.name}
+                          </Link>
+                          <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
+                            CLEARANCE
+                          </span>
+                          <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                            {hasDiscount && (
+                              <span className="old-price" style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "line-through", fontWeight: "600" }}>
+                                ৳{oldPrice.toFixed(2)}
+                              </span>
+                            )}
+                            <span className="price" style={{ fontSize: "16px", fontWeight: "800", color: "#e2136e" }}>
+                              ৳{currentPrice.toFixed(2)}
+                            </span>
+                          </div>
+                          <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
+                            ★ ★ ★ ★ ★
+                          </div>
+                          {sizeLabel && (
+                            <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
+                              {sizeLabel}
+                            </div>
+                          )}
+                        </div>
+                        <button className="add-to-cart-btn" onClick={() => handleAddToCart(p)} style={{ backgroundColor: "#581c87", color: "#ffffff", border: "none", padding: "12px", fontWeight: "800", fontSize: "13px", letterSpacing: "0.5px", cursor: "pointer", width: "100%", borderRadius: "0 0 12px 12px" }}>
+                          ADD TO CART
+                        </button>
                       </div>
-                      <button className="add-to-cart-btn" onClick={() => handleAddToCart(p)} style={{ backgroundColor: "#581c87", color: "#ffffff", border: "none", padding: "12px", fontWeight: "800", fontSize: "13px", letterSpacing: "0.5px", cursor: "pointer", width: "100%", borderRadius: "0 0 12px 12px" }}>
-                        ADD TO CART
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </section>
           );
         })()}
@@ -778,11 +663,11 @@ export default function Home() {
 
         {/* SKIN CARE Section */}
         {(() => {
-          const skincareProducts = products
+          const filtered = products
             .filter(p => p.category?.name?.toLowerCase().includes("skin") || p.name?.toLowerCase().includes("serum") || p.name?.toLowerCase().includes("cream") || p.name?.toLowerCase().includes("sunscreen") || p.name?.toLowerCase().includes("moisturizer") || p.name?.toLowerCase().includes("toner") || p.name?.toLowerCase().includes("face wash"))
             .slice(0, 4);
 
-          if (skincareProducts.length === 0) return null;
+          const skincareProducts = filtered.length > 0 ? filtered : products.slice(0, 4);
 
           return (
             <section style={{ margin: "40px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
@@ -795,65 +680,71 @@ export default function Home() {
                 </Link>
               </div>
 
-              <div className="homepage-product-grid mobile-limit-2">
-                {skincareProducts.map((p) => {
-                  const primaryImage = p.images?.find((img) => img.isPrimary)?.url || p.images?.[0]?.url || "";
-                  const primaryVariant = p.variants?.[0];
-                  const oldPrice = primaryVariant?.price || 0;
-                  const currentPrice = primaryVariant?.discountPrice || primaryVariant?.price || 0;
-                  const hasDiscount = Boolean(primaryVariant?.discountPrice && primaryVariant.discountPrice < primaryVariant.price);
-                  const discountPercent = hasDiscount && oldPrice > 0 ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100) : 0;
-                  const sizeLabel = (primaryVariant as any)?.size || (primaryVariant?.name && !primaryVariant.name.toLowerCase().includes("default") ? primaryVariant.name : "");
+              {skincareProducts.length === 0 ? (
+                <div style={{ padding: "35px 20px", textAlign: "center", color: "#64748b", backgroundColor: "#f8fafc", borderRadius: "12px", border: "1.5px dashed #e2e8f0", fontSize: "13px", fontWeight: "600" }}>
+                  Database Connected • Products will show here once added to database
+                </div>
+              ) : (
+                <div className="homepage-product-grid mobile-limit-2">
+                  {skincareProducts.map((p) => {
+                    const primaryImage = p.images?.find((img) => img.isPrimary)?.url || p.images?.[0]?.url || "";
+                    const primaryVariant = p.variants?.[0];
+                    const oldPrice = primaryVariant?.price || 0;
+                    const currentPrice = primaryVariant?.discountPrice || primaryVariant?.price || 0;
+                    const hasDiscount = Boolean(primaryVariant?.discountPrice && primaryVariant.discountPrice < primaryVariant.price);
+                    const discountPercent = hasDiscount && oldPrice > 0 ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100) : 0;
+                    const sizeLabel = (primaryVariant as any)?.size || (primaryVariant?.name && !primaryVariant.name.toLowerCase().includes("default") ? primaryVariant.name : "");
 
-                  return (
-                    <div key={p.id} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
-                      {hasDiscount && discountPercent > 0 && (
-                        <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
-                          {discountPercent}% OFF
-                        </div>
-                      )}
-
-                      <div className={`wishlist-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)}>
-                        <svg fill={wishlist.includes(p.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-                        </svg>
-                      </div>
-                      <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
-                      </Link>
-                      <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
-                        <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                          {p.name}
-                        </Link>
-                        <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
-                          SKIN CARE
-                        </span>
-                        <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                          {hasDiscount && (
-                            <span className="old-price" style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "line-through", fontWeight: "600" }}>
-                              ৳{oldPrice.toFixed(2)}
-                            </span>
-                          )}
-                          <span className="price" style={{ fontSize: "16px", fontWeight: "800", color: "#e2136e" }}>
-                            ৳{currentPrice.toFixed(2)}
-                          </span>
-                        </div>
-                        <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
-                          ★ ★ ★ ★ ★
-                        </div>
-                        {sizeLabel && (
-                          <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
-                            {sizeLabel}
+                    return (
+                      <div key={p.id} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
+                        {hasDiscount && discountPercent > 0 && (
+                          <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
+                            {discountPercent}% OFF
                           </div>
                         )}
+
+                        <div className={`wishlist-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)}>
+                          <svg fill={wishlist.includes(p.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                          </svg>
+                        </div>
+                        <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
+                        </Link>
+                        <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
+                          <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                            {p.name}
+                          </Link>
+                          <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
+                            SKIN CARE
+                          </span>
+                          <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                            {hasDiscount && (
+                              <span className="old-price" style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "line-through", fontWeight: "600" }}>
+                                ৳{oldPrice.toFixed(2)}
+                              </span>
+                            )}
+                            <span className="price" style={{ fontSize: "16px", fontWeight: "800", color: "#e2136e" }}>
+                              ৳{currentPrice.toFixed(2)}
+                            </span>
+                          </div>
+                          <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
+                            ★ ★ ★ ★ ★
+                          </div>
+                          {sizeLabel && (
+                            <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
+                              {sizeLabel}
+                            </div>
+                          )}
+                        </div>
+                        <button className="add-to-cart-btn" onClick={() => handleAddToCart(p)} style={{ backgroundColor: "#581c87", color: "#ffffff", border: "none", padding: "12px", fontWeight: "800", fontSize: "13px", letterSpacing: "0.5px", cursor: "pointer", width: "100%", borderRadius: "0 0 12px 12px" }}>
+                          ADD TO CART
+                        </button>
                       </div>
-                      <button className="add-to-cart-btn" onClick={() => handleAddToCart(p)} style={{ backgroundColor: "#581c87", color: "#ffffff", border: "none", padding: "12px", fontWeight: "800", fontSize: "13px", letterSpacing: "0.5px", cursor: "pointer", width: "100%", borderRadius: "0 0 12px 12px" }}>
-                        ADD TO CART
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </section>
           );
         })()}
@@ -905,11 +796,11 @@ export default function Home() {
 
         {/* BOGO Section */}
         {(() => {
-          const bogoProducts = products
-            .filter(p => p.category?.name?.toLowerCase().includes("bogo") || p.name?.toLowerCase().includes("bogo") || p.name?.toLowerCase().includes("buy 1") || p.campaignName === "BOGO")
+          const filtered = products
+            .filter(p => p.category?.name?.toLowerCase().includes("bogo") || p.name?.toLowerCase().includes("bogo") || p.name?.toLowerCase().includes("buy 1") || p.campaignName === "BOGO" || p.name?.toLowerCase().includes("combo") || p.name?.toLowerCase().includes("free"))
             .slice(0, 4);
 
-          if (bogoProducts.length === 0) return null;
+          const bogoProducts = filtered.length > 0 ? filtered : products.slice(0, 4);
 
           return (
             <section style={{ margin: "40px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
@@ -922,65 +813,71 @@ export default function Home() {
                 </Link>
               </div>
 
-              <div className="homepage-product-grid mobile-limit-2">
-                {bogoProducts.map((p) => {
-                  const primaryImage = p.images?.find((img) => img.isPrimary)?.url || p.images?.[0]?.url || "";
-                  const primaryVariant = p.variants?.[0];
-                  const oldPrice = primaryVariant?.price || 0;
-                  const currentPrice = primaryVariant?.discountPrice || primaryVariant?.price || 0;
-                  const hasDiscount = Boolean(primaryVariant?.discountPrice && primaryVariant.discountPrice < primaryVariant.price);
-                  const discountPercent = hasDiscount && oldPrice > 0 ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100) : 0;
-                  const sizeLabel = (primaryVariant as any)?.size || (primaryVariant?.name && !primaryVariant.name.toLowerCase().includes("default") ? primaryVariant.name : "");
+              {bogoProducts.length === 0 ? (
+                <div style={{ padding: "35px 20px", textAlign: "center", color: "#64748b", backgroundColor: "#f8fafc", borderRadius: "12px", border: "1.5px dashed #e2e8f0", fontSize: "13px", fontWeight: "600" }}>
+                  Database Connected • Products will show here once added to database
+                </div>
+              ) : (
+                <div className="homepage-product-grid mobile-limit-2">
+                  {bogoProducts.map((p) => {
+                    const primaryImage = p.images?.find((img) => img.isPrimary)?.url || p.images?.[0]?.url || "";
+                    const primaryVariant = p.variants?.[0];
+                    const oldPrice = primaryVariant?.price || 0;
+                    const currentPrice = primaryVariant?.discountPrice || primaryVariant?.price || 0;
+                    const hasDiscount = Boolean(primaryVariant?.discountPrice && primaryVariant.discountPrice < primaryVariant.price);
+                    const discountPercent = hasDiscount && oldPrice > 0 ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100) : 0;
+                    const sizeLabel = (primaryVariant as any)?.size || (primaryVariant?.name && !primaryVariant.name.toLowerCase().includes("default") ? primaryVariant.name : "");
 
-                  return (
-                    <div key={p.id} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
-                      {hasDiscount && discountPercent > 0 && (
-                        <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
-                          {discountPercent}% OFF
-                        </div>
-                      )}
-
-                      <div className={`wishlist-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)}>
-                        <svg fill={wishlist.includes(p.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-                        </svg>
-                      </div>
-                      <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
-                      </Link>
-                      <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
-                        <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                          {p.name}
-                        </Link>
-                        <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
-                          BOGO OFFER
-                        </span>
-                        <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                          {hasDiscount && (
-                            <span className="old-price" style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "line-through", fontWeight: "600" }}>
-                              ৳{oldPrice.toFixed(2)}
-                            </span>
-                          )}
-                          <span className="price" style={{ fontSize: "16px", fontWeight: "800", color: "#e2136e" }}>
-                            ৳{currentPrice.toFixed(2)}
-                          </span>
-                        </div>
-                        <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
-                          ★ ★ ★ ★ ★
-                        </div>
-                        {sizeLabel && (
-                          <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
-                            {sizeLabel}
+                    return (
+                      <div key={p.id} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
+                        {hasDiscount && discountPercent > 0 && (
+                          <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
+                            {discountPercent}% OFF
                           </div>
                         )}
+
+                        <div className={`wishlist-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)}>
+                          <svg fill={wishlist.includes(p.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                          </svg>
+                        </div>
+                        <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
+                        </Link>
+                        <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
+                          <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                            {p.name}
+                          </Link>
+                          <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
+                            BOGO OFFER
+                          </span>
+                          <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                            {hasDiscount && (
+                              <span className="old-price" style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "line-through", fontWeight: "600" }}>
+                                ৳{oldPrice.toFixed(2)}
+                              </span>
+                            )}
+                            <span className="price" style={{ fontSize: "16px", fontWeight: "800", color: "#e2136e" }}>
+                              ৳{currentPrice.toFixed(2)}
+                            </span>
+                          </div>
+                          <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
+                            ★ ★ ★ ★ ★
+                          </div>
+                          {sizeLabel && (
+                            <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
+                              {sizeLabel}
+                            </div>
+                          )}
+                        </div>
+                        <button className="add-to-cart-btn" onClick={() => handleAddToCart(p)} style={{ backgroundColor: "#581c87", color: "#ffffff", border: "none", padding: "12px", fontWeight: "800", fontSize: "13px", letterSpacing: "0.5px", cursor: "pointer", width: "100%", borderRadius: "0 0 12px 12px" }}>
+                          ADD TO CART
+                        </button>
                       </div>
-                      <button className="add-to-cart-btn" onClick={() => handleAddToCart(p)} style={{ backgroundColor: "#581c87", color: "#ffffff", border: "none", padding: "12px", fontWeight: "800", fontSize: "13px", letterSpacing: "0.5px", cursor: "pointer", width: "100%", borderRadius: "0 0 12px 12px" }}>
-                        ADD TO CART
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </section>
           );
         })()}
@@ -991,9 +888,7 @@ export default function Home() {
             .filter(p => (p.category?.name?.toLowerCase().includes("makeup") && !p.category?.name?.toLowerCase().includes("tool")) || p.name?.toLowerCase().includes("lipstick") || p.name?.toLowerCase().includes("mascara") || p.name?.toLowerCase().includes("powder") || p.name?.toLowerCase().includes("foundation") || p.name?.toLowerCase().includes("primer") || p.name?.toLowerCase().includes("gloss"))
             .slice(0, 4);
 
-          const makeupProducts = filtered.length > 0 ? filtered : DEFAULT_MAKEUP_PRODUCTS;
-
-          if (makeupProducts.length === 0) return null;
+          const makeupProducts = filtered.length > 0 ? filtered : products.slice(0, 4);
 
           return (
             <section style={{ margin: "40px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
@@ -1006,65 +901,71 @@ export default function Home() {
                 </Link>
               </div>
 
-              <div className="homepage-product-grid mobile-limit-2">
-                {makeupProducts.map((p) => {
-                  const primaryImage = p.images?.find((img) => img.isPrimary)?.url || p.images?.[0]?.url || "";
-                  const primaryVariant = p.variants?.[0];
-                  const oldPrice = primaryVariant?.price || 0;
-                  const currentPrice = primaryVariant?.discountPrice || primaryVariant?.price || 0;
-                  const hasDiscount = Boolean(primaryVariant?.discountPrice && primaryVariant.discountPrice < primaryVariant.price);
-                  const discountPercent = hasDiscount && oldPrice > 0 ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100) : 0;
-                  const sizeLabel = (primaryVariant as any)?.size || (primaryVariant?.name && !primaryVariant.name.toLowerCase().includes("default") ? primaryVariant.name : "");
+              {makeupProducts.length === 0 ? (
+                <div style={{ padding: "35px 20px", textAlign: "center", color: "#64748b", backgroundColor: "#f8fafc", borderRadius: "12px", border: "1.5px dashed #e2e8f0", fontSize: "13px", fontWeight: "600" }}>
+                  Database Connected • Products will show here once added to database
+                </div>
+              ) : (
+                <div className="homepage-product-grid mobile-limit-2">
+                  {makeupProducts.map((p) => {
+                    const primaryImage = p.images?.find((img) => img.isPrimary)?.url || p.images?.[0]?.url || "";
+                    const primaryVariant = p.variants?.[0];
+                    const oldPrice = primaryVariant?.price || 0;
+                    const currentPrice = primaryVariant?.discountPrice || primaryVariant?.price || 0;
+                    const hasDiscount = Boolean(primaryVariant?.discountPrice && primaryVariant.discountPrice < primaryVariant.price);
+                    const discountPercent = hasDiscount && oldPrice > 0 ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100) : 0;
+                    const sizeLabel = (primaryVariant as any)?.size || (primaryVariant?.name && !primaryVariant.name.toLowerCase().includes("default") ? primaryVariant.name : "");
 
-                  return (
-                    <div key={p.id} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
-                      {hasDiscount && discountPercent > 0 && (
-                        <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
-                          {discountPercent}% OFF
-                        </div>
-                      )}
-
-                      <div className={`wishlist-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)}>
-                        <svg fill={wishlist.includes(p.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-                        </svg>
-                      </div>
-                      <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
-                      </Link>
-                      <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
-                        <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                          {p.name}
-                        </Link>
-                        <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
-                          MAKEUP
-                        </span>
-                        <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                          {hasDiscount && (
-                            <span className="old-price" style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "line-through", fontWeight: "600" }}>
-                              ৳{oldPrice.toFixed(2)}
-                            </span>
-                          )}
-                          <span className="price" style={{ fontSize: "16px", fontWeight: "800", color: "#e2136e" }}>
-                            ৳{currentPrice.toFixed(2)}
-                          </span>
-                        </div>
-                        <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
-                          ★ ★ ★ ★ ★
-                        </div>
-                        {sizeLabel && (
-                          <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
-                            {sizeLabel}
+                    return (
+                      <div key={p.id} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
+                        {hasDiscount && discountPercent > 0 && (
+                          <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
+                            {discountPercent}% OFF
                           </div>
                         )}
+
+                        <div className={`wishlist-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)}>
+                          <svg fill={wishlist.includes(p.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                          </svg>
+                        </div>
+                        <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
+                        </Link>
+                        <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
+                          <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                            {p.name}
+                          </Link>
+                          <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
+                            MAKEUP
+                          </span>
+                          <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                            {hasDiscount && (
+                              <span className="old-price" style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "line-through", fontWeight: "600" }}>
+                                ৳{oldPrice.toFixed(2)}
+                              </span>
+                            )}
+                            <span className="price" style={{ fontSize: "16px", fontWeight: "800", color: "#e2136e" }}>
+                              ৳{currentPrice.toFixed(2)}
+                            </span>
+                          </div>
+                          <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
+                            ★ ★ ★ ★ ★
+                          </div>
+                          {sizeLabel && (
+                            <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
+                              {sizeLabel}
+                            </div>
+                          )}
+                        </div>
+                        <button className="add-to-cart-btn" onClick={() => handleAddToCart(p)} style={{ backgroundColor: "#581c87", color: "#ffffff", border: "none", padding: "12px", fontWeight: "800", fontSize: "13px", letterSpacing: "0.5px", cursor: "pointer", width: "100%", borderRadius: "0 0 12px 12px" }}>
+                          ADD TO CART
+                        </button>
                       </div>
-                      <button className="add-to-cart-btn" onClick={() => handleAddToCart(p)} style={{ backgroundColor: "#581c87", color: "#ffffff", border: "none", padding: "12px", fontWeight: "800", fontSize: "13px", letterSpacing: "0.5px", cursor: "pointer", width: "100%", borderRadius: "0 0 12px 12px" }}>
-                        ADD TO CART
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </section>
           );
         })()}
@@ -1096,8 +997,8 @@ export default function Home() {
 
         {/* PERFECT MATCH WITH COMBO Section */}
         {(() => {
-          const comboProducts = products
-            .filter(p => p.category?.name?.toLowerCase().includes("combo") || p.name?.toLowerCase().includes("combo") || p.campaignName === "COMBO")
+          const filtered = products
+            .filter(p => p.category?.name?.toLowerCase().includes("combo") || p.name?.toLowerCase().includes("combo") || p.campaignName === "COMBO" || p.name?.toLowerCase().includes("pack") || p.name?.toLowerCase().includes("set"))
             .sort((a, b) => {
               const discA = (a.variants?.[0]?.price || 0) - (a.variants?.[0]?.discountPrice || a.variants?.[0]?.price || 0);
               const discB = (b.variants?.[0]?.price || 0) - (b.variants?.[0]?.discountPrice || b.variants?.[0]?.price || 0);
@@ -1105,7 +1006,7 @@ export default function Home() {
             })
             .slice(0, 4);
 
-          if (comboProducts.length === 0) return null;
+          const comboProducts = filtered.length > 0 ? filtered : products.slice(0, 4);
 
           return (
             <section style={{ margin: "40px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
@@ -1118,65 +1019,71 @@ export default function Home() {
                 </Link>
               </div>
 
-              <div className="homepage-product-grid mobile-limit-2">
-                {comboProducts.map((p) => {
-                  const primaryImage = p.images?.find((img) => img.isPrimary)?.url || p.images?.[0]?.url || "";
-                  const primaryVariant = p.variants?.[0];
-                  const oldPrice = primaryVariant?.price || 0;
-                  const currentPrice = primaryVariant?.discountPrice || primaryVariant?.price || 0;
-                  const hasDiscount = Boolean(primaryVariant?.discountPrice && primaryVariant.discountPrice < primaryVariant.price);
-                  const discountPercent = hasDiscount && oldPrice > 0 ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100) : 0;
-                  const sizeLabel = (primaryVariant as any)?.size || (primaryVariant?.name && !primaryVariant.name.toLowerCase().includes("default") ? primaryVariant.name : "");
+              {comboProducts.length === 0 ? (
+                <div style={{ padding: "35px 20px", textAlign: "center", color: "#64748b", backgroundColor: "#f8fafc", borderRadius: "12px", border: "1.5px dashed #e2e8f0", fontSize: "13px", fontWeight: "600" }}>
+                  Database Connected • Products will show here once added to database
+                </div>
+              ) : (
+                <div className="homepage-product-grid mobile-limit-2">
+                  {comboProducts.map((p) => {
+                    const primaryImage = p.images?.find((img) => img.isPrimary)?.url || p.images?.[0]?.url || "";
+                    const primaryVariant = p.variants?.[0];
+                    const oldPrice = primaryVariant?.price || 0;
+                    const currentPrice = primaryVariant?.discountPrice || primaryVariant?.price || 0;
+                    const hasDiscount = Boolean(primaryVariant?.discountPrice && primaryVariant.discountPrice < primaryVariant.price);
+                    const discountPercent = hasDiscount && oldPrice > 0 ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100) : 0;
+                    const sizeLabel = (primaryVariant as any)?.size || (primaryVariant?.name && !primaryVariant.name.toLowerCase().includes("default") ? primaryVariant.name : "");
 
-                  return (
-                    <div key={p.id} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
-                      {hasDiscount && discountPercent > 0 && (
-                        <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
-                          {discountPercent}% OFF
-                        </div>
-                      )}
-
-                      <div className={`wishlist-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)}>
-                        <svg fill={wishlist.includes(p.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-                        </svg>
-                      </div>
-                      <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
-                      </Link>
-                      <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
-                        <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                          {p.name}
-                        </Link>
-                        <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
-                          COMBO
-                        </span>
-                        <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                          {hasDiscount && (
-                            <span className="old-price" style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "line-through", fontWeight: "600" }}>
-                              ৳{oldPrice.toFixed(2)}
-                            </span>
-                          )}
-                          <span className="price" style={{ fontSize: "16px", fontWeight: "800", color: "#e2136e" }}>
-                            ৳{currentPrice.toFixed(2)}
-                          </span>
-                        </div>
-                        <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
-                          ★ ★ ★ ★ <span style={{ color: "#cbd5e1" }}>★</span>
-                        </div>
-                        {sizeLabel && (
-                          <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
-                            {sizeLabel}
+                    return (
+                      <div key={p.id} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
+                        {hasDiscount && discountPercent > 0 && (
+                          <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
+                            {discountPercent}% OFF
                           </div>
                         )}
+
+                        <div className={`wishlist-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)}>
+                          <svg fill={wishlist.includes(p.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                          </svg>
+                        </div>
+                        <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
+                        </Link>
+                        <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
+                          <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                            {p.name}
+                          </Link>
+                          <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
+                            COMBO
+                          </span>
+                          <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                            {hasDiscount && (
+                              <span className="old-price" style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "line-through", fontWeight: "600" }}>
+                                ৳{oldPrice.toFixed(2)}
+                              </span>
+                            )}
+                            <span className="price" style={{ fontSize: "16px", fontWeight: "800", color: "#e2136e" }}>
+                              ৳{currentPrice.toFixed(2)}
+                            </span>
+                          </div>
+                          <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
+                            ★ ★ ★ ★ <span style={{ color: "#cbd5e1" }}>★</span>
+                          </div>
+                          {sizeLabel && (
+                            <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
+                              {sizeLabel}
+                            </div>
+                          )}
+                        </div>
+                        <button className="add-to-cart-btn" onClick={() => handleAddToCart(p)} style={{ backgroundColor: "#581c87", color: "#ffffff", border: "none", padding: "12px", fontWeight: "800", fontSize: "13px", letterSpacing: "0.5px", cursor: "pointer", width: "100%", borderRadius: "0 0 12px 12px" }}>
+                          ADD TO CART
+                        </button>
                       </div>
-                      <button className="add-to-cart-btn" onClick={() => handleAddToCart(p)} style={{ backgroundColor: "#581c87", color: "#ffffff", border: "none", padding: "12px", fontWeight: "800", fontSize: "13px", letterSpacing: "0.5px", cursor: "pointer", width: "100%", borderRadius: "0 0 12px 12px" }}>
-                        ADD TO CART
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </section>
           );
         })()}
@@ -1187,9 +1094,7 @@ export default function Home() {
             .filter(p => p.category?.name?.toLowerCase().includes("tool") || p.name?.toLowerCase().includes("brush") || p.name?.toLowerCase().includes("sponge") || p.name?.toLowerCase().includes("curler") || p.name?.toLowerCase().includes("applicator"))
             .slice(0, 4);
 
-          const toolProducts = filtered.length > 0 ? filtered : DEFAULT_TOOL_PRODUCTS;
-
-          if (toolProducts.length === 0) return null;
+          const toolProducts = filtered.length > 0 ? filtered : products.slice(0, 4);
 
           return (
             <section style={{ margin: "40px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
@@ -1202,65 +1107,71 @@ export default function Home() {
                 </Link>
               </div>
 
-              <div className="homepage-product-grid mobile-limit-2">
-                {toolProducts.map((p) => {
-                  const primaryImage = p.images?.find((img) => img.isPrimary)?.url || p.images?.[0]?.url || "";
-                  const primaryVariant = p.variants?.[0];
-                  const oldPrice = primaryVariant?.price || 0;
-                  const currentPrice = primaryVariant?.discountPrice || primaryVariant?.price || 0;
-                  const hasDiscount = Boolean(primaryVariant?.discountPrice && primaryVariant.discountPrice < primaryVariant.price);
-                  const discountPercent = hasDiscount && oldPrice > 0 ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100) : 0;
-                  const sizeLabel = (primaryVariant as any)?.size || (primaryVariant?.name && !primaryVariant.name.toLowerCase().includes("default") ? primaryVariant.name : "");
+              {toolProducts.length === 0 ? (
+                <div style={{ padding: "35px 20px", textAlign: "center", color: "#64748b", backgroundColor: "#f8fafc", borderRadius: "12px", border: "1.5px dashed #e2e8f0", fontSize: "13px", fontWeight: "600" }}>
+                  Database Connected • Products will show here once added to database
+                </div>
+              ) : (
+                <div className="homepage-product-grid mobile-limit-2">
+                  {toolProducts.map((p) => {
+                    const primaryImage = p.images?.find((img) => img.isPrimary)?.url || p.images?.[0]?.url || "";
+                    const primaryVariant = p.variants?.[0];
+                    const oldPrice = primaryVariant?.price || 0;
+                    const currentPrice = primaryVariant?.discountPrice || primaryVariant?.price || 0;
+                    const hasDiscount = Boolean(primaryVariant?.discountPrice && primaryVariant.discountPrice < primaryVariant.price);
+                    const discountPercent = hasDiscount && oldPrice > 0 ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100) : 0;
+                    const sizeLabel = (primaryVariant as any)?.size || (primaryVariant?.name && !primaryVariant.name.toLowerCase().includes("default") ? primaryVariant.name : "");
 
-                  return (
-                    <div key={p.id} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
-                      {hasDiscount && discountPercent > 0 && (
-                        <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
-                          {discountPercent}% OFF
-                        </div>
-                      )}
-
-                      <div className={`wishlist-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)}>
-                        <svg fill={wishlist.includes(p.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-                        </svg>
-                      </div>
-                      <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
-                      </Link>
-                      <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
-                        <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                          {p.name}
-                        </Link>
-                        <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
-                          MAKEUP TOOLS
-                        </span>
-                        <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                          {hasDiscount && (
-                            <span className="old-price" style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "line-through", fontWeight: "600" }}>
-                              ৳{oldPrice.toFixed(2)}
-                            </span>
-                          )}
-                          <span className="price" style={{ fontSize: "16px", fontWeight: "800", color: "#e2136e" }}>
-                            ৳{currentPrice.toFixed(2)}
-                          </span>
-                        </div>
-                        <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
-                          ★ ★ ★ ★ ★
-                        </div>
-                        {sizeLabel && (
-                          <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
-                            {sizeLabel}
+                    return (
+                      <div key={p.id} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
+                        {hasDiscount && discountPercent > 0 && (
+                          <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
+                            {discountPercent}% OFF
                           </div>
                         )}
+
+                        <div className={`wishlist-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)}>
+                          <svg fill={wishlist.includes(p.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                          </svg>
+                        </div>
+                        <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
+                        </Link>
+                        <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
+                          <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                            {p.name}
+                          </Link>
+                          <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
+                            MAKEUP TOOLS
+                          </span>
+                          <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                            {hasDiscount && (
+                              <span className="old-price" style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "line-through", fontWeight: "600" }}>
+                                ৳{oldPrice.toFixed(2)}
+                              </span>
+                            )}
+                            <span className="price" style={{ fontSize: "16px", fontWeight: "800", color: "#e2136e" }}>
+                              ৳{currentPrice.toFixed(2)}
+                            </span>
+                          </div>
+                          <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
+                            ★ ★ ★ ★ ★
+                          </div>
+                          {sizeLabel && (
+                            <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
+                              {sizeLabel}
+                            </div>
+                          )}
+                        </div>
+                        <button className="add-to-cart-btn" onClick={() => handleAddToCart(p)} style={{ backgroundColor: "#581c87", color: "#ffffff", border: "none", padding: "12px", fontWeight: "800", fontSize: "13px", letterSpacing: "0.5px", cursor: "pointer", width: "100%", borderRadius: "0 0 12px 12px" }}>
+                          ADD TO CART
+                        </button>
                       </div>
-                      <button className="add-to-cart-btn" onClick={() => handleAddToCart(p)} style={{ backgroundColor: "#581c87", color: "#ffffff", border: "none", padding: "12px", fontWeight: "800", fontSize: "13px", letterSpacing: "0.5px", cursor: "pointer", width: "100%", borderRadius: "0 0 12px 12px" }}>
-                        ADD TO CART
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </section>
           );
         })()}
@@ -1342,9 +1253,7 @@ export default function Home() {
             .filter(p => p.category?.name?.toLowerCase().includes("hair") || p.name?.toLowerCase().includes("hair") || p.name?.toLowerCase().includes("shampoo") || p.name?.toLowerCase().includes("conditioner"))
             .slice(0, 4);
 
-          const hairProducts = filtered.length > 0 ? filtered : DEFAULT_HAIR_PRODUCTS;
-
-          if (hairProducts.length === 0) return null;
+          const hairProducts = filtered.length > 0 ? filtered : products.slice(0, 4);
 
           return (
             <section style={{ margin: "40px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
@@ -1357,65 +1266,71 @@ export default function Home() {
                 </Link>
               </div>
 
-              <div className="homepage-product-grid mobile-limit-2">
-                {hairProducts.map((p, idx) => {
-                  const primaryImage = p.images?.find((img) => img.isPrimary)?.url || p.images?.[0]?.url || "";
-                  const primaryVariant = p.variants?.[0];
-                  const oldPrice = primaryVariant?.price || 0;
-                  const currentPrice = primaryVariant?.discountPrice || primaryVariant?.price || 0;
-                  const hasDiscount = Boolean(primaryVariant?.discountPrice && primaryVariant.discountPrice < primaryVariant.price);
-                  const discountPercent = hasDiscount && oldPrice > 0 ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100) : 0;
-                  const sizeLabel = (primaryVariant as any)?.size || (primaryVariant?.name && !primaryVariant.name.toLowerCase().includes("default") ? primaryVariant.name : "");
+              {hairProducts.length === 0 ? (
+                <div style={{ padding: "35px 20px", textAlign: "center", color: "#64748b", backgroundColor: "#f8fafc", borderRadius: "12px", border: "1.5px dashed #e2e8f0", fontSize: "13px", fontWeight: "600" }}>
+                  Database Connected • Products will show here once added to database
+                </div>
+              ) : (
+                <div className="homepage-product-grid mobile-limit-2">
+                  {hairProducts.map((p, idx) => {
+                    const primaryImage = p.images?.find((img) => img.isPrimary)?.url || p.images?.[0]?.url || "";
+                    const primaryVariant = p.variants?.[0];
+                    const oldPrice = primaryVariant?.price || 0;
+                    const currentPrice = primaryVariant?.discountPrice || primaryVariant?.price || 0;
+                    const hasDiscount = Boolean(primaryVariant?.discountPrice && primaryVariant.discountPrice < primaryVariant.price);
+                    const discountPercent = hasDiscount && oldPrice > 0 ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100) : 0;
+                    const sizeLabel = (primaryVariant as any)?.size || (primaryVariant?.name && !primaryVariant.name.toLowerCase().includes("default") ? primaryVariant.name : "");
 
-                  return (
-                    <div key={p.id ? `${p.id}-${idx}` : idx} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
-                      {hasDiscount && discountPercent > 0 && (
-                        <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
-                          {discountPercent}% OFF
-                        </div>
-                      )}
-
-                      <div className={`wishlist-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)}>
-                        <svg fill={wishlist.includes(p.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-                        </svg>
-                      </div>
-                      <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
-                      </Link>
-                      <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
-                        <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                          {p.name}
-                        </Link>
-                        <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
-                          HAIR CARE
-                        </span>
-                        <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                          {hasDiscount && (
-                            <span className="old-price" style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "line-through", fontWeight: "600" }}>
-                              ৳{oldPrice.toFixed(2)}
-                            </span>
-                          )}
-                          <span className="price" style={{ fontSize: "16px", fontWeight: "800", color: "#e2136e" }}>
-                            ৳{currentPrice.toFixed(2)}
-                          </span>
-                        </div>
-                        <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
-                          ★ ★ ★ ★ ★
-                        </div>
-                        {sizeLabel && (
-                          <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
-                            {sizeLabel}
+                    return (
+                      <div key={p.id ? `${p.id}-${idx}` : idx} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
+                        {hasDiscount && discountPercent > 0 && (
+                          <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
+                            {discountPercent}% OFF
                           </div>
                         )}
+
+                        <div className={`wishlist-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)}>
+                          <svg fill={wishlist.includes(p.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                          </svg>
+                        </div>
+                        <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <img src={primaryImage} alt={p.name} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
+                        </Link>
+                        <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
+                          <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                            {p.name}
+                          </Link>
+                          <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
+                            HAIR CARE
+                          </span>
+                          <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                            {hasDiscount && (
+                              <span className="old-price" style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "line-through", fontWeight: "600" }}>
+                                ৳{oldPrice.toFixed(2)}
+                              </span>
+                            )}
+                            <span className="price" style={{ fontSize: "16px", fontWeight: "800", color: "#e2136e" }}>
+                              ৳{currentPrice.toFixed(2)}
+                            </span>
+                          </div>
+                          <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
+                            ★ ★ ★ ★ ★
+                          </div>
+                          {sizeLabel && (
+                            <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
+                              {sizeLabel}
+                            </div>
+                          )}
+                        </div>
+                        <button className="add-to-cart-btn" onClick={() => handleAddToCart(p)} style={{ backgroundColor: "#581c87", color: "#ffffff", border: "none", padding: "12px", fontWeight: "800", fontSize: "13px", letterSpacing: "0.5px", cursor: "pointer", width: "100%", borderRadius: "0 0 12px 12px" }}>
+                          ADD TO CART
+                        </button>
                       </div>
-                      <button className="add-to-cart-btn" onClick={() => handleAddToCart(p)} style={{ backgroundColor: "#581c87", color: "#ffffff", border: "none", padding: "12px", fontWeight: "800", fontSize: "13px", letterSpacing: "0.5px", cursor: "pointer", width: "100%", borderRadius: "0 0 12px 12px" }}>
-                        ADD TO CART
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </section>
           );
         })()}

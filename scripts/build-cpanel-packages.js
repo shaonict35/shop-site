@@ -62,9 +62,10 @@ const backendZipPath = path.join(deployDir, 'glowgoodly-backend-cpanel.zip');
 if (fs.existsSync(backendZipPath)) fs.unlinkSync(backendZipPath);
 
 try {
-  execSync(`powershell -Command "Compress-Archive -Path '${backendStageDir}\\*' -DestinationPath '${backendZipPath}' -Force"`, { stdio: 'inherit' });
+  execSync(`tar -a -c -f "${backendZipPath}" -C "${backendStageDir}" .`, { stdio: 'inherit' });
 } catch (e) {
   console.log('Using fallback zip command');
+  execSync(`powershell -Command "Compress-Archive -Path '${backendStageDir}\\*' -DestinationPath '${backendZipPath}' -Force"`, { stdio: 'inherit' });
 }
 fs.rmSync(backendStageDir, { recursive: true, force: true });
 
@@ -78,7 +79,11 @@ if (fs.existsSync(frontendZipPath)) {
 }
 
 if (fs.existsSync(outDir)) {
-  execSync(`powershell -Command "$items = (Get-ChildItem -LiteralPath '${outDir}' -Force).FullName; Compress-Archive -LiteralPath $items -DestinationPath '${frontendZipPath}' -Force"`, { stdio: 'inherit' });
+  try {
+    execSync(`tar -a -c -f "${frontendZipPath}" -C "${outDir}" .`, { stdio: 'inherit' });
+  } catch (e) {
+    execSync(`powershell -Command "$items = (Get-ChildItem -LiteralPath '${outDir}' -Force).FullName; Compress-Archive -LiteralPath $items -DestinationPath '${frontendZipPath}' -Force"`, { stdio: 'inherit' });
+  }
 } else {
   console.log('ℹ️ Static "out" directory not found. Packaging as Next.js SSR App for cPanel Node.js Selector...');
   const frontendStageDir = path.join(deployDir, 'frontend_staging');

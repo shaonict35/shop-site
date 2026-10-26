@@ -2,11 +2,12 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -40,7 +41,7 @@ model Address {
 model Brand {
   id         String    @id @default(uuid())
   name       String    @unique
-  logoUrl    String?  
+  logoUrl    String?   @db.LongText
   isTopBrand Boolean   @default(false)
   products   Product[]
   createdAt  DateTime  @default(now())
@@ -50,7 +51,7 @@ model Brand {
 model Category {
   id            String     @id @default(uuid())
   name          String     @unique
-  imageUrl      String?   
+  imageUrl      String?    @db.LongText
   parentId      String?    // For Sub-categories
   parent        Category?  @relation("SubCategories", fields: [parentId], references: [id], onDelete: Cascade)
   subCategories Category[] @relation("SubCategories")
@@ -90,7 +91,7 @@ model ProductImage {
   id        String   @id @default(uuid())
   productId String
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  url       String  
+  url       String   @db.LongText
   isPrimary Boolean  @default(false)
   createdAt DateTime @default(now())
 
@@ -109,7 +110,7 @@ model Variant {
   costPrice     Float?         // Purchase price
   stock         Int            @default(0)
   sku           String         @unique
-  imageUrl      String?       
+  imageUrl      String?        @db.LongText
   orderItems    OrderItem[]
   inventoryLogs InventoryLog[]
   createdAt     DateTime       @default(now())
@@ -192,9 +193,9 @@ model Review {
 model PromoBanner {
   id             String   @id @default(uuid())
   title          String   // Used as alt text and aria-label (SEO friendly)
-  imageUrl       String   // Full-width desktop banner image URL (supports base64 images)
-  mobileImageUrl String?  // Mobile version banner image URL
-  tabletImageUrl String?  // Tablet version banner image URL
+  imageUrl       String   @db.LongText // Full-width desktop banner image URL (supports base64 images)
+  mobileImageUrl String?  @db.LongText // Mobile version banner image URL
+  tabletImageUrl String?  @db.LongText // Tablet version banner image URL
   linkUrl        String?  // Optional click-through link
   bgColor        String   @default("#1a1a2e") // Fallback background color
   page           String   @default("Homepage") // Homepage, Hair Care 101, Skin Care 101, Makeup 101

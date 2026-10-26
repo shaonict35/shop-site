@@ -147,7 +147,7 @@ router.post("/execute-payment", async (req: Request, res: Response) => {
       }
     }
 
-    // Save/Update order status in Firestore / SQLite DB if orderId provided
+    // Save/Update order status in Firestore / MySQL DB if orderId provided
     if (orderId && db) {
       try {
         const orderQuery = await db.collection("orders").where("orderNumber", "==", orderId).get();

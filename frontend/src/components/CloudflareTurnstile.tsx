@@ -13,24 +13,18 @@ export default function CloudflareTurnstile({
   onExpire,
   siteKey = "6LfFxbMtAAAAAEYjy9I2zALRD-VTo6mOsjEWl-vd"
 }: CloudflareTurnstileProps) {
-  const [isVerified, setIsVerified] = useState(true);
+  const [isVerified, setIsVerified] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
 
-  // Auto-verify on mount so user is never blocked, but keep interactive toggle
-  useEffect(() => {
-    const generatedToken = "cf_turnstile_verified_" + Date.now() + "_" + Math.random().toString(36).substring(2, 10);
-    onVerify(generatedToken);
-  }, []);
-
   const handleManualClick = () => {
-    if (isVerified) return;
+    if (isVerified || isChecking) return;
     setIsChecking(true);
     setTimeout(() => {
       setIsChecking(false);
       setIsVerified(true);
       const generatedToken = "cf_turnstile_verified_" + Date.now() + "_" + Math.random().toString(36).substring(2, 10);
       onVerify(generatedToken);
-    }, 400);
+    }, 600);
   };
 
   return (

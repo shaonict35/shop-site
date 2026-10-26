@@ -11,7 +11,7 @@ async function resetAdmin() {
   const newPassword = "Shaonerbou01";
   const passwordHash = await bcrypt.hash(newPassword, 10);
 
-  // 1. Update/Create in SQLite (Prisma)
+  // 1. Update/Create in MySQL (Prisma)
   await prisma.user.upsert({
     where: { email: adminEmail },
     update: {

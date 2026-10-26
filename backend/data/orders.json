@@ -1,0 +1,49 @@
+[
+  {
+    "id": "mock-id-1793029086747-7waolu4qr",
+    "orderNumber": "POS-261026-6934",
+    "orderSource": "Offline / POS / Showroom",
+    "isOffline": true,
+    "customerId": null,
+    "customerName": "Rahim Ahmed",
+    "customerPhone": "01711223344",
+    "customerEmail": "",
+    "address": "Dhanmondi, Dhaka",
+    "zone": "Showroom / Counter",
+    "deliveryCharge": 0,
+    "subTotal": 2500,
+    "discount": 200,
+    "total": 2300,
+    "paymentMethod": "Cash",
+    "paymentStatus": "Paid",
+    "orderStatus": "Delivered",
+    "cashReceived": 2500,
+    "changeDue": 200,
+    "notes": "In-store customer purchased in counter",
+    "staffName": "admin@glowgoodly.com",
+    "orderItems": [
+      {
+        "productId": "",
+        "variantId": "",
+        "productName": "Matte Liquid Lipstick",
+        "variantName": "Red Ruby",
+        "quantity": 2,
+        "price": 650,
+        "total": 1300,
+        "imageUrl": ""
+      },
+      {
+        "productId": "",
+        "variantId": "",
+        "productName": "Hydrating Face Serum",
+        "variantName": "30ml",
+        "quantity": 1,
+        "price": 1200,
+        "total": 1200,
+        "imageUrl": ""
+      }
+    ],
+    "createdAt": "2026-10-26T15:38:06.746Z",
+    "updatedAt": "2026-10-26T15:38:06.746Z"
+  }
+]

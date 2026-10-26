@@ -13,6 +13,9 @@ function ThankYouContent() {
   const orderNumber = searchParams.get("orderNumber") || "GG-ORDER-99214";
   const total = searchParams.get("total") || "0.00";
 
+  const email = searchParams.get("email");
+  const phone = searchParams.get("phone");
+
   React.useEffect(() => {
     if (typeof window !== "undefined" && (window as any).fbq) {
       console.log(`[Meta Pixel Tracking] Purchase Event Fired: Order #${orderNumber}, Value: ${total} BDT`);
@@ -53,8 +56,33 @@ function ThankYouContent() {
           Thank You For Your Order!
         </h1>
         <p style={{ fontSize: "15px", color: "#4a5568", fontWeight: "600", marginTop: "8px", maxWidth: "600px" }}>
-          Your beauty items are already being processed. A confirmation email and tracking link will be sent to you shortly.
+          আপনার অর্ডারটি সফলভাবে গৃহীত হয়েছে। ইনভয়েস ও রসিদ আপনার ইমেইলে পাঠিয়ে দেওয়া হয়েছে।
         </p>
+      </div>
+
+      {/* Confirmation Banners */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%", maxWidth: "520px" }}>
+        {/* Email Dispatched Notification */}
+        <div style={{ backgroundColor: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: "12px", padding: "14px 18px", display: "flex", alignItems: "center", gap: "14px", textAlign: "left" }}>
+          <div style={{ fontSize: "26px" }}>✉️</div>
+          <div>
+            <p style={{ margin: 0, fontSize: "13.5px", fontWeight: "800", color: "#166534" }}>অর্ডার নিশ্চিতকরণ ইমেইল পাঠানো হয়েছে</p>
+            <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#15803d", lineHeight: "1.4" }}>
+              ইনভয়েস রসিদ {email ? <strong>{email}</strong> : "আপনার ইমেইলে"} পাঠানো হয়েছে। অনুগ্রহ করে ইনবক্স বা স্প্যাম ফোল্ডার চেক করুন।
+            </p>
+          </div>
+        </div>
+
+        {/* Automated Call Notification */}
+        <div style={{ backgroundColor: "#eff6ff", border: "1.5px solid #93c5fd", borderRadius: "12px", padding: "14px 18px", display: "flex", alignItems: "center", gap: "14px", textAlign: "left" }}>
+          <div style={{ fontSize: "26px" }}>📞</div>
+          <div>
+            <p style={{ margin: 0, fontSize: "13.5px", fontWeight: "800", color: "#1e40af" }}>স্বয়ংক্রিয় ভয়েস কল কনফার্মেশন শুরু হয়েছে</p>
+            <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#1d4ed8", lineHeight: "1.4" }}>
+              আপনার মোবাইল নাম্বার {phone ? <strong>{phone}</strong> : ""} এ আমাদের সিস্টেম থেকে স্বয়ংক্রিয় ভেরিফিকেশন কল দেওয়া হচ্ছে।
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Order Info Card */}

@@ -1,0 +1,44 @@
+[
+  {
+    "slug": "seasonal-offer",
+    "title": "বিশেষ অফারে অরিজিনাল বিউটি কম্বো প্যাকেজ!",
+    "subtitle": "সীমিত সময়ের জন্য ছাড়! ১০০% অরিজিনাল প্রোডাক্ট দ্রুত ক্যাশ অন ডেলিভারিতে পান।",
+    "videoUrl": "",
+    "facebookGroupUrl": "https://www.facebook.com/groups/675430693128442",
+    "productTitle": "প্রিমিয়াম বিউটি ও স্কিনকেয়ার গ্লো সেট",
+    "productPrice": "1250",
+    "originalPrice": "1850",
+    "productImages": [
+      "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&auto=format&fit=crop&q=80"
+    ],
+    "description": "আমাদের এই বিশেষ প্যাকেজে রয়েছে ত্বকের যত্ন ও উজ্জ্বলতার জন্য প্রয়োজনীয় প্রিমিয়াম উপাদান। নিয়মিত ব্যবহারে পাবেন দাগহীন, উজ্জ্বল ও সতেজ ত্বক।",
+    "bulletPoints": "১০০% অরিজিনাল প্রোডাক্ট|ত্বক হবে সতেজ ও উজ্জ্বল|কোনো সাইড ইফেক্ট নেই|সারাদেশে ক্যাশ অন ডেলিভারি",
+    "insideDhakaShipping": "70",
+    "subAreaShipping": "100",
+    "outsideDhakaShipping": "130",
+    "isActive": true,
+    "createdAt": "2026-10-12T17:30:01.451Z",
+    "updatedAt": "2026-10-12T17:30:01.451Z"
+  },
+  {
+    "slug": "glow-special-deal",
+    "title": "গ্লো স্পেশাল ভ্যালেন্টাইন কম্বো অফার",
+    "subtitle": "সীমিত সময়ের জন্য সুপার ডিসকাউন্ট!",
+    "productTitle": "গ্লো বিউটি কম্বো সেট",
+    "productPrice": "1450",
+    "originalPrice": "2100",
+    "productImages": [
+      "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800"
+    ],
+    "videoUrl": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "facebookGroupUrl": "https://www.facebook.com/groups/675430693128442",
+    "bulletPoints": "১০০% অথেনটিক|দ্রুত হোম ডেলিভারি",
+    "description": "বিশেষ যত্ন ও গ্লোয়িং লুকের জন্য সম্পূর্ণ কম্বো।",
+    "insideDhakaShipping": "70",
+    "subAreaShipping": "100",
+    "outsideDhakaShipping": "130",
+    "isActive": true,
+    "updatedAt": "2026-10-12T17:30:17.144Z",
+    "createdAt": "2026-10-12T17:30:17.144Z"
+  }
+]

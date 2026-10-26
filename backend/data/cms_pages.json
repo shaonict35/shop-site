@@ -1,0 +1,65 @@
+[
+  {
+    "id": "about",
+    "slug": "about",
+    "title": "Our Story",
+    "contentHtml": "\n      <h2>Welcome to GlowGoodly Bangladesh</h2>\n      <p>GlowGoodly is Bangladesh's premier luxury beauty and cosmetics destination. We are committed to providing 100% authentic international skincare, hair care, personal care, and makeup products directly to your doorstep.</p>\n      <h3>Our Vision</h3>\n      <p>To empower every individual with genuine, cruelty-free, and clinically safe beauty solutions that suit South Asian skin tones and concerns.</p>\n      <ul style=\"line-height: 2;\">\n        <li><strong>Over 400+ Exclusive Global Brands:</strong> COSRX, The Ordinary, CeraVe, Beauty of Joseon, L'Oreal, and more.</li>\n        <li><strong>15,000+ Verified Authentic Products:</strong> Directly imported from brand headquarters worldwide.</li>\n        <li><strong>Fast 24-48h Express Delivery:</strong> Reliable fulfillment across Dhaka and all 64 districts.</li>\n      </ul>\n\n      <div style=\"margin-top: 30px; background-color: #fff0f4; padding: 24px; border-radius: 12px; border-left: 5px solid #e63b7a;\">\n        <h3 style=\"color: #e63b7a; font-size: 18px; font-weight: 800; margin-top: 0; text-transform: uppercase;\">\n          Our Promises (আমাদের অঙ্গীকার)\n        </h3>\n        <ul style=\"line-height: 2; margin-bottom: 0; padding-left: 20px;\">\n          <li><strong>1. 100% Authentic & Genuine Products:</strong> We work directly with verified brands and authorized distributors.</li>\n          <li><strong>2. Fast Nationwide Delivery:</strong> Inside Dhaka ৳70, Sub Area (Keraniganj, Savar, Gazipur, Narayanganj) ৳100, Outside Dhaka ৳130.</li>\n          <li><strong>3. Hassle-Free 7-Day Return Policy:</strong> Easy return and instant store replacement for any defective or damaged items.</li>\n          <li><strong>4. Safe & Secure Payments:</strong> bKash Direct Merchant & Bangla QR Payment (01609013011) along with Cash on Delivery.</li>\n          <li><strong>5. 24/7 Dedicated Customer Support:</strong> Always here to assist you with order inquiries and personalized beauty advice.</li>\n        </ul>\n      </div>\n    ",
+    "updatedAt": "2026-10-26T15:57:13.811Z"
+  },
+  {
+    "id": "authenticity",
+    "slug": "authenticity",
+    "title": "100% Authenticity Guarantee",
+    "contentHtml": "\n      <h2>Zero Tolerance For Counterfeit Products</h2>\n      <p>Every product sold on GlowGoodly is sourced directly from authorized brand distributors or brand headquarters worldwide. We take authenticity very seriously.</p>\n      <h3>How We Verify Integrity:</h3>\n      <ul style=\"line-height: 2;\">\n        <li><strong>Direct Supply Chain Partnerships:</strong> Sourced directly from manufacturers and verified distributors.</li>\n        <li><strong>Original Batch Numbers & Hologram Seals:</strong> Product verification codes intact on every single item.</li>\n        <li><strong>100% Money-Back Guarantee:</strong> Full cash refund if any item fails authenticity inspection.</li>\n      </ul>\n    ",
+    "updatedAt": "2026-10-26T15:57:21.963Z"
+  },
+  {
+    "id": "shipping-delivery",
+    "slug": "shipping-delivery",
+    "title": "Shipping & Delivery Policy",
+    "contentHtml": "\n      <h2>Delivery Charges & Delivery Timeframes</h2>\n      <p>We deliver nationwide across Bangladesh using fast express courier services. Below are our standard delivery zones and charges:</p>\n      <table style=\"width: 100%; border-collapse: collapse; margin: 20px 0; border: 1px solid #cbd5e1;\">\n        <tr style=\"background-color: #f1f5f9; text-align: left;\">\n          <th style=\"padding: 12px; border: 1px solid #cbd5e1; font-weight: 800;\">Delivery Zone</th>\n          <th style=\"padding: 12px; border: 1px solid #cbd5e1; font-weight: 800;\">Coverage Areas</th>\n          <th style=\"padding: 12px; border: 1px solid #cbd5e1; font-weight: 800;\">Delivery Fee</th>\n          <th style=\"padding: 12px; border: 1px solid #cbd5e1; font-weight: 800;\">Estimated Time</th>\n        </tr>\n        <tr>\n          <td style=\"padding: 12px; border: 1px solid #cbd5e1; font-weight: 700;\">Inside Dhaka City</td>\n          <td style=\"padding: 12px; border: 1px solid #cbd5e1;\">Dhaka Metropolitan Areas</td>\n          <td style=\"padding: 12px; border: 1px solid #cbd5e1; color: #e63b7a; font-weight: 800;\">৳70</td>\n          <td style=\"padding: 12px; border: 1px solid #cbd5e1;\">24 - 48 Hours</td>\n        </tr>\n        <tr>\n          <td style=\"padding: 12px; border: 1px solid #cbd5e1; font-weight: 700;\">Sub Area</td>\n          <td style=\"padding: 12px; border: 1px solid #cbd5e1; font-weight: 600; color: #0f172a;\">Keraniganj, Savar, Gazipur, Narayanganj</td>\n          <td style=\"padding: 12px; border: 1px solid #cbd5e1; color: #e63b7a; font-weight: 800;\">৳100</td>\n          <td style=\"padding: 12px; border: 1px solid #cbd5e1;\">2 - 3 Business Days</td>\n        </tr>\n        <tr>\n          <td style=\"padding: 12px; border: 1px solid #cbd5e1; font-weight: 700;\">Outside Dhaka</td>\n          <td style=\"padding: 12px; border: 1px solid #cbd5e1;\">All Other 63 Districts</td>\n          <td style=\"padding: 12px; border: 1px solid #cbd5e1; color: #e63b7a; font-weight: 800;\">৳130</td>\n          <td style=\"padding: 12px; border: 1px solid #cbd5e1;\">2 - 4 Business Days</td>\n        </tr>\n      </table>\n      <h3>Important Delivery Notice:</h3>\n      <p style=\"color: #be123c; font-weight: 700; background-color: #ffe4e6; padding: 12px; borderRadius: 8px;\">\n        ⚠️ For orders exceeding ৳1,000 outside Dhaka City & Sub Areas (Keraniganj, Savar, Gazipur, Narayanganj), Cash on Delivery (COD) is unavailable. Please select Bangla QR during checkout to complete your purchase.\n      </p>\n    ",
+    "updatedAt": "2026-10-26T15:57:30.131Z"
+  },
+  {
+    "id": "refund-policy",
+    "slug": "refund-policy",
+    "title": "Refund & Return Policy",
+    "contentHtml": "\n      <h2>Hassle-Free 7-Day Return Policy</h2>\n      <p>Customer satisfaction is our highest priority. If you receive a damaged, defective, or incorrect product, you can request a return or full refund within 7 days of receiving your order.</p>\n      <h3>Return Guidelines & Conditions:</h3>\n      <ul style=\"line-height: 2;\">\n        <li><strong>Original Packaging Intact:</strong> Product seal, box, and stickers must be unopened and undamaged.</li>\n        <li><strong>Unboxing Proof:</strong> An unboxing video or photo taken at the time of delivery is required for transit damage claims.</li>\n        <li><strong>Fast Refunds:</strong> Refunds are processed back to your bKash, Nagad, or Bank Account within 3 business days of return inspection.</li>\n      </ul>\n    ",
+    "updatedAt": "2026-10-26T15:57:38.312Z"
+  },
+  {
+    "id": "terms",
+    "slug": "terms",
+    "title": "Terms & Conditions",
+    "contentHtml": "\n      <h2>GlowGoodly Terms of Service</h2>\n      <p>Welcome to GlowGoodly. By browsing or placing an order on our platform, you agree to comply with our store terms and guidelines.</p>\n      <h3>Pricing & Currency</h3>\n      <p>All prices listed on GlowGoodly are in Bangladeshi Taka (BDT) and inclusive of applicable taxes. Prices are subject to change without prior notice during special campaigns.</p>\n      <h3>Cash on Delivery (COD) Policy & ৳1,000 Threshold Condition</h3>\n      <p style=\"background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 14px; borderRadius: 6px; font-weight: 700; color: #991b1b;\">\n        Cash on Delivery (COD) is available up to ৳1,000 for Outside Dhaka and Sub Area deliveries (Keraniganj, Savar, Gazipur, Narayanganj). Orders exceeding ৳1,000 outside Dhaka / Sub Areas require advance digital payment via Bangla QR.\n      </p>\n    ",
+    "updatedAt": "2026-10-26T15:57:46.428Z"
+  },
+  {
+    "id": "privacy-policy",
+    "slug": "privacy-policy",
+    "title": "Privacy Policy",
+    "contentHtml": "\n      <h2>Your Data Security & Privacy Protection</h2>\n      <p>GlowGoodly respects your personal data. We collect customer name, mobile number, and shipping address solely for processing your orders and fulfilling deliveries.</p>\n      <h3>Data Confidentiality:</h3>\n      <ul style=\"line-height: 2;\">\n        <li>We never sell or share your personal contact details with unauthorized third parties.</li>\n        <li>All digital payment transactions (Bangla QR, bKash, Nagad, SSLCommerz) are processed securely through end-to-end encrypted banking gateways.</li>\n        <li>You can request account or order data deletion at any time by contacting our support team.</li>\n      </ul>\n    ",
+    "updatedAt": "2026-10-26T15:57:54.619Z"
+  },
+  {
+    "id": "faq",
+    "slug": "faq",
+    "title": "Frequently Asked Questions (FAQs)",
+    "contentHtml": "\n      <h2>Frequently Asked Questions</h2>\n      <h3>1. Are all products 100% authentic?</h3>\n      <p>Yes, absolutely. We source all cosmetics and skincare products directly from brand manufacturers and official regional importers.</p>\n      <h3>2. What payment methods are accepted?</h3>\n      <p>We accept Cash on Delivery (COD) and Bangla QR (bKash / Nagad / Rocket / Cards).</p>\n      <h3>3. How do I pay using Bangla QR?</h3>\n      <p>During checkout, select Bangla QR and tap Place Order. Enter your mobile wallet number (bKash / Nagad / Rocket) and complete payment using merchant number <strong>01609013011</strong> (GlowGoodly).</p>\n      <h3>4. Why is Cash on Delivery disabled for my order?</h3>\n      <p>For locations outside Dhaka Metropolitan area and Sub Areas (Keraniganj, Savar, Gazipur, Narayanganj), Cash on Delivery is available for order totals up to ৳1,000. Orders above ৳1,000 require advance payment via Bangla QR.</p>\n    ",
+    "updatedAt": "2026-10-26T15:58:02.746Z"
+  },
+  {
+    "id": "points",
+    "slug": "points",
+    "title": "GlowGoodly Beauty Points & Rewards",
+    "contentHtml": "\n      <h2>Earn GlowPoints On Every Purchase!</h2>\n      <p>Join the GlowGoodly Rewards Club! Spend BDT 100 on any beauty items and earn 5 GlowPoints automatically credited to your account profile.</p>\n      <h3>Point Redemption Levels:</h3>\n      <ul style=\"line-height: 2;\">\n        <li><strong>100 Points:</strong> Redeem for ৳50 Instant Shopping Voucher</li>\n        <li><strong>200 Points:</strong> Redeem for ৳120 Instant Shopping Voucher</li>\n        <li><strong>500 Points:</strong> Redeem for ৳350 Instant Shopping Voucher</li>\n      </ul>\n    ",
+    "updatedAt": "2026-10-26T15:58:10.868Z"
+  },
+  {
+    "id": "contact",
+    "slug": "contact",
+    "title": "Contact Us & Customer Support",
+    "contentHtml": "\n      <h2>We Are Here To Assist You 24/7!</h2>\n      <p>Have questions about your order, skin type consultation, or shipping? Reach out to our customer care team anytime.</p>\n      <div style=\"background-color: #f8fafc; padding: 20px; border-radius: 10px; border: 1px solid #cbd5e1; margin-top: 15px; line-height: 2;\">\n        <p><strong>📞 Customer Support Hotline:</strong> 01609013011 (10 AM - 10 PM)</p>\n        <p><strong>💬 Official Merchant Number:</strong> 01609013011 (GlowGoodly)</p>\n        <p><strong>✉️ Email Address:</strong> support@glowgoodly.com</p>\n        <p><strong>📍 Corporate Office:</strong> 1268/3 East Monipur, Mirpur-2, Dhaka-1216, Bangladesh</p>\n      </div>\n    ",
+    "updatedAt": "2026-10-26T15:58:19.007Z"
+  }
+]

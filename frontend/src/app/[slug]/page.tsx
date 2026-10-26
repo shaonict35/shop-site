@@ -1,6 +1,6 @@
 import CmsClient from "./CmsClient";
 
-export const dynamicParams = true;
+export const dynamicParams = false;
 
 export async function generateStaticParams() {
   return [

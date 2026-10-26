@@ -7,8 +7,10 @@ import Footer from "../../../components/Footer";
 import { useApp } from "../../../context/AppContext";
 import { trackViewContent } from "../../../utils/pixel";
 import Link from "next/link";
-import { API_BASE, getProductUrl, generateSlug, fetchWithCache } from "../../../utils/api";
+import { API_BASE, getProductUrl, fetchWithCache } from "../../../utils/api";
+import { findLooseProduct, generateSlug } from "../../../utils/productMatcher";
 import GlowLoader from "../../../components/GlowLoader";
+import { useParams, useRouter } from "next/navigation";
 
 interface Variant {
   id: string;
@@ -19,16 +21,18 @@ interface Variant {
   sku: string;
   shadeColor: string | null;
   sizeValue: string | null;
+  imageUrl?: string | null;
 }
 
 interface ProductDetail {
   id: string;
   name: string;
+  slug?: string;
   description: string;
   ingredients: string;
   howToUse: string;
-  brand: { name: string };
-  category: { name: string };
+  brand: { name: string; id?: string };
+  category: { name: string; id?: string };
   subcategory?: string | null;
   childSubcategory?: string | null;
   images: { id: string; url: string; isPrimary: boolean }[];
@@ -36,34 +40,69 @@ interface ProductDetail {
   reviews: { id: string; customerName: string; rating: number; comment: string; createdAt: string }[];
 }
 
-import { useParams, useRouter } from "next/navigation";
-
-export default function ProductPage({ initialProduct }: { initialProduct?: any } = {}) {
+export default function ProductPage({
+  initialProduct,
+  slug: propSlug,
+}: {
+  initialProduct?: any;
+  slug?: string;
+} = {}) {
   const router = useRouter();
   const { addToCart, wishlist, toggleWishlist } = useApp();
   const routeParams = useParams();
-  const rawId = routeParams?.id as string;
 
-  const [clientProductId, setClientProductId] = useState<string>("");
-
-  useEffect(() => {
+  // Helper to resolve the initial target slug from props, route params, or current window path
+  const getInitialSlug = () => {
+    let raw = (propSlug || (routeParams?.slug as string) || (routeParams?.id as string) || "") as string;
     if (typeof window !== "undefined") {
-      const match = window.location.pathname.match(/\/product\/([^\/?#]+)/);
-      if (match && match[1] && match[1] !== "default") {
-        setClientProductId(match[1]);
-        return;
+      if (!raw || raw === "default" || raw === "[slug]") {
+        const match = window.location.pathname.match(/\/(?:product|products)\/([^\/?#]+)/i);
+        if (match && match[1] && match[1] !== "default" && match[1] !== "[slug]") {
+          raw = match[1];
+        }
       }
     }
-    if (rawId && rawId !== "default") {
-      setClientProductId(rawId);
+    try {
+      return raw ? decodeURIComponent(raw).trim() : "";
+    } catch {
+      return (raw || "").trim();
     }
-  }, [rawId]);
+  };
 
-  const productId = clientProductId || (rawId !== "default" ? rawId : "");
-  const [unwrappedParams, setUnwrappedParams] = useState<{ id: string } | null>(null);
-  const [product, setProduct] = useState<ProductDetail | null>(initialProduct || null);
+  const [activeSlug, setActiveSlug] = useState<string>(() => getInitialSlug());
+
+  useEffect(() => {
+    const current = getInitialSlug();
+    if (current && current !== activeSlug) {
+      setActiveSlug(current);
+    }
+  }, [propSlug, routeParams]);
+
+  // Synchronously resolve product from fallback if available to prevent flash of 'not found'
+  const [product, setProduct] = useState<ProductDetail | null>(() => {
+    if (initialProduct && (initialProduct.id || initialProduct.name)) return initialProduct;
+    const s = getInitialSlug();
+    if (s && s !== "default" && s !== "[slug]") {
+      const found = findLooseProduct(s);
+      if (found) return found;
+    }
+    return null;
+  });
+
   const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(!initialProduct);
+
+  // Initial loading state: if product is already resolved, don't show loading spinner!
+  const [loading, setLoading] = useState<boolean>(() => {
+    if (initialProduct && (initialProduct.id || initialProduct.name)) return false;
+    const s = getInitialSlug();
+    if (s && s !== "default" && s !== "[slug]") {
+      const found = findLooseProduct(s);
+      if (found) return false;
+      return true;
+    }
+    return false;
+  });
+
   const relatedSliderRef = useRef<HTMLDivElement>(null);
   const offersSliderRef = useRef<HTMLDivElement>(null);
   const [isOffersPaused, setIsOffersPaused] = useState(false);
@@ -91,15 +130,31 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
     return () => clearInterval(timer);
   }, [isOffersPaused]);
 
-  // Detail View States
-  const initialCoverImg = initialProduct?.images?.find((img: any) => img.isPrimary)?.url 
-    || initialProduct?.images?.[0]?.url 
-    || (initialProduct?.variants?.[0] as any)?.imageUrl 
-    || "";
+  // Detail View States initialized safely
+  const initialCoverImg =
+    product?.images?.find((img: any) => img?.isPrimary)?.url ||
+    product?.images?.[0]?.url ||
+    (product?.variants?.[0] as any)?.imageUrl ||
+    "";
 
   const [activeImage, setActiveImage] = useState(initialCoverImg);
-  const [selectedVariant, setSelectedVariant] = useState<Variant | null>(initialProduct?.variants?.[0] || null);
+  const [selectedVariant, setSelectedVariant] = useState<Variant | null>(product?.variants?.[0] || null);
   const [activeTab, setActiveTab] = useState<"desc" | "ingredients" | "howToUse">("desc");
+
+  // Keep activeImage and selectedVariant in sync when product resolves
+  useEffect(() => {
+    if (product) {
+      const cover =
+        product.images?.find((img: any) => img?.isPrimary)?.url ||
+        product.images?.[0]?.url ||
+        (product.variants?.[0] as any)?.imageUrl ||
+        "";
+      setActiveImage((prev: string) => prev || cover);
+      if (product.variants && product.variants.length > 0) {
+        setSelectedVariant((prev: Variant | null) => prev || product.variants[0]);
+      }
+    }
+  }, [product]);
 
   // Review Form States
   const [customerName, setCustomerName] = useState("");
@@ -112,76 +167,127 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
     fetchWithCache(`${API_BASE}/coupons/public`)
       .then((data) => {
         if (Array.isArray(data)) {
-          setPublicOffers(data.map((c: any) => ({
-            id: c.id || c.code,
-            title: c.description || (c.code ? `Promo Code ${c.code}` : "Exclusive Offer"),
-            subtitle: c.minOrder ? `Min order ৳${c.minOrder}` : "Special discount",
-            code: c.code
-          })));
+          setPublicOffers(
+            data.map((c: any) => ({
+              id: c.id || c.code,
+              title: c.description || (c.code ? `Promo Code ${c.code}` : "Exclusive Offer"),
+              subtitle: c.minOrder ? `Min order ৳${c.minOrder}` : "Special discount",
+              code: c.code,
+            }))
+          );
         }
       })
       .catch(() => {});
   }, []);
 
   useEffect(() => {
-    if (!productId) return;
     if (typeof window !== "undefined") {
       window.scrollTo(0, 0);
     }
+
+    // If we have initialProduct matching activeSlug, no fetch needed
+    if (
+      initialProduct &&
+      (initialProduct.slug === activeSlug ||
+        initialProduct.id === activeSlug ||
+        generateSlug(initialProduct.name) === activeSlug)
+    ) {
+      setProduct(initialProduct);
+      setLoading(false);
+      return;
+    }
+
+    // If no valid slug, stop loading and mark product not found
+    if (!activeSlug || activeSlug === "default" || activeSlug === "[slug]") {
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
     const fetchProductDetails = async () => {
+      // If we already have a matched fallback product, keep showing it without blocking
       if (!product) {
         setLoading(true);
       }
       try {
-        let data: any = await fetchWithCache(`${API_BASE}/products/${productId}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-        if (!data || !data.product) {
-          // Fallback search in full product list
-          const list = await fetchWithCache(`${API_BASE}/products`);
-          if (Array.isArray(list)) {
-            const matched = list.find((p: any) => p.id === productId || p.slug === productId || generateSlug(p.name) === productId);
-            if (matched) {
-              data = { product: matched, relatedProducts: list.slice(0, 6) };
+        const res = await fetch(`${API_BASE}/products/${encodeURIComponent(activeSlug)}`, {
+          signal: controller.signal,
+          headers: { Accept: "application/json" },
+        });
+        clearTimeout(timeoutId);
+
+        // Handle 404, 500 or any non-OK HTTP status
+        if (!res.ok) {
+          const fallbackItem = findLooseProduct(activeSlug);
+          if (isMounted) {
+            setProduct((prev) => prev || fallbackItem || null);
+          }
+          return;
+        }
+
+        const data = await res.json();
+        const prod = data?.product || (data?.id ? data : null);
+
+        if (isMounted) {
+          if (prod && (prod.id || prod.name)) {
+            setProduct(prod);
+            setRelatedProducts(data?.relatedProducts || []);
+
+            const mainCoverImg =
+              prod?.images?.find((img: any) => img?.isPrimary)?.url ||
+              prod?.images?.[0]?.url ||
+              (prod?.variants?.[0] as any)?.imageUrl ||
+              "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&auto=format&fit=crop&q=60";
+
+            setActiveImage((prev: string) => prev || mainCoverImg);
+            if (prod?.variants && prod.variants.length > 0) {
+              setSelectedVariant((prev: Variant | null) => prev || prod.variants[0]);
             }
+
+            try {
+              trackViewContent({
+                id: prod?.id,
+                name: prod?.name,
+                price: prod?.variants?.[0]?.discountPrice || prod?.variants?.[0]?.price || 0,
+                category: prod?.category?.name || "Cosmetics",
+              });
+            } catch (err) {
+              // Ignore analytics errors
+            }
+          } else {
+            // Null or undefined product: check fallback catalog with loose matching
+            const fallbackItem = findLooseProduct(activeSlug);
+            setProduct((prev) => prev || fallbackItem || null);
           }
         }
-
-        if (data && data.product) {
-          setProduct(data.product);
-          setRelatedProducts(data.relatedProducts || []);
-
-          // Always set Product Main Cover Image as the primary display image when page opens
-          const mainCoverImg = data.product.images?.find((img: any) => img.isPrimary)?.url 
-            || data.product.images?.[0]?.url 
-            || (data.product.variants?.[0] as any)?.imageUrl 
-            || "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&auto=format&fit=crop&q=60";
-
-          setActiveImage((prev: string) => prev || mainCoverImg);
-          if (data.product.variants && data.product.variants.length > 0) {
-            setSelectedVariant((prev: Variant | null) => prev || data.product.variants[0]);
-          }
-
-          // Meta Pixel ViewContent event
-          trackViewContent({
-            id: data.product.id,
-            name: data.product.name,
-            price: data.product.variants?.[0]?.discountPrice || data.product.variants?.[0]?.price || 0,
-            category: data.product.category?.name || "Cosmetics"
-          });
+      } catch (err: any) {
+        // Network timeout / connection error: check fallback catalog with loose matching
+        const fallbackItem = findLooseProduct(activeSlug);
+        if (isMounted) {
+          setProduct((prev) => prev || fallbackItem || null);
         }
-      } catch (e) {
-        console.error("Error fetching product", e);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
+
     fetchProductDetails();
-  }, [productId]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeSlug, initialProduct]);
 
   // Dynamic SEO meta tags and Schema.org JSON-LD updater
   useEffect(() => {
     if (product) {
-      document.title = `${product.name} | GlowGoodly`;
+      document.title = `${product?.name || "Product"} | GlowGoodly`;
       
       // Update meta description
       let metaDesc = document.querySelector('meta[name="description"]');
@@ -190,7 +296,7 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
         metaDesc.setAttribute('name', 'description');
         document.head.appendChild(metaDesc);
       }
-      const safeDesc = product.description || "Authentic cosmetics product at GlowGoodly";
+      const safeDesc = product?.description || "Authentic cosmetics product at GlowGoodly";
       metaDesc.setAttribute('content', safeDesc.substring(0, 160).replace(/\n/g, ' '));
 
       // Update primary og:image tag in-place without deleting nodes
@@ -200,7 +306,7 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
         ogImage.setAttribute('property', 'og:image');
         document.head.appendChild(ogImage);
       }
-      const primaryImg = product.images?.find((img: any) => img.isPrimary)?.url || product.images?.[0]?.url;
+      const primaryImg = product?.images?.find((img: any) => img?.isPrimary)?.url || product?.images?.[0]?.url;
       if (primaryImg) {
         ogImage.setAttribute('content', primaryImg);
       }
@@ -215,22 +321,22 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
       }
 
       const activePrice = selectedVariant?.discountPrice || selectedVariant?.price || 500;
-      const imagesList = product.images?.map(i => i.url) || [primaryImg];
+      const imagesList = product?.images?.map((i: any) => i?.url).filter(Boolean) || (primaryImg ? [primaryImg] : []);
 
       const schemaData = {
         "@context": "https://schema.org",
         "@type": "Product",
-        "name": product.name,
+        "name": product?.name || "",
         "image": imagesList,
         "description": safeDesc.substring(0, 300),
         "brand": {
           "@type": "Brand",
-          "name": product.brand?.name || "GlowGoodly"
+          "name": product?.brand?.name || "GlowGoodly"
         },
-        "category": product.category?.name || "Beauty & Cosmetics",
+        "category": product?.category?.name || "Beauty & Cosmetics",
         "offers": {
           "@type": "Offer",
-          "url": typeof window !== "undefined" ? window.location.href : `https://shop.glowgoodly.com/product/${product.id}`,
+          "url": typeof window !== "undefined" ? window.location.href : `https://shop.glowgoodly.com/product/${product?.slug || product?.id || ""}`,
           "priceCurrency": "BDT",
           "price": activePrice,
           "itemCondition": "https://schema.org/NewCondition",
@@ -240,10 +346,10 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
             "name": "GlowGoodly Bangladesh"
           }
         },
-        ...(product.reviews && product.reviews.length > 0 ? {
+        ...(product?.reviews && product.reviews.length > 0 ? {
           "aggregateRating": {
             "@type": "AggregateRating",
-            "ratingValue": (product.reviews.reduce((acc, r) => acc + r.rating, 0) / product.reviews.length).toFixed(1),
+            "ratingValue": (product.reviews.reduce((acc, r) => acc + (r?.rating || 5), 0) / product.reviews.length).toFixed(1),
             "reviewCount": product.reviews.length
           }
         } : {})
@@ -258,8 +364,8 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
 
     addToCart({
       id: selectedVariant.id,
-      productId: product.id,
-      name: product.name,
+      productId: product?.id || "",
+      name: product?.name || "",
       variantName: selectedVariant.name,
       image: activeImage,
       price: selectedVariant.discountPrice || selectedVariant.price,
@@ -274,14 +380,14 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
 
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!productId) return;
+    if (!activeSlug) return;
     if (!customerName || !comment) {
       setReviewMessage("Please fill in all review fields.");
       return;
     }
 
     try {
-      const res = await fetch(`${API_BASE}/products/${productId}/reviews`, {
+      const res = await fetch(`${API_BASE}/products/${encodeURIComponent(activeSlug)}/reviews`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ customerName, rating, comment }),
@@ -305,21 +411,21 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
     const addedUrls = new Set<string>();
 
     // 1. First thumbnail is ALWAYS Main Cover Product Image
-    const coverUrl = product.images?.find(i => i.isPrimary)?.url || product.images?.[0]?.url;
+    const coverUrl = product?.images?.find((i: any) => i?.isPrimary)?.url || product?.images?.[0]?.url;
     if (coverUrl) {
       addedUrls.add(coverUrl);
       items.push({ id: "cover-img", url: coverUrl, isCover: true });
     }
 
     // 2. Next thumbnails match each variant in exact index order (Shade 1, Shade 2, Shade 3...)
-    (product.variants || []).forEach((v, vIdx) => {
-      const vImg = ((v as any).imageUrl && (v as any).imageUrl.trim() !== "")
-        ? (v as any).imageUrl
-        : product.images?.[vIdx + 1]?.url || coverUrl;
+    (product?.variants || []).forEach((v: any, vIdx: number) => {
+      const vImg = (v?.imageUrl && v.imageUrl.trim() !== "")
+        ? v.imageUrl
+        : product?.images?.[vIdx + 1]?.url || coverUrl;
 
       if (vImg) {
         items.push({
-          id: `var-thumb-${v.id || vIdx}`,
+          id: `var-thumb-${v?.id || vIdx}`,
           url: vImg,
           variant: v
         });
@@ -327,23 +433,57 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
     });
 
     // 3. Add any additional product gallery images not already added
-    (product.images || []).forEach((img, idx) => {
-      if (img.url && !addedUrls.has(img.url) && !items.some(i => i.url === img.url)) {
+    (product?.images || []).forEach((img: any, idx: number) => {
+      if (img?.url && !addedUrls.has(img.url) && !items.some((i) => i.url === img.url)) {
         addedUrls.add(img.url);
-        items.push({ id: img.id || `img-extra-${idx}`, url: img.url });
+        items.push({ id: img?.id || `img-extra-${idx}`, url: img.url });
       }
     });
 
     return items;
   }, [product]);
 
-  if (loading || !product) {
+  if (loading) {
     return (
       <>
         <Header />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
           <GlowLoader text="Loading Product Details..." subtext="Fetching authentic product information" />
         </div>
+        <Footer />
+        <MobileNavbar />
+      </>
+    );
+  }
+
+  if (!product) {
+    return (
+      <>
+        <Header />
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", padding: "40px 20px", textAlign: "center" }}>
+          <div style={{ fontSize: "56px", marginBottom: "16px" }}>🛍️</div>
+          <h2 style={{ fontSize: "24px", fontWeight: "800", color: "#1e293b", marginBottom: "8px" }}>প্রোডাক্টটি পাওয়া যায়নি (Product Not Found)</h2>
+          <p style={{ color: "#64748b", fontSize: "14px", maxWidth: "460px", marginBottom: "24px", lineHeight: "1.6" }}>
+            এই প্রোডাক্টটি স্টক আউট বা সাময়িকভাবে পাওয়া যাচ্ছে না। আমাদের অন্যান্য ১০০% অরিজিনাল প্রোডাক্টগুলো দেখতে শপ পেজ ভিজিট করুন।
+          </p>
+          <Link
+            href="/shop"
+            style={{
+              backgroundColor: "#e2136e",
+              color: "#ffffff",
+              padding: "12px 30px",
+              borderRadius: "10px",
+              fontWeight: "700",
+              textDecoration: "none",
+              fontSize: "14px",
+              boxShadow: "0 4px 14px rgba(226, 19, 110, 0.3)",
+              display: "inline-block"
+            }}
+          >
+            সব প্রোডাক্ট দেখুন (Shop Now)
+          </Link>
+        </div>
+        <Footer />
         <MobileNavbar />
       </>
     );
@@ -364,21 +504,21 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
           <span>›</span>
           <Link href="/shop" style={{ color: "#475569", textDecoration: "none" }}>Shop</Link>
           <span>›</span>
-          <Link href={`/shop?category=${encodeURIComponent(product.category?.name || "makeup")}`} style={{ color: "#475569", textDecoration: "none" }}>{product.category?.name || "Makeup"}</Link>
-          {product.subcategory && (
+          <Link href={`/shop?category=${encodeURIComponent(product?.category?.name || "makeup")}`} style={{ color: "#475569", textDecoration: "none" }}>{product?.category?.name || "Makeup"}</Link>
+          {product?.subcategory && (
             <>
               <span>›</span>
-              <Link href={`/shop?category=${encodeURIComponent(product.category?.name || "")}&sub=${encodeURIComponent(product.subcategory)}`} style={{ color: "#475569", textDecoration: "none" }}>{product.subcategory}</Link>
+              <Link href={`/shop?category=${encodeURIComponent(product?.category?.name || "")}&sub=${encodeURIComponent(product?.subcategory)}`} style={{ color: "#475569", textDecoration: "none" }}>{product?.subcategory}</Link>
             </>
           )}
-          {product.childSubcategory && (
+          {product?.childSubcategory && (
             <>
               <span>›</span>
-              <Link href={`/shop?category=${encodeURIComponent(product.category?.name || "")}&sub=${encodeURIComponent(product.childSubcategory)}`} style={{ color: "#475569", textDecoration: "none" }}>{product.childSubcategory}</Link>
+              <Link href={`/shop?category=${encodeURIComponent(product?.category?.name || "")}&sub=${encodeURIComponent(product?.childSubcategory)}`} style={{ color: "#475569", textDecoration: "none" }}>{product?.childSubcategory}</Link>
             </>
           )}
           <span>›</span>
-          <span style={{ color: "#e2136e", fontWeight: "800" }}>{product.name}</span>
+          <span style={{ color: "#e2136e", fontWeight: "800" }}>{product?.name}</span>
         </div>
 
         {/* Product General Layout */}
@@ -403,7 +543,7 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
             >
               <img
                 src={activeImage || "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&auto=format&fit=crop&q=60"}
-                alt={product.name}
+                alt={product?.name || "Product Image"}
                 onError={(e) => { e.currentTarget.src = "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&auto=format&fit=crop&q=60"; }}
                 style={{ width: "100%", height: "100%", objectFit: "cover" }}
               />
@@ -473,16 +613,16 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
           <div style={{ flex: "1.5", minWidth: "320px", display: "flex", flexDirection: "column", gap: "20px" }}>
             <div>
               <span style={{ fontSize: "13px", fontWeight: "700", color: "var(--primary)", textTransform: "uppercase", letterSpacing: "1px" }}>
-                {product.brand.name}
+                {product?.brand?.name || "GlowGoodly"}
               </span>
               <h1 style={{ fontSize: "28px", fontWeight: "800", color: "var(--dark)", marginTop: "4px" }}>
-                {product.name}
+                {product?.name}
               </h1>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px" }}>
                 <span style={{ color: "var(--secondary)", fontWeight: "700" }}>
-                  ★ {product.reviews && product.reviews.length > 0 ? (product.reviews.reduce((acc: number, r: any) => acc + r.rating, 0) / product.reviews.length).toFixed(1) : "5.0"}
+                  ★ {product?.reviews && product.reviews.length > 0 ? (product.reviews.reduce((acc: number, r: any) => acc + (r?.rating || 5), 0) / product.reviews.length).toFixed(1) : "5.0"}
                 </span>
-                <span style={{ color: "var(--gray-500)", fontSize: "13px", fontWeight: "600" }}>| {product.reviews?.length || 0} Customer Reviews</span>
+                <span style={{ color: "var(--gray-500)", fontSize: "13px", fontWeight: "600" }}>| {product?.reviews?.length || 0} Customer Reviews</span>
               </div>
             </div>
 
@@ -504,20 +644,20 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
             </div>
 
             {/* Variant Selectors (Shades & Size Variants Side-by-Side) */}
-            {product.variants && product.variants.length > 0 && (
+            {product?.variants && product.variants.length > 0 && (
               <div>
                 <h3 style={{ fontSize: "14px", fontWeight: "800", color: "var(--dark)", marginBottom: "10px", display: "flex", alignItems: "center", gap: "6px" }}>
                   <span>🎨 Available Shades & Variants:</span>
-                  <span style={{ fontSize: "12px", color: "var(--primary)", fontWeight: "700" }}>({product.variants.length} available)</span>
+                  <span style={{ fontSize: "12px", color: "var(--primary)", fontWeight: "700" }}>({product?.variants?.length || 0} available)</span>
                 </h3>
                 
                 {/* Side-by-side flex wrap container */}
                 <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
-                  {product.variants.map((v, vIdx) => {
+                  {product?.variants?.map((v, vIdx) => {
                     const isSelected = selectedVariant?.id === v.id;
                     const vImg = (v as any).imageUrl && (v as any).imageUrl.trim() !== "" ? (v as any).imageUrl : null;
                     const galleryMatch = allGalleryItems.find(item => item.variant?.id === v.id || item.variant?.name === v.name)?.url;
-                    const variantImg = vImg || galleryMatch || product.images?.[vIdx + 1]?.url || product.images?.[0]?.url;
+                    const variantImg = vImg || galleryMatch || product?.images?.[vIdx + 1]?.url || product?.images?.[0]?.url;
                     const hasSwatch = Boolean(v.shadeColor);
 
                     return (
@@ -628,7 +768,7 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
                 </button>
                 
                 <button
-                  onClick={() => toggleWishlist(product.id)}
+                  onClick={() => product?.id && toggleWishlist(product.id)}
                   style={{
                     flex: 0.5,
                     border: "1.5px solid var(--gray-300)",
@@ -637,12 +777,12 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
                     alignItems: "center",
                     justifyContent: "center",
                     cursor: "pointer",
-                    color: wishlist.includes(product.id) ? "var(--primary)" : "var(--dark)",
+                    color: Boolean(product?.id && wishlist.includes(product.id)) ? "var(--primary)" : "var(--dark)",
                     backgroundColor: "var(--white)",
                   }}
                 >
                   <svg
-                    fill={wishlist.includes(product.id) ? "currentColor" : "none"}
+                    fill={Boolean(product?.id && wishlist.includes(product.id)) ? "currentColor" : "none"}
                     stroke="currentColor"
                     strokeWidth="2"
                     viewBox="0 0 24 24"
@@ -660,17 +800,17 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
                 <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1.5px solid #f1f5f9", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#475569" }}>
                   <div style={{ display: "flex", gap: "24px" }}>
                     <span style={{ fontWeight: "700", minWidth: "90px", color: "#334155" }}>SKU</span>
-                    <span style={{ color: "#0f172a", fontWeight: "700" }}>{selectedVariant?.sku || product.variants?.[0]?.sku || `GG-${product.id}`}</span>
+                    <span style={{ color: "#0f172a", fontWeight: "700" }}>{selectedVariant?.sku || product?.variants?.[0]?.sku || (product?.id ? `GG-${product.id}` : "")}</span>
                   </div>
                   <div style={{ display: "flex", gap: "24px" }}>
                     <span style={{ fontWeight: "700", minWidth: "90px", color: "#334155" }}>Categories</span>
                     <span style={{ color: "#0f172a", fontWeight: "700" }}>
-                      {[product.category?.name, product.subcategory, product.childSubcategory].filter(Boolean).join(", ") || "Makeup, Face, Face Primer"}
+                      {[product?.category?.name, product?.subcategory, product?.childSubcategory].filter(Boolean).join(", ") || "Makeup, Face, Face Primer"}
                     </span>
                   </div>
                   <div style={{ display: "flex", gap: "24px" }}>
                     <span style={{ fontWeight: "700", minWidth: "90px", color: "#334155" }}>Brands</span>
-                    <span style={{ color: "#e2136e", fontWeight: "800" }}>{product.brand?.name || "GlowGoodly"}</span>
+                    <span style={{ color: "#e2136e", fontWeight: "800" }}>{product?.brand?.name || "GlowGoodly"}</span>
                   </div>
                 </div>
 
@@ -711,7 +851,7 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
                 return (
                   <div style={{ display: "flex", alignItems: "center", gap: "20px", flexWrap: "wrap" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-                      <img src={activeImage || "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&auto=format&fit=crop&q=60"} alt={product.name} style={{ width: "95px", height: "95px", objectFit: "contain", borderRadius: "10px", border: "1.5px solid #e2e8f0", backgroundColor: "#f8fafc", padding: "6px" }} />
+                      <img src={activeImage || "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&auto=format&fit=crop&q=60"} alt={product?.name || "Product"} style={{ width: "95px", height: "95px", objectFit: "contain", borderRadius: "10px", border: "1.5px solid #e2e8f0", backgroundColor: "#f8fafc", padding: "6px" }} />
                       <span style={{ fontSize: "24px", fontWeight: "900", color: "#94a3b8" }}>+</span>
                       <img src={relImg} alt={rel.name} style={{ width: "95px", height: "95px", objectFit: "contain", borderRadius: "10px", border: "1.5px solid #e2e8f0", backgroundColor: "#f8fafc", padding: "6px" }} />
                     </div>
@@ -722,14 +862,14 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
                       </div>
                       <button
                         onClick={() => {
-                          const var1 = selectedVariant || product.variants[0];
-                          if (var1) {
+                          const var1 = selectedVariant || product?.variants?.[0];
+                          if (var1 && product) {
                             addToCart({
                               id: var1.id,
-                              productId: product.id,
-                              name: product.name,
+                              productId: product?.id || "",
+                              name: product?.name || "",
                               variantName: var1.name,
-                              image: activeImage || product.images.find((i) => i.isPrimary)?.url || product.images[0]?.url || "",
+                              image: activeImage || product?.images?.find((i: any) => i?.isPrimary)?.url || product?.images?.[0]?.url || "",
                               price: var1.discountPrice !== null ? var1.discountPrice : var1.price,
                               stock: var1.stock || 50,
                             });
@@ -856,7 +996,7 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
             >
               Product Description
             </button>
-            {product.ingredients && (
+            {product?.ingredients && (
               <button
                 onClick={() => setActiveTab("ingredients")}
                 style={{
@@ -871,7 +1011,7 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
                 Ingredients
               </button>
             )}
-            {product.howToUse && (
+            {product?.howToUse && (
               <button
                 onClick={() => setActiveTab("howToUse")}
                 style={{
@@ -890,9 +1030,9 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
 
           {/* Tab Content */}
           <div style={{ fontSize: "14px", lineHeight: "1.7", color: "var(--gray-800)", fontWeight: "500" }}>
-            {activeTab === "desc" && <p>{product.description}</p>}
-            {activeTab === "ingredients" && <p>{product.ingredients}</p>}
-            {activeTab === "howToUse" && <p>{product.howToUse}</p>}
+            {activeTab === "desc" && <p>{product?.description || "Authentic skincare product."}</p>}
+            {activeTab === "ingredients" && <p>{product?.ingredients || "N/A"}</p>}
+            {activeTab === "howToUse" && <p>{product?.howToUse || "N/A"}</p>}
           </div>
         </section>
 
@@ -902,14 +1042,14 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
           {/* Reviews List */}
           <div style={{ flex: 1.5, minWidth: "300px" }}>
             <h2 style={{ fontSize: "20px", fontWeight: "800", marginBottom: "20px" }}>
-              Customer Reviews ({(product.reviews || []).length})
+              Customer Reviews ({(product?.reviews || []).length})
             </h2>
 
-            {(product.reviews || []).length === 0 ? (
+            {(product?.reviews || []).length === 0 ? (
               <p style={{ color: "var(--gray-500)", fontWeight: "600" }}>No approved reviews for this product yet.</p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
-                {(product.reviews || []).map((rev) => (
+                {(product?.reviews || []).map((rev) => (
                   <div
                     key={rev.id}
                     style={{

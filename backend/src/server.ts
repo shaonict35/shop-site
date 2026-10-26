@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import compression from "compression";
 import dotenv from "dotenv";
+import path from "path";
+import fs from "fs";
 import { createServer } from "http";
 import { Server as SocketIOServer } from "socket.io";
 
@@ -31,6 +33,34 @@ const app = express();
 app.set("trust proxy", 1);
 app.set("etag", "strong"); // Enable HTTP ETag for 304 Not Modified instant bandwidth-free caching
 
+// Serve GlowGoodly favicon and brand assets statically
+const publicDir = path.resolve(__dirname, "../public");
+const localPublicDir = path.resolve(__dirname, "public");
+if (fs.existsSync(publicDir)) {
+  app.use(express.static(publicDir));
+}
+if (fs.existsSync(localPublicDir)) {
+  app.use(express.static(localPublicDir));
+}
+
+// Explicit Favicon and Logo endpoint handlers
+app.get("/favicon.ico", (req, res) => {
+  const p1 = path.join(publicDir, "favicon.ico");
+  const p2 = path.join(localPublicDir, "favicon.ico");
+  if (fs.existsSync(p1)) return res.sendFile(p1);
+  if (fs.existsSync(p2)) return res.sendFile(p2);
+  return res.redirect("https://shop.glowgoodly.com/favicon.ico");
+});
+
+app.get(["/favicon-32x32.png", "/icon.png", "/apple-icon.png", "/user-glow-logo.png", "/logo-admin.png"], (req, res) => {
+  const filename = path.basename(req.path);
+  const p1 = path.join(publicDir, filename);
+  const p2 = path.join(localPublicDir, filename);
+  if (fs.existsSync(p1)) return res.sendFile(p1);
+  if (fs.existsSync(p2)) return res.sendFile(p2);
+  return res.redirect(`https://shop.glowgoodly.com/${filename}`);
+});
+
 const httpServer = createServer(app);
 const io = new SocketIOServer(httpServer, {
   cors: {
@@ -41,19 +71,45 @@ const io = new SocketIOServer(httpServer, {
 
 const PORT = process.env.PORT || 5000;
 
-// 1. Advanced OWASP Security Headers
+// 1. Explicit CORS & Preflight Middleware allowing all origins, credentials, and all request headers
+app.use((req, res, next) => {
+  const origin = req.headers.origin || "*";
+  res.header("Access-Control-Allow-Origin", origin);
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD");
+  res.header(
+    "Access-Control-Allow-Headers",
+    (req.headers["access-control-request-headers"] as string) ||
+      "Content-Type, Authorization, x-admin-key, x-api-key, X-Requested-With, Accept, Cache-Control, Pragma, *"
+  );
+  res.header("Access-Control-Max-Age", "86400");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+  next();
+});
+
+app.use(cors({
+  origin: true,
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
+  allowedHeaders: ["*"]
+}));
+
+// 2. Advanced OWASP Security Headers
 app.use(securityHeaders);
 
-// 2. Global DDoS / Flooding Rate Limiter (Max 350 req/min per IP)
+// 3. Global DDoS / Flooding Rate Limiter (Max 350 req/min per IP)
 app.use(globalRateLimiter);
 
-// 3. Brute Force Login / Signup Guard (Max 15 attempts / 5 mins per IP)
+// 4. Brute Force Login / Signup Guard (Max 15 attempts / 5 mins per IP)
 app.use("/api/auth", authRateLimiter);
 
-// 4. Fake Order / Spam Purchase Guard (Max 20 orders / 10 mins per IP)
+// 5. Fake Order / Spam Purchase Guard (Max 20 orders / 10 mins per IP)
 app.use("/api/orders", orderRateLimiter);
 
-// 5. Gzip / Deflate Compression Middleware (80%+ reduction in payload transfer size)
+// 6. Gzip / Deflate Compression Middleware (80%+ reduction in payload transfer size)
 app.use(compression({
   level: 6,
   threshold: 512, // Compress all payloads >= 512 bytes for maximum efficiency
@@ -63,15 +119,8 @@ app.use(compression({
   }
 }));
 
-// 6. Explicit CORS Middleware allowing all origins for seamless client-side fetching
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Cache-Control"]
-}));
-
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+app.use(express.json({ limit: "100mb" }));
+app.use(express.urlencoded({ limit: "100mb", extended: true }));
 
 // Handle JSON syntax parse errors gracefully without 500 crash
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -113,6 +162,26 @@ app.use("/api", (req, res, next) => {
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
+});
+
+// /api Health Status Endpoint
+app.get("/api", (req, res) => {
+  res.json({
+    success: true,
+    status: "online",
+    name: "GlowGoodly API Engine",
+    version: "2.0.0",
+    endpoints: {
+      products: "/api/products",
+      categories: "/api/categories",
+      brands: "/api/brands",
+      banners: "/api/banners",
+      settings: "/api/settings",
+      auth: "/api/auth/login",
+      orders: "/api/orders"
+    },
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Mount Routes
@@ -535,8 +604,11 @@ app.get("/", (req, res) => {
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>WELCOME TO GLOWGOODLY</title>
-	<link rel="icon" href="https://shop.glowgoodly.com/user-glow-logo.png" type="image/png">
+	<title>WELCOME TO GLOWGOODLY API</title>
+	<link rel="icon" type="image/x-icon" href="/favicon.ico">
+	<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="192x192" href="/icon.png">
+	<link rel="apple-touch-icon" href="/apple-icon.png">
 	<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
 	<style>
 		* {
@@ -665,7 +737,7 @@ app.get("/", (req, res) => {
 					
 					<!-- GlowGoodly Exact User Image Logo Center -->
 					<g transform="translate(175, 120)">
-						<image href="https://shop.glowgoodly.com/user-glow-logo.png" x="0" y="0" width="150" height="180" />
+						<image href="/user-glow-logo.png" x="0" y="0" width="150" height="180" />
 						<text x="75" y="220" text-anchor="middle" font-family="'Montserrat', sans-serif" font-weight="800" font-size="18" letter-spacing="3" fill="#1c1917">GLOWGOODLY</text>
 					</g>
 

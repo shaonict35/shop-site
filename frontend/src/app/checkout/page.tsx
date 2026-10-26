@@ -163,8 +163,8 @@ export default function CheckoutPage() {
     e.preventDefault();
     if (cart.length === 0) return;
 
-    if (!checkoutName || !checkoutPhone || !checkoutAddress) {
-      setErrorMsg("Please fill in all delivery information.");
+    if (!checkoutName || !checkoutPhone || !checkoutAddress || !email) {
+      setErrorMsg("অনুগ্রহ করে আপনার নাম, মোবাইল নাম্বার, ঠিকানা এবং ইমেইল অ্যাড্রেস দিন (অর্ডার নিশ্চিতকরণ ও ইনভয়েস পাওয়ার জন্য)।");
       return;
     }
 
@@ -204,7 +204,7 @@ export default function CheckoutPage() {
 
       // Cash on Delivery (COD) -> Order complete!
       clearCart();
-      router.push(`/thank-you?orderNumber=${createdOrderNumber}&total=${total}&paymentMethod=COD`);
+      router.push(`/thank-you?orderNumber=${createdOrderNumber}&total=${total}&paymentMethod=COD&phone=${encodeURIComponent(checkoutPhone)}&email=${encodeURIComponent(email)}`);
     } catch (err: any) {
       setErrorMsg("Network error. Please try placing your order again.");
     } finally {
@@ -270,13 +270,16 @@ export default function CheckoutPage() {
                       />
                     </div>
                     <div>
-                      <label htmlFor="checkout-email" style={{ fontSize: "13px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "4px" }}>Email (Optional)</label>
+                      <label htmlFor="checkout-email" style={{ fontSize: "13px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "4px" }}>
+                        Email Address * <span style={{ fontSize: "11px", color: "#e63b7a", fontWeight: "600" }}>(ইনভয়েস ও রসিদ পাওয়ার জন্য)</span>
+                      </label>
                       <input
                         id="checkout-email"
                         name="email"
                         type="email"
                         autoComplete="email"
-                        placeholder="name@gmail.com"
+                        required
+                        placeholder="yourname@gmail.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         style={{ width: "100%", padding: "11px", borderRadius: "8px", border: "1.5px solid #cbd5e1", fontSize: "14px", fontWeight: "600" }}

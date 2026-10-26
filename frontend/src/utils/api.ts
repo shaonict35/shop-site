@@ -52,6 +52,15 @@ export function getProductUrl(p: { id?: string; slug?: string; name?: string } |
   return `/product/${slug}`;
 }
 
+export function getMediaUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) return url;
+  if (url.startsWith("/uploads/")) {
+    return `${API_ROOT}${url}`;
+  }
+  return url;
+}
+
 // In-flight request deduplication map
 const inFlightRequests = new Map<string, Promise<any>>();
 

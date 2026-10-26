@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import Link from "next/link";
 import { Sparkles, X, Tag, ExternalLink, Copy, Check } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { API_ROOT } from "../utils/api";
 
 interface PromoData {
@@ -18,6 +19,9 @@ interface PromoData {
 }
 
 export default function PromoSocketListener() {
+  const pathname = usePathname();
+  const isAdmin = Boolean(pathname?.startsWith("/admin") || pathname?.startsWith("/valobasa"));
+
   const [promo, setPromo] = useState<PromoData | null>(null);
   const [dismissedIds, setDismissedIds] = useState<string[]>(() => {
     if (typeof window !== "undefined") {
@@ -33,6 +37,9 @@ export default function PromoSocketListener() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    // Never connect to socket promos or display promos when on admin panel routes
+    if (isAdmin) return;
+
     const socket: Socket = io(API_ROOT, {
       transports: ["polling", "websocket"],   // polling first (more reliable), upgrade if possible
       reconnection: true,
@@ -81,9 +88,9 @@ export default function PromoSocketListener() {
       socket.disconnect();
       window.removeEventListener("gg_test_promo", handleTestPromo);
     };
-  }, []);
+  }, [isAdmin]);
 
-  if (!promo || dismissedIds.includes(promo.id)) return null;
+  if (isAdmin || !promo || dismissedIds.includes(promo.id)) return null;
 
   const handleCopy = (code: string) => {
     navigator.clipboard.writeText(code);

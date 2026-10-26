@@ -1,8 +1,11 @@
 import { Router, Request, Response } from "express";
 import db from "../firebase";
 import { authenticateJWT, requireRole } from "../middleware/auth";
+import { saveBase64Image } from "../services/imageStorage";
+import { findCatalogProduct } from "../catalogFallback";
 
 const router = Router();
+
 
 // Memory cache for products queries to maximize performance
 export const productsCache = new Map<string, { data: any; expiry: number }>();
@@ -67,10 +70,11 @@ router.get("/categories", async (req: Request, res: Response) => {
 // POST /api/categories (Admin only - Create/Update category or subcategory)
 router.post("/categories", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: any, res: any) => {
   try {
-    const { id, name, parentId, imageUrl } = req.body || {};
+    let { id, name, parentId, imageUrl } = req.body || {};
     if (!name) {
       return res.status(400).json({ error: "Category name is required" });
     }
+    const savedImageUrl = imageUrl ? saveBase64Image(imageUrl, "categories") : "";
     const docId = id || db.collection("categories").doc().id;
     const docRef = db.collection("categories").doc(docId);
     const cleanSlug = generateSlug(name);
@@ -79,7 +83,7 @@ router.post("/categories", authenticateJWT as any, requireRole(["SuperAdmin", "M
       name,
       slug: cleanSlug,
       parentId: parentId || null,
-      imageUrl: imageUrl || "",
+      imageUrl: savedImageUrl,
       updatedAt: new Date().toISOString()
     };
     await docRef.set(data, { merge: true });
@@ -93,19 +97,20 @@ router.post("/categories", authenticateJWT as any, requireRole(["SuperAdmin", "M
 // PUT /api/categories/:id (Admin only - Update category)
 router.put("/categories/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: any, res: any) => {
   try {
-    const { name, parentId, imageUrl } = req.body || {};
+    let { name, parentId, imageUrl } = req.body || {};
     const docId = req.params.id;
     const docRef = db.collection("categories").doc(docId);
     const existingSnap = await docRef.get();
     const existing = existingSnap.exists ? existingSnap.data() : {};
     const cleanName = name || existing.name;
+    const savedImageUrl = imageUrl !== undefined ? (imageUrl ? saveBase64Image(imageUrl, "categories") : "") : (existing.imageUrl || "");
     const data = {
       ...existing,
       id: docId,
       name: cleanName,
       slug: cleanName ? generateSlug(cleanName) : existing.slug,
       parentId: parentId !== undefined ? parentId : (existing.parentId || null),
-      imageUrl: imageUrl !== undefined ? imageUrl : (existing.imageUrl || ""),
+      imageUrl: savedImageUrl,
       updatedAt: new Date().toISOString()
     };
     await docRef.set(data, { merge: true });
@@ -128,17 +133,47 @@ router.delete("/categories/:id", authenticateJWT as any, requireRole(["SuperAdmi
   }
 });
 
-// GET /api/brands
-router.get("/brands", async (req: Request, res: Response) => {
+// ─── BRANDS SETTINGS HELPERS ──────────────────────────────────────────────────
+const markBrandAsDeleted = async (id: string) => {
+  try {
+    const deletedDoc = await db.collection("settings").doc("DELETED_BRANDS").get();
+    const currentIds: string[] = deletedDoc.exists ? (deletedDoc.data()?.ids || []) : [];
+    if (!currentIds.includes(id)) {
+      currentIds.push(id);
+      await db.collection("settings").doc("DELETED_BRANDS").set({ key: "DELETED_BRANDS", ids: currentIds, updatedAt: new Date().toISOString() });
+    }
+  } catch (e) {
+    console.error("Error updating DELETED_BRANDS setting:", e);
+  }
+};
+
+const unmarkBrandAsDeleted = async (id: string) => {
+  try {
+    const deletedDoc = await db.collection("settings").doc("DELETED_BRANDS").get();
+    if (deletedDoc.exists && deletedDoc.data()?.ids) {
+      const currentIds: string[] = deletedDoc.data().ids.filter((deletedId: string) => deletedId !== id);
+      await db.collection("settings").doc("DELETED_BRANDS").set({ key: "DELETED_BRANDS", ids: currentIds, updatedAt: new Date().toISOString() });
+    }
+  } catch (e) {
+    console.error("Error unmarking brand from DELETED_BRANDS:", e);
+  }
+};
+
+// GET /api/brands & /api/admin/brands
+const getBrandsHandler = async (req: Request, res: Response) => {
   try {
     const isBypass = req.query.bypass === "true" || req.query.t;
     if (!isBypass && brandsCache.data && brandsCache.expiry > Date.now()) {
       return res.json(brandsCache.data);
     }
 
+    const deletedDoc = await db.collection("settings").doc("DELETED_BRANDS").get();
+    const deletedIds: string[] = deletedDoc.exists ? (deletedDoc.data()?.ids || []) : [];
+
     const snapshot = await db.collection("brands").get();
     const brandsList: any[] = [];
     snapshot.forEach(doc => {
+      if (deletedIds.includes(doc.id)) return;
       const bData = doc.data() as any;
       brandsList.push({ 
         id: doc.id, 
@@ -155,47 +190,78 @@ router.get("/brands", async (req: Request, res: Response) => {
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
-});
+};
 
-// POST /api/brands (Admin only - Add/Update Brand)
-router.post("/brands", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: any, res: any) => {
+router.get("/brands", getBrandsHandler);
+router.get("/admin/brands", getBrandsHandler);
+
+// POST, PUT, PATCH /api/brands & /api/admin/brands (Admin only - Add/Update Brand)
+const saveBrandHandler = async (req: any, res: any) => {
   try {
-    const { id, name, logoUrl, originCountry } = req.body || {};
-    if (!name) return res.status(400).json({ error: "Brand name is required" });
-    const cleanSlug = generateSlug(name);
-    const docId = id || cleanSlug;
-    const docRef = db.collection("brands").doc(docId);
+    let { id, name, logoUrl, originCountry } = req.body || {};
+    const targetId = (req.params.id || id || (name ? generateSlug(name) : "")).trim();
+    
+    if (!name && targetId) {
+      const existing = await db.collection("brands").doc(targetId).get();
+      if (existing.exists) {
+        name = existing.data()?.name;
+      }
+    }
+    if (!name && !targetId) {
+      return res.status(400).json({ error: "Brand name is required" });
+    }
+
+    const brandName = name || targetId;
+    const cleanSlug = generateSlug(brandName);
+    const finalId = targetId || cleanSlug;
+    const docRef = db.collection("brands").doc(finalId);
     const existingDoc = await docRef.get();
     const existingData = existingDoc.exists ? existingDoc.data() : {};
+    const savedLogoUrl = logoUrl ? saveBase64Image(logoUrl, "brands") : (existingData?.logoUrl || "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200&q=80");
     
     const data = {
       ...existingData,
-      id: docId,
-      name,
+      id: finalId,
+      name: brandName,
       slug: cleanSlug,
       originCountry: originCountry !== undefined ? originCountry : (existingData?.originCountry || "International"),
-      logoUrl: logoUrl || existingData?.logoUrl || "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200&q=80",
+      logoUrl: savedLogoUrl,
       updatedAt: new Date().toISOString()
     };
     await docRef.set(data, { merge: true });
+    await unmarkBrandAsDeleted(finalId);
     brandsCache.data = null;
     res.json({ message: "Brand saved successfully", brand: data });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
-});
+};
 
-// DELETE /api/brands/:id (Admin only)
-router.delete("/brands/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: any, res: any) => {
+router.post("/brands", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, saveBrandHandler);
+router.post("/admin/brands", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, saveBrandHandler);
+router.patch("/brands/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, saveBrandHandler);
+router.patch("/admin/brands/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, saveBrandHandler);
+router.put("/brands/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, saveBrandHandler);
+router.put("/admin/brands/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, saveBrandHandler);
+
+// DELETE /api/brands/:id & /api/admin/brands/:id (Admin only)
+const deleteBrandHandler = async (req: any, res: any) => {
   try {
     const { id } = req.params;
-    await db.collection("brands").doc(id).delete();
+    if (!id) return res.status(400).json({ error: "Brand ID is required" });
+    const targetId = String(id).trim();
+    await db.collection("brands").doc(targetId).delete();
+    await markBrandAsDeleted(targetId);
     brandsCache.data = null;
-    res.json({ message: "Brand deleted successfully" });
+    res.json({ success: true, message: `Brand '${targetId}' deleted successfully` });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
-});
+};
+
+router.delete("/brands/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, deleteBrandHandler);
+router.delete("/admin/brands/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, deleteBrandHandler);
+
 
 // GET /api/products and /api/admin/products
 const getProductsHandler = async (req: Request, res: Response) => {
@@ -335,10 +401,12 @@ const getProductsHandler = async (req: Request, res: Response) => {
 };
 
 router.get("/products", getProductsHandler);
+router.get("/product", getProductsHandler);
 router.get("/admin/products", getProductsHandler);
+router.get("/admin/product", getProductsHandler);
 
-// GET /api/products/:id
-router.get("/products/:id", async (req: Request, res: Response) => {
+// GET /api/products/:id and /api/product/:id
+const getSingleProductHandler = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     if (!id || id === "default" || id === "undefined") {
@@ -364,8 +432,20 @@ router.get("/products/:id", async (req: Request, res: Response) => {
     }
 
     if (!productData) {
+      // Fallback search across rich catalog fallback data (3,214 products)
+      const fallback = findCatalogProduct(id as string);
+      if (fallback) {
+        productData = {
+          ...fallback,
+          reviews: []
+        };
+      }
+    }
+
+    if (!productData) {
       return res.status(404).json({ error: "Product not found" });
     }
+
 
     // Fetch approved reviews safely without requiring Firestore composite index
     let reviews: any[] = [];
@@ -413,7 +493,10 @@ router.get("/products/:id", async (req: Request, res: Response) => {
     console.error("Error in GET /products/:id", error);
     res.status(500).json({ error: error.message || "Failed to fetch product" });
   }
-});
+};
+
+router.get("/products/:id", getSingleProductHandler);
+router.get("/product/:id", getSingleProductHandler);
 
 // POST /api/products/:id/reviews
 router.post("/products/:id/reviews", async (req: Request, res: Response) => {
@@ -464,8 +547,8 @@ router.post("/products/:id/reviews", async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/products (Admin only - Create product)
-router.post("/products", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: Request, res: Response) => {
+// POST /api/products and /api/product (Admin only - Create product)
+const createProductHandler = async (req: Request, res: Response) => {
   try {
     const { name, description, imageUrl, price, discountPrice, costPrice, stock, metaTitle, metaDescription, metaKeywords, campaignName, variants } = req.body;
     let brandId = req.body.brandId;
@@ -489,6 +572,7 @@ router.post("/products", authenticateJWT as any, requireRole(["SuperAdmin", "Man
     }
 
     let variantCreateList = [];
+    const savedMainImage = imageUrl ? saveBase64Image(imageUrl, "products") : "";
     if (variants && Array.isArray(variants) && variants.length > 0) {
       variantCreateList = variants.map((v: any) => ({
         id: v.id || `var-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
@@ -499,7 +583,7 @@ router.post("/products", authenticateJWT as any, requireRole(["SuperAdmin", "Man
         stock: parseInt(v.stock) || 0,
         shadeColor: v.shadeColor || null,
         sizeValue: v.sizeValue || null,
-        imageUrl: v.imageUrl || null,
+        imageUrl: v.imageUrl ? saveBase64Image(v.imageUrl, "products") : null,
         sku: v.sku || `SKU-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`
       }));
     } else {
@@ -541,7 +625,7 @@ router.post("/products", authenticateJWT as any, requireRole(["SuperAdmin", "Man
       campaignName: campaignName || null,
       images: (() => {
         const list: any[] = [];
-        if (imageUrl) list.push({ id: `img-${Date.now()}`, url: imageUrl, isPrimary: true });
+        if (savedMainImage) list.push({ id: `img-${Date.now()}`, url: savedMainImage, isPrimary: true });
         variantCreateList.forEach((v: any) => {
           if (v.imageUrl && !list.some(img => img.url === v.imageUrl)) {
             list.push({ id: `img-var-${v.id}`, url: v.imageUrl, isPrimary: list.length === 0 });
@@ -563,7 +647,11 @@ router.post("/products", authenticateJWT as any, requireRole(["SuperAdmin", "Man
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
-});
+};
+
+router.post("/products", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, createProductHandler);
+router.post("/product", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, createProductHandler);
+router.post("/admin/products", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, createProductHandler);
 
 // PUT & PATCH /api/products/:id & /api/admin/products/:id (Admin only - Update product)
 const updateProductHandler = async (req: Request, res: Response) => {
@@ -591,6 +679,7 @@ const updateProductHandler = async (req: Request, res: Response) => {
     }
 
     let updatedVariants = currentProduct.variants || [];
+    const savedMainImage = imageUrl ? saveBase64Image(imageUrl, "products") : (currentProduct.imageUrl || null);
     if (variants && Array.isArray(variants)) {
       if (variants.length === 0) {
         updatedVariants = [{
@@ -602,7 +691,7 @@ const updateProductHandler = async (req: Request, res: Response) => {
           stock: stock !== undefined ? parseInt(stock) : (currentProduct.stock || 50),
           shadeColor: null,
           sizeValue: null,
-          imageUrl: imageUrl || currentProduct.imageUrl || null,
+          imageUrl: savedMainImage,
           sku: currentProduct.variants?.[0]?.sku || `SKU-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`
         }];
       } else {
@@ -615,7 +704,7 @@ const updateProductHandler = async (req: Request, res: Response) => {
           stock: v.stock !== undefined ? parseInt(v.stock) : 50,
           shadeColor: v.shadeColor || null,
           sizeValue: v.sizeValue || null,
-          imageUrl: v.imageUrl || null,
+          imageUrl: v.imageUrl ? saveBase64Image(v.imageUrl, "products") : null,
           sku: v.sku || `SKU-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`
         }));
       }
@@ -630,7 +719,7 @@ const updateProductHandler = async (req: Request, res: Response) => {
 
     // Rebuild images strictly from Main Cover URL + active remaining variants' images
     let updatedImages: any[] = [];
-    const primaryUrl = imageUrl || currentProduct.imageUrl || currentProduct.images?.find((i: any) => i.isPrimary)?.url || currentProduct.images?.[0]?.url;
+    const primaryUrl = savedMainImage || currentProduct.images?.find((i: any) => i.isPrimary)?.url || currentProduct.images?.[0]?.url;
     if (primaryUrl) {
       updatedImages.push({ id: `img-primary-${id}`, url: primaryUrl, isPrimary: true });
     }
@@ -678,6 +767,8 @@ const updateProductHandler = async (req: Request, res: Response) => {
 
 router.put("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, updateProductHandler);
 router.patch("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, updateProductHandler);
+router.put("/product/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, updateProductHandler);
+router.patch("/product/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, updateProductHandler);
 router.put("/admin/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, updateProductHandler);
 router.patch("/admin/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, updateProductHandler);
 
@@ -700,6 +791,7 @@ const deleteProductHandler = async (req: Request, res: Response) => {
 };
 
 router.delete("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, deleteProductHandler);
+router.delete("/product/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, deleteProductHandler);
 router.delete("/admin/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, deleteProductHandler);
 
 export default router;

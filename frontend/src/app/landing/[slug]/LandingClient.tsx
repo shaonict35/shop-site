@@ -1,10 +1,45 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { CheckCircle2, ShoppingBag, Truck, ShieldCheck, Sparkles, Phone, MapPin, User, Clock } from "lucide-react";
-import { API_BASE } from "../../../utils/api";
+import { 
+  CheckCircle2, ShoppingBag, Truck, ShieldCheck, Sparkles, Phone, MapPin, User, Clock,
+  ChevronLeft, ChevronRight, ThumbsUp, MessageCircle, ExternalLink, Users, Heart, Share2, Award, ArrowDown
+} from "lucide-react";
+import { API_BASE, getMediaUrl } from "../../../utils/api";
+
+function FacebookIcon({ size = 20, color = "#1877F2" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+    </svg>
+  );
+}
+
+interface FbPost {
+  id: string;
+  authorName: string;
+  authorAvatar?: string;
+  roleBadge?: string;
+  badgeColor?: string;
+  timeAgo?: string;
+  postText: string;
+  image?: string;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  tag?: string;
+}
+
+interface FbCommunityData {
+  groupTitle: string;
+  groupUrl: string;
+  groupCoverImage: string;
+  memberCount: string;
+  description: string;
+  posts: FbPost[];
+}
 
 export default function DynamicLandingPage() {
   const params = useParams();
@@ -14,6 +49,7 @@ export default function DynamicLandingPage() {
     title: "বিশেষ অফারে অরিজিনাল বিউটি কম্বো প্যাকেজ!",
     subtitle: "সীমিত সময়ের জন্য ছাড়! ১০০% অরিজিনাল প্রোডাক্ট দ্রুত ক্যাশ অন ডেলিভারিতে পান।",
     videoUrl: "",
+    facebookGroupUrl: "https://www.facebook.com/groups/675430693128442",
     productTitle: "প্রিমিয়াম বিউটি ও স্কিনকেয়ার গ্লো সেট",
     productPrice: "1250",
     originalPrice: "1850",
@@ -29,9 +65,39 @@ export default function DynamicLandingPage() {
   });
 
   const [selectedImage, setSelectedImage] = useState(0);
+  const [activeMediaTab, setActiveMediaTab] = useState<"images" | "video">("images");
+  
+  // Real Facebook Community state & ref
+  const fbSliderRef = useRef<HTMLDivElement>(null);
+  const [activeFbIndex, setActiveFbIndex] = useState(0);
+  const [fbCommunity, setFbCommunity] = useState<FbCommunityData>({
+    groupTitle: "Glowgoodly-Review & problem solution",
+    groupUrl: "https://www.facebook.com/groups/675430693128442",
+    groupCoverImage: "https://lookaside.fbsbx.com/lookaside/crawler/media/?media_id=1392699616200457",
+    memberCount: "৮৫০+",
+    description: "অনলাইনে বিশ্বস্ত কেনাকাটা করতে জয়েন হয়ে যান আমাদের গ্রুপে।😊 আমাদের পেজ থেকে অর্ডার করা প্রোডাক্টের রিভিউ দিয়ে পেয়ে যান নেক্সট অর্ডার আকর্ষণীয় ডিসকাউন্ট...",
+    posts: []
+  });
+
+  const scrollFbSlider = (direction: "left" | "right") => {
+    if (fbSliderRef.current) {
+      const scrollAmount = direction === "left" ? -355 : 355;
+      fbSliderRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
+    }
+  };
+
+  const handleFbSliderScroll = () => {
+    if (fbSliderRef.current) {
+      const totalPosts = Math.max(1, (fbCommunity.posts || []).length);
+      const index = Math.round(fbSliderRef.current.scrollLeft / 355);
+      setActiveFbIndex(Math.max(0, Math.min(totalPosts - 1, index)));
+    }
+  };
+
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
+  const [customerNotes, setCustomerNotes] = useState("");
   const [deliveryZone, setDeliveryZone] = useState<"inside" | "sub" | "outside">("inside");
   const [quantity, setQuantity] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -39,7 +105,26 @@ export default function DynamicLandingPage() {
 
   useEffect(() => {
     fetchPageData();
+    fetchFbCommunity();
   }, [slug]);
+
+  const fetchFbCommunity = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/settings/facebook-community`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && typeof data === "object") {
+          setFbCommunity((prev) => ({
+            ...prev,
+            ...data,
+            posts: Array.isArray(data.posts) ? data.posts : []
+          }));
+        }
+      }
+    } catch (e) {
+      console.warn("Could not fetch Facebook community settings:", e);
+    }
+  };
 
   const fetchPageData = async () => {
     try {
@@ -138,7 +223,9 @@ export default function DynamicLandingPage() {
         totalAmount: grandTotal,
         paymentMethod: "Cash on Delivery",
         status: "Pending",
-        notes: `Order placed from Landing Page [/${slug}] [Zone: ${zoneLabel}]`
+        notes: customerNotes 
+          ? `[কাস্টমার শেড/নোট]: ${customerNotes} | [ল্যান্ডিং পেজ: /${slug}] [Zone: ${zoneLabel}]` 
+          : `Order placed from Landing Page [/${slug}] [Zone: ${zoneLabel}]`
       };
 
       const res = await fetch(`${API_BASE}/orders`, {
@@ -203,6 +290,10 @@ export default function DynamicLandingPage() {
           {/* Video Section */}
           {offer.videoUrl && (
             <div style={{ maxWidth: "800px", margin: "0 auto 30px auto", borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 40px rgba(0,0,0,0.15)", background: "#000000", border: "4px solid #ffffff" }}>
+              <div style={{ background: "linear-gradient(90deg, #1e293b, #0f172a)", color: "#f8fafc", padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "13px", fontWeight: "700" }}>
+                <span>🎥 পণ্যটির সরাসরি ভিডিও ডেমো (Watch Live Demo)</span>
+                <span style={{ color: "#f472b6", fontSize: "12px" }}>১০০% অরিজিনাল কোয়ালিটি</span>
+              </div>
               {offer.videoUrl.includes("youtube.com") || offer.videoUrl.includes("youtu.be") ? (
                 <div style={{ position: "relative", paddingBottom: "56.25%", height: 0 }}>
                   <iframe 
@@ -236,30 +327,91 @@ export default function DynamicLandingPage() {
       <section style={{ maxWidth: "1000px", margin: "40px auto", padding: "0 16px" }}>
         <div style={{ background: "#ffffff", borderRadius: "20px", padding: "30px", boxShadow: "0 4px 20px rgba(0,0,0,0.04)", border: "1px solid #e2e8f0", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "30px" }}>
           
-          {/* Images */}
+          {/* Media (Images & Video Tab Switcher) */}
           <div>
-            <div style={{ borderRadius: "14px", overflow: "hidden", border: "1px solid #f1f5f9", height: "350px", background: "#f8fafc", position: "relative" }}>
-              <img 
-                src={offer.productImages[selectedImage] || offer.productImages[0]} 
-                alt={offer.productTitle}
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
-              <span style={{ position: "absolute", top: "12px", left: "12px", background: "#e52860", color: "#ffffff", padding: "4px 12px", borderRadius: "20px", fontWeight: "800", fontSize: "12px" }}>
-                বিশেষ অফার
-              </span>
-            </div>
+            {offer.videoUrl && (
+              <div style={{ display: "flex", gap: "8px", marginBottom: "14px" }}>
+                <button
+                  type="button"
+                  onClick={() => setActiveMediaTab("images")}
+                  style={{
+                    flex: 1,
+                    padding: "8px 12px",
+                    borderRadius: "8px",
+                    border: activeMediaTab === "images" ? "2px solid #e52860" : "1px solid #cbd5e1",
+                    background: activeMediaTab === "images" ? "#fff5f7" : "#f8fafc",
+                    color: activeMediaTab === "images" ? "#e52860" : "#475569",
+                    fontWeight: "800",
+                    fontSize: "13px",
+                    cursor: "pointer"
+                  }}
+                >
+                  📷 ফটো গ্যালারি ({offer.productImages.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveMediaTab("video")}
+                  style={{
+                    flex: 1,
+                    padding: "8px 12px",
+                    borderRadius: "8px",
+                    border: activeMediaTab === "video" ? "2px solid #e52860" : "1px solid #cbd5e1",
+                    background: activeMediaTab === "video" ? "#fff5f7" : "#f8fafc",
+                    color: activeMediaTab === "video" ? "#e52860" : "#475569",
+                    fontWeight: "800",
+                    fontSize: "13px",
+                    cursor: "pointer"
+                  }}
+                >
+                  🎥 ভিডিও রিভিউ
+                </button>
+              </div>
+            )}
 
-            {offer.productImages.length > 1 && (
-              <div style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
-                {offer.productImages.map((img: string, idx: number) => (
-                  <img 
-                    key={idx}
-                    src={img}
-                    alt={`Thumb ${idx}`}
-                    onClick={() => setSelectedImage(idx)}
-                    style={{ width: "60px", height: "60px", borderRadius: "8px", objectFit: "cover", cursor: "pointer", border: selectedImage === idx ? "2px solid #e52860" : "1px solid #e2e8f0" }}
+            {activeMediaTab === "video" && offer.videoUrl ? (
+              <div style={{ borderRadius: "14px", overflow: "hidden", border: "1px solid #f1f5f9", height: "350px", background: "#000000" }}>
+                {offer.videoUrl.includes("youtube.com") || offer.videoUrl.includes("youtu.be") ? (
+                  <iframe 
+                    src={offer.videoUrl.replace("watch?v=", "embed/")} 
+                    title="Product Video" 
+                    style={{ width: "100%", height: "100%", border: 0 }}
+                    allowFullScreen
                   />
-                ))}
+                ) : (
+                  <video 
+                    src={offer.videoUrl} 
+                    controls 
+                    autoPlay 
+                    style={{ width: "100%", height: "100%", objectFit: "contain" }} 
+                  />
+                )}
+              </div>
+            ) : (
+              <div>
+                <div style={{ borderRadius: "14px", overflow: "hidden", border: "1px solid #f1f5f9", height: "350px", background: "#f8fafc", position: "relative" }}>
+                  <img 
+                    src={offer.productImages[selectedImage] || offer.productImages[0]} 
+                    alt={offer.productTitle}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                  <span style={{ position: "absolute", top: "12px", left: "12px", background: "#e52860", color: "#ffffff", padding: "4px 12px", borderRadius: "20px", fontWeight: "800", fontSize: "12px" }}>
+                    বিশেষ অফার
+                  </span>
+                </div>
+
+                {offer.productImages.length > 1 && (
+                  <div style={{ display: "flex", gap: "10px", marginTop: "12px", flexWrap: "wrap" }}>
+                    {offer.productImages.map((img: string, idx: number) => (
+                      <img 
+                        key={idx}
+                        src={img}
+                        alt={`Thumb ${idx}`}
+                        onClick={() => { setSelectedImage(idx); setActiveMediaTab("images"); }}
+                        style={{ width: "60px", height: "60px", borderRadius: "8px", objectFit: "cover", cursor: "pointer", border: (selectedImage === idx && activeMediaTab === "images") ? "2px solid #e52860" : "1px solid #e2e8f0" }}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -309,6 +461,576 @@ export default function DynamicLandingPage() {
             </div>
           </div>
 
+        </div>
+      </section>
+
+      {/* Facebook Group Customer Reviews Sliding Section */}
+      <section style={{ maxWidth: "1150px", margin: "45px auto 35px auto", padding: "0 16px" }}>
+        {/* Enclosed Card Container with Proper Padding ("section ta ekta padding diye atkao") */}
+        <div style={{
+          background: "#ffffff",
+          borderRadius: "24px",
+          border: "2px solid #e2e8f0",
+          boxShadow: "0 10px 35px rgba(15, 23, 42, 0.06)",
+          padding: "28px 24px",
+          position: "relative"
+        }}>
+          {/* Header Box */}
+          <div style={{
+            background: "linear-gradient(135deg, #eff6ff 0%, #ffffff 50%, #fdf2f8 100%)",
+            border: "1.5px solid #bfdbfe",
+            borderRadius: "20px",
+            padding: "22px 20px",
+            boxShadow: "0 4px 18px rgba(24, 119, 242, 0.07)",
+            marginBottom: "24px"
+          }}>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
+              
+              {/* Title & Real Group Meta */}
+              <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                <div style={{
+                  width: "52px",
+                  height: "52px",
+                  borderRadius: "16px",
+                  background: "#1877F2",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#ffffff",
+                  boxShadow: "0 6px 16px rgba(24, 119, 242, 0.35)",
+                  flexShrink: 0
+                }}>
+                  <FacebookIcon size={30} color="#ffffff" />
+                </div>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <span style={{
+                      background: "#dbeafe",
+                      color: "#1d4ed8",
+                      fontSize: "12px",
+                      fontWeight: "800",
+                      padding: "3px 10px",
+                      borderRadius: "12px"
+                    }}>
+                      👥 অফিশিয়াল ফেসবুক গ্রুপ
+                    </span>
+                    {fbCommunity.memberCount && (
+                      <span style={{ fontSize: "12.5px", color: "#1e293b", fontWeight: "800" }}>
+                        • {fbCommunity.memberCount} জন মেম্বার
+                      </span>
+                    )}
+                  </div>
+                  <h3 style={{ fontSize: "21px", fontWeight: "900", color: "#0f172a", marginTop: "4px", marginBottom: "2px" }}>
+                    {fbCommunity.groupTitle || "Glowgoodly-Review & problem solution"}
+                  </h3>
+                  <p style={{ fontSize: "13px", color: "#475569", margin: 0 }}>
+                    {fbCommunity.description || "আমাদের অফিশিয়াল ফেসবুক গ্রুপে কাস্টমারদের রিয়েল পোস্ট ও রিভিউ দেখুন"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons & Navigation Arrows */}
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <a 
+                  href={fbCommunity.groupUrl || offer.facebookGroupUrl || "https://www.facebook.com/groups/675430693128442"} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    background: "#1877F2",
+                    color: "#ffffff",
+                    fontSize: "13.5px",
+                    fontWeight: "800",
+                    padding: "10px 18px",
+                    borderRadius: "25px",
+                    textDecoration: "none",
+                    boxShadow: "0 4px 14px rgba(24, 119, 242, 0.3)",
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  <FacebookIcon size={18} color="#ffffff" />
+                  <span>গ্রুপে জয়েন করুন</span>
+                  <ExternalLink size={15} />
+                </a>
+
+                {/* Header Arrow Buttons */}
+                <button 
+                  type="button"
+                  onClick={() => scrollFbSlider("left")}
+                  aria-label="Previous Facebook Post"
+                  style={{
+                    width: "42px",
+                    height: "42px",
+                    borderRadius: "50%",
+                    border: "2px solid #1877F2",
+                    background: "#ffffff",
+                    color: "#1877F2",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    boxShadow: "0 3px 10px rgba(24,119,242,0.18)",
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  <ChevronLeft size={22} />
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => scrollFbSlider("right")}
+                  aria-label="Next Facebook Post"
+                  style={{
+                    width: "42px",
+                    height: "42px",
+                    borderRadius: "50%",
+                    border: "2px solid #1877F2",
+                    background: "#ffffff",
+                    color: "#1877F2",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    boxShadow: "0 3px 10px rgba(24,119,242,0.18)",
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  <ChevronRight size={22} />
+                </button>
+              </div>
+
+            </div>
+
+            {/* Swipe Instruction Banner */}
+            <div style={{
+              marginTop: "14px",
+              padding: "8px 14px",
+              background: "#ffffff",
+              borderRadius: "12px",
+              border: "1px dashed #93c5fd",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              fontSize: "12px",
+              fontWeight: "700",
+              color: "#1e40af"
+            }}>
+              <span>👈 ডানে-বামে স্লাইড করে অথবা দুই পাশের অ্যারো (Arrow) বাটনে ক্লিক করে গ্রুপের রিয়েল পোস্টগুলো দেখুন 👉</span>
+              <span style={{ color: "#64748b", fontWeight: "600" }}>পোস্ট {activeFbIndex + 1} / {Math.max(1, (fbCommunity.posts || []).length)}</span>
+            </div>
+          </div>
+
+          {/* Slider Container with Visible Side Navigation Arrows ("right left arrow dio") */}
+          <div style={{ position: "relative" }}>
+            
+            {/* Prominent Left Arrow Button */}
+            <button
+              type="button"
+              onClick={() => scrollFbSlider("left")}
+              aria-label="Scroll Left"
+              style={{
+                position: "absolute",
+                left: "-16px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                width: "46px",
+                height: "46px",
+                borderRadius: "50%",
+                background: "#ffffff",
+                border: "2px solid #1877F2",
+                boxShadow: "0 6px 18px rgba(0,0,0,0.15)",
+                color: "#1877F2",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                zIndex: 10,
+                transition: "all 0.2s ease"
+              }}
+            >
+              <ChevronLeft size={26} />
+            </button>
+
+            {/* Prominent Right Arrow Button */}
+            <button
+              type="button"
+              onClick={() => scrollFbSlider("right")}
+              aria-label="Scroll Right"
+              style={{
+                position: "absolute",
+                right: "-16px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                width: "46px",
+                height: "46px",
+                borderRadius: "50%",
+                background: "#ffffff",
+                border: "2px solid #1877F2",
+                boxShadow: "0 6px 18px rgba(0,0,0,0.15)",
+                color: "#1877F2",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                zIndex: 10,
+                transition: "all 0.2s ease"
+              }}
+            >
+              <ChevronRight size={26} />
+            </button>
+
+            {/* Sliding Carousel Track */}
+            <div 
+              ref={fbSliderRef}
+              onScroll={handleFbSliderScroll}
+              style={{
+                display: "flex",
+                gap: "18px",
+                overflowX: "auto",
+                scrollSnapType: "x mandatory",
+                scrollBehavior: "smooth",
+                padding: "8px 6px 20px 6px",
+                WebkitOverflowScrolling: "touch",
+                scrollbarWidth: "none",
+                msOverflowStyle: "none"
+              }}
+            >
+              {(!fbCommunity.posts || fbCommunity.posts.length === 0) ? (
+                /* Group Cover & Info Card when no posts added yet */
+                <div 
+                  style={{
+                    flex: "0 0 100%",
+                    width: "100%",
+                    background: "#ffffff",
+                    borderRadius: "20px",
+                    border: "1px solid #e2e8f0",
+                    boxShadow: "0 8px 24px rgba(15, 23, 42, 0.07)",
+                    overflow: "hidden",
+                    display: "flex",
+                    flexDirection: "column"
+                  }}
+                >
+                  <div style={{ position: "relative", width: "100%", height: "260px", background: "#f8fafc" }}>
+                    <img 
+                      src={getMediaUrl(fbCommunity.groupCoverImage) || "https://lookaside.fbsbx.com/lookaside/crawler/media/?media_id=1392699616200457"} 
+                      alt="Glowgoodly Official Facebook Group" 
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                    <div style={{
+                      position: "absolute",
+                      bottom: "12px",
+                      left: "12px",
+                      background: "rgba(15,23,42,0.85)",
+                      backdropFilter: "blur(6px)",
+                      color: "#ffffff",
+                      fontSize: "13px",
+                      fontWeight: "800",
+                      padding: "6px 14px",
+                      borderRadius: "20px"
+                    }}>
+                      👥 {fbCommunity.groupTitle || "Glowgoodly-Review & problem solution"}
+                    </div>
+                  </div>
+                  <div style={{ padding: "20px", textAlign: "center" }}>
+                    <p style={{ fontSize: "14.5px", color: "#334155", margin: "0 0 16px 0", lineHeight: "1.6" }}>
+                      {fbCommunity.description || "অনলাইনে বিশ্বস্ত কেনাকাটা করতে জয়েন হয়ে যান আমাদের গ্রুপে।😊 আমাদের পেজ থেকে অর্ডার করা প্রোডাক্টের রিভিউ দিয়ে পেয়ে যান নেক্সট অর্ডার আকর্ষণীয় ডিসকাউন্ট..."}
+                    </p>
+                    <a
+                      href={fbCommunity.groupUrl || "https://www.facebook.com/groups/675430693128442"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        background: "#1877F2",
+                        color: "#ffffff",
+                        padding: "10px 24px",
+                        borderRadius: "25px",
+                        fontWeight: "800",
+                        textDecoration: "none",
+                        fontSize: "14px"
+                      }}
+                    >
+                      <FacebookIcon size={18} color="#ffffff" />
+                      <span>ফেসবুক গ্রুপে সরাসরি সকল পোস্ট ও রিভিউ দেখুন</span>
+                      <ExternalLink size={15} />
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                /* Real Posts from Facebook Community */
+                fbCommunity.posts.map((post: FbPost, idx: number) => (
+                  <div 
+                    key={post.id || idx}
+                    style={{
+                      flex: "0 0 350px",
+                      width: "350px",
+                      maxWidth: "88vw",
+                      scrollSnapAlign: "start",
+                      background: "#ffffff",
+                      borderRadius: "20px",
+                      border: "1px solid #e2e8f0",
+                      boxShadow: "0 8px 24px rgba(15, 23, 42, 0.07)",
+                      display: "flex",
+                      flexDirection: "column",
+                      overflow: "hidden",
+                      transition: "transform 0.2s ease, box-shadow 0.2s ease"
+                    }}
+                  >
+                    {/* Post Author Bar */}
+                    <div style={{ padding: "16px 16px 12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <img 
+                          src={getMediaUrl(post.authorAvatar) || "/images/logo-admin.png"} 
+                          alt={post.authorName || "Member"} 
+                          style={{ width: "46px", height: "46px", borderRadius: "50%", objectFit: "cover", border: "2px solid #e2e8f0" }}
+                        />
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span style={{ fontSize: "15px", fontWeight: "800", color: "#0f172a" }}>{post.authorName}</span>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px" }}>
+                            <span style={{
+                              background: `${post.badgeColor || "#1877F2"}15`,
+                              color: post.badgeColor || "#1877F2",
+                              fontSize: "11px",
+                              fontWeight: "800",
+                              padding: "1px 7px",
+                              borderRadius: "10px"
+                            }}>
+                              {post.roleBadge || "গ্রুপ মেম্বার"}
+                            </span>
+                            {post.timeAgo && (
+                              <span style={{ fontSize: "11px", color: "#64748b" }}>• {post.timeAgo}</span>
+                            )}
+                            <span style={{ fontSize: "11px", color: "#64748b" }}>• 🌐</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Facebook Community Mark */}
+                      <div style={{
+                        width: "28px",
+                        height: "28px",
+                        borderRadius: "50%",
+                        background: "#f0f7ff",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center"
+                      }}>
+                        <FacebookIcon size={16} color="#1877F2" />
+                      </div>
+                    </div>
+
+                    {/* Post Text */}
+                    <div style={{ padding: "0 16px 12px 16px", flexGrow: 1 }}>
+                      <p style={{
+                        fontSize: "13.5px",
+                        lineHeight: "1.6",
+                        color: "#334155",
+                        margin: 0,
+                        whiteSpace: "pre-line"
+                      }}>
+                        {post.postText}
+                      </p>
+                      {post.tag && (
+                        <div style={{ marginTop: "8px", fontSize: "12px", color: "#1877F2", fontWeight: "700" }}>
+                          {post.tag}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Customer / Group Photo */}
+                    {post.image && (
+                      <div style={{ position: "relative", width: "100%", height: "230px", background: "#f8fafc" }}>
+                        <img 
+                          src={getMediaUrl(post.image)} 
+                          alt="Customer Review Photo" 
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                        <div style={{
+                          position: "absolute",
+                          bottom: "10px",
+                          right: "10px",
+                          background: "rgba(0,0,0,0.65)",
+                          backdropFilter: "blur(4px)",
+                          color: "#ffffff",
+                          fontSize: "11px",
+                          fontWeight: "700",
+                          padding: "4px 10px",
+                          borderRadius: "20px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px"
+                        }}>
+                          <span>📷 গ্রুপ পোস্ট ফটো</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Facebook Reactions Counter Bar */}
+                    <div style={{
+                      padding: "10px 16px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      borderBottom: "1px solid #f1f5f9",
+                      fontSize: "12px",
+                      color: "#64748b"
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          <span style={{
+                            width: "20px",
+                            height: "20px",
+                            borderRadius: "50%",
+                            background: "#1877F2",
+                            color: "#fff",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "11px",
+                            border: "2px solid #fff"
+                          }}>👍</span>
+                          <span style={{
+                            width: "20px",
+                            height: "20px",
+                            borderRadius: "50%",
+                            background: "#f43f5e",
+                            color: "#fff",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "11px",
+                            marginLeft: "-6px",
+                            border: "2px solid #fff"
+                          }}>❤️</span>
+                        </div>
+                        <span style={{ fontWeight: "700", color: "#334155", marginLeft: "4px" }}>{post.likes || 12}</span>
+                      </div>
+                      <div>
+                        <span>{post.comments || 3} টি কমেন্ট</span> • <span>{post.shares || 1} টি শেয়ার</span>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons Bar */}
+                    <div style={{
+                      padding: "8px 12px",
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr 1.3fr",
+                      gap: "6px",
+                      background: "#fafafa"
+                    }}>
+                      <button
+                        type="button"
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "6px",
+                          background: "none",
+                          border: "none",
+                          padding: "7px 6px",
+                          borderRadius: "8px",
+                          color: "#475569",
+                          fontSize: "12px",
+                          fontWeight: "700",
+                          cursor: "pointer"
+                        }}
+                      >
+                        <ThumbsUp size={15} color="#1877F2" />
+                        <span>লাইক</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "6px",
+                          background: "none",
+                          border: "none",
+                          padding: "7px 6px",
+                          borderRadius: "8px",
+                          color: "#475569",
+                          fontSize: "12px",
+                          fontWeight: "700",
+                          cursor: "pointer"
+                        }}
+                      >
+                        <MessageCircle size={15} color="#059669" />
+                        <span>কমেন্ট</span>
+                      </button>
+
+                      <a 
+                        href={fbCommunity.groupUrl || "https://www.facebook.com/groups/675430693128442"} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "5px",
+                          background: "#eff6ff",
+                          border: "1px solid #bfdbfe",
+                          padding: "7px 6px",
+                          borderRadius: "8px",
+                          color: "#1d4ed8",
+                          fontSize: "12px",
+                          fontWeight: "800",
+                          textDecoration: "none"
+                        }}
+                      >
+                        <span>গ্রুপে দেখুন</span>
+                        <ExternalLink size={13} />
+                      </a>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Carousel Pagination Dots & Jump to Checkout CTA */}
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", marginTop: "16px", gap: "12px" }}>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              {((fbCommunity.posts && fbCommunity.posts.length > 0) ? fbCommunity.posts : [1]).map((_, i) => (
+                <div 
+                  key={i}
+                  style={{
+                    width: activeFbIndex === i ? "24px" : "8px",
+                    height: "8px",
+                    borderRadius: "4px",
+                    background: activeFbIndex === i ? "#1877F2" : "#cbd5e1",
+                    transition: "all 0.3s ease"
+                  }}
+                />
+              ))}
+            </div>
+
+            <a 
+              href="#checkout-form"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                background: "#ffe4e8",
+                color: "#e52860",
+                fontWeight: "800",
+                fontSize: "13px",
+                padding: "8px 18px",
+                borderRadius: "20px",
+                textDecoration: "none"
+              }}
+            >
+              <span>নিচের ফর্ম পূরণ করে অর্ডার করুন</span>
+              <ArrowDown size={15} />
+            </a>
+          </div>
         </div>
       </section>
 
@@ -410,6 +1132,30 @@ export default function DynamicLandingPage() {
                     style={{ width: "100%", padding: "12px 14px 12px 42px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "15px", outline: "none", boxSizing: "border-box" }}
                   />
                 </div>
+              </div>
+
+              {/* Shade Customization & Order Notes Field */}
+              <div style={{ background: "#fff5f7", padding: "14px", borderRadius: "12px", border: "1.5px dashed #f472b6" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                  <label htmlFor="landing-customer-notes" style={{ fontSize: "14px", fontWeight: "800", color: "#e52860" }}>
+                    🎨 পছন্দের শেড বা কাস্টমাইজেশন নোট (ঐচ্ছিক)
+                  </label>
+                  <span style={{ fontSize: "11px", background: "#ffffff", color: "#e52860", padding: "2px 8px", borderRadius: "10px", fontWeight: "700", border: "1px solid #fecdd3" }}>
+                    Shade / Custom Note
+                  </span>
+                </div>
+                <textarea 
+                  id="landing-customer-notes"
+                  name="notes"
+                  rows={2}
+                  placeholder="যেমন: লিপস্টিক বা ফাউন্ডেশন শেড নম্বর (Shade #02 / Natural Glow), বা পছন্দের কালার কোড লিখুন..."
+                  value={customerNotes}
+                  onChange={(e) => setCustomerNotes(e.target.value)}
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "14px", outline: "none", boxSizing: "border-box", background: "#ffffff" }}
+                />
+                <p style={{ margin: "6px 0 0 0", fontSize: "12px", color: "#64748b" }}>
+                  💡 আপনি যে শেড বা ভ্যারিয়েন্ট পছন্দ করেন তা এখানে লিখে দিন, আমাদের প্রতিনিধি সেই অনুযায়ী প্রোডাক্ট রেডি করবেন।
+                </p>
               </div>
 
               {/* Delivery Zone Selector */}

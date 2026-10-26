@@ -36,12 +36,15 @@ function getClientIp(req: Request): string {
  * Global DDoS & Flooding Protection: Max 300 requests per minute per IP
  */
 export function globalRateLimiter(req: Request, res: Response, next: NextFunction) {
-  // Allow healthchecks or static assets
-  if (req.path === "/health" || req.path.startsWith("/public")) {
+  if (req.method === "OPTIONS" || req.path === "/health" || req.path.startsWith("/public")) {
     return next();
   }
 
   const ip = getClientIp(req);
+  if (ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1" || ip === "localhost") {
+    return next();
+  }
+
   const now = Date.now();
   const windowMs = 60 * 1000;
   const maxRequests = 350;
@@ -74,10 +77,18 @@ export function globalRateLimiter(req: Request, res: Response, next: NextFunctio
  * Brute-Force Login & Signup Defense: Max 15 attempts per 5 minutes per IP
  */
 export function authRateLimiter(req: Request, res: Response, next: NextFunction) {
+  if (req.method === "OPTIONS") {
+    return next();
+  }
+
   const ip = getClientIp(req);
+  if (ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1" || ip === "localhost") {
+    return next();
+  }
+
   const now = Date.now();
   const windowMs = 5 * 60 * 1000; // 5 minutes
-  const maxAttempts = 15;
+  const maxAttempts = 25;
 
   const entry = authLimits.get(ip) || { count: 0, resetTime: now + windowMs };
 

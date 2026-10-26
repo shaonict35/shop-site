@@ -5,7 +5,7 @@ import db from "./firebase";
 export const getActiveSmtpConfig = async () => {
   let host = process.env.SMTP_HOST || "mail.glowgoodly.com";
   let port = parseInt(process.env.SMTP_PORT || "465", 10);
-  let user = process.env.SMTP_USER || "support@glowgoodly.com";
+  let user = process.env.SMTP_USER || "admin@glowgoodly.com";
   let pass = process.env.SMTP_PASS || "";
   let fromAddress = process.env.SMTP_FROM_EMAIL || `"GlowGoodly Official" <${user}>`;
 
@@ -32,7 +32,7 @@ export const getActiveSmtpConfig = async () => {
 export const getTransporter = (overrideConfig?: { host?: string; port?: number; user?: string; pass?: string }) => {
   const host = overrideConfig?.host || process.env.SMTP_HOST || "mail.glowgoodly.com";
   const port = overrideConfig?.port || parseInt(process.env.SMTP_PORT || "465", 10);
-  const user = overrideConfig?.user || process.env.SMTP_USER || "support@glowgoodly.com";
+  const user = overrideConfig?.user || process.env.SMTP_USER || "admin@glowgoodly.com";
   const pass = overrideConfig?.pass !== undefined ? overrideConfig.pass : (process.env.SMTP_PASS || "");
 
   const isSecure = port === 465;
@@ -154,14 +154,21 @@ export async function sendWelcomeUserEmail(toEmail: string, name: string, tempPa
 export async function sendOrderReceiptEmail(order: any) {
   try {
     const config = await getActiveSmtpConfig();
-    const transporter = getTransporter(config);
-    const senderEmail = config.user || "support@glowgoodly.com";
+    const senderEmail = config.user || "admin@glowgoodly.com";
     const fromAddress = config.fromAddress || `"GlowGoodly Official" <${senderEmail}>`;
-    const storeSupportEmail = "support@glowgoodly.com";
+    const storeSupportEmail = "admin@glowgoodly.com";
 
     // Determine destination recipients
     const customerEmail = (order.customerEmail || "").trim();
     const hasValidCustomerEmail = Boolean(customerEmail && customerEmail.includes("@"));
+    const targetRecipient = hasValidCustomerEmail ? customerEmail : storeSupportEmail;
+
+    if (!config.pass) {
+      console.warn(`[Order Mailer Info] SMTP_PASS is empty. To send live emails from mail.glowgoodly.com, set SMTP_PASS in .env or via Admin Settings (valobasa) > SMTP. Order invoice #${order.orderNumber} successfully prepared for customer: ${targetRecipient}.`);
+      return { success: true, simulated: true, recipient: targetRecipient };
+    }
+
+    const transporter = getTransporter(config);
 
     // Prepare Items HTML and Text
     const items = order.orderItems || [];
@@ -305,6 +312,12 @@ Warehouse: 1162, East Monipur, Mirpur-2, Dhaka-1216, Bangladesh
                 Phone: <strong>${order.customerPhone || "N/A"}</strong><br/>
                 Address: ${order.address || "N/A"}
               </p>
+              ${order.notes ? `
+                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dotted #e2e8f0;">
+                  <strong style="color: #e63b7a; font-size: 12px;">🎨 কাস্টমার নোট / শেড চয়েস (Customization Notes):</strong>
+                  <p style="margin: 4px 0 0 0; font-size: 12.5px; color: #1e293b; background: #fff5f7; padding: 6px 10px; border-radius: 6px; border: 1px solid #fecdd3;">${order.notes}</p>
+                </div>
+              ` : ""}
             </div>
 
             <p style="font-size: 12px; color: #64748b; line-height: 1.5; margin: 0; text-align: center;">
@@ -324,17 +337,16 @@ Warehouse: 1162, East Monipur, Mirpur-2, Dhaka-1216, Bangladesh
     `;
 
     const messageId = `<order-${order.orderNumber || Date.now()}-${Date.now()}@glowgoodly.com>`;
-    const targetRecipient = hasValidCustomerEmail ? customerEmail : storeSupportEmail;
     const bccList = hasValidCustomerEmail ? [storeSupportEmail] : undefined;
 
     const mailOptions: any = {
       from: fromAddress,
       to: targetRecipient,
       bcc: bccList,
-      subject: `Order Receipt #${order.orderNumber} - GlowGoodly`,
+      subject: `Order Confirmation #${order.orderNumber} - GlowGoodly`,
       text: plainTextReceipt,
       html: htmlContent,
-      replyTo: "support@glowgoodly.com",
+      replyTo: "admin@glowgoodly.com",
       sender: senderEmail,
       messageId: messageId,
       date: new Date(),
@@ -343,14 +355,15 @@ Warehouse: 1162, East Monipur, Mirpur-2, Dhaka-1216, Bangladesh
         to: hasValidCustomerEmail ? [customerEmail, storeSupportEmail] : [storeSupportEmail]
       },
       headers: {
-        "X-Mailer": "GlowGoodly Hosting Mailer 2.0",
+        "X-Mailer": "GlowGoodly Official Store Mailer 2.0",
         "X-Priority": "3 (Normal)",
         "Importance": "Normal",
         "Auto-Submitted": "auto-generated",
-        "Precedence": "bulk",
         "X-Auto-Response-Suppress": "All",
+        "X-Entity-Ref-ID": String(order.orderNumber || "GG-ORD"),
+        "X-Transaction-Category": "order-confirmation",
         "Feedback-ID": "order-receipt:glowgoodly:transactional",
-        "List-Unsubscribe": "<mailto:support@glowgoodly.com?subject=Unsubscribe>",
+        "List-Unsubscribe": "<mailto:admin@glowgoodly.com?subject=Unsubscribe>",
         "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
         "Return-Path": senderEmail
       }

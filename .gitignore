@@ -1,6 +1,7 @@
 node_modules/
 .next/
 dist/
+.tools/
 *.log
 .DS_Store
 *.db
@@ -9,13 +10,15 @@ dist/
 *.db-wal
 backend/dev.db
 backend/node_modules/
+backend/dist/
 frontend/node_modules/
 frontend/.next/
+frontend/out/
 website/
 website_2/
 *.zip
-*.md
+**/*.zip
+cpanel_updated_files/
+cpanel_updated_files.zip
+deploy/
 creds
-deploy/frontend_staging/
-deploy/backend_staging/
-

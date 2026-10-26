@@ -238,11 +238,38 @@ router.post("/notifications/push", async (req: Request, res: Response) => {
       };
     }
 
+    // PushAlert Web Push Dispatch (if API key provided or configured)
+    const pushalertKey = req.body.pushalertApiKey || process.env.PUSHALERT_API_KEY;
+    let pushalertResult = null;
+    if (pushalertKey) {
+      try {
+        const params = new URLSearchParams();
+        params.append("title", title);
+        params.append("message", message);
+        params.append("url", linkUrl || "https://shop.glowgoodly.com");
+        if (imageUrl) params.append("image", imageUrl);
+        params.append("icon", "https://shop.glowgoodly.com/icon.png");
+
+        const paRes = await fetch("https://api.pushalert.co/rest/v1/send", {
+          method: "POST",
+          headers: {
+            "Authorization": `api_key=${pushalertKey}`,
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          body: params.toString()
+        });
+        pushalertResult = await paRes.json();
+      } catch (paErr: any) {
+        pushalertResult = { error: paErr.message };
+      }
+    }
+
     res.status(201).json({
       id: docRef.id,
       ...notificationData,
       subscribersCount: tokens.length,
       fcmResult,
+      pushalertResult,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

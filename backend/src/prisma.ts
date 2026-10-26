@@ -3,72 +3,37 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const dbUrl = process.env.DATABASE_URL || "file:./dev.db";
+// MariaDB / MySQL URL Builder
+function buildDatabaseUrl(): string {
+  if (process.env.DATABASE_URL && (process.env.DATABASE_URL.startsWith("mysql://") || process.env.DATABASE_URL.startsWith("mariadb://"))) {
+    return process.env.DATABASE_URL.replace(/^mariadb:\/\//, "mysql://");
+  }
 
-function parseDbUrl(urlStr: string) {
-  // If discrete DB environment variables are set, prioritize them
+  // If discrete DB environment variables are set (recommended for cPanel)
   if (process.env.DB_USER && process.env.DB_NAME) {
-    return {
-      host: process.env.DB_HOST || "localhost",
-      port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 3306,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD || "",
-      database: process.env.DB_NAME,
-      connectionLimit: 10,
-    };
+    const user = encodeURIComponent(process.env.DB_USER);
+    const pass = encodeURIComponent(process.env.DB_PASSWORD || "");
+    const host = process.env.DB_HOST || "localhost";
+    const port = process.env.DB_PORT || "3306";
+    const name = encodeURIComponent(process.env.DB_NAME);
+    return `mysql://${user}:${pass}@${host}:${port}/${name}`;
   }
 
-  if (!urlStr) {
-    return {
-      host: "localhost",
-      port: 3306,
-      user: "root",
-      password: "",
-      database: "glowgoodly_db",
-      connectionLimit: 10,
-    };
-  }
-
-  try {
-    // 1. Try regex extraction to handle special characters in password without URL parsing errors
-    const match = urlStr.match(/^(?:mysql|mariadb):\/\/([^:]+):?(.*)?@([^:/]+)(?::(\d+))?\/([^?]+)/);
-    if (match) {
-      const [, user, rawPass, host, portStr, database] = match;
-      return {
-        host: host || "localhost",
-        port: portStr ? parseInt(portStr, 10) : 3306,
-        user: decodeURIComponent(user || "root"),
-        password: decodeURIComponent(rawPass || ""),
-        database: decodeURIComponent(database || "glowgoodly_db"),
-        connectionLimit: 10,
-      };
-    }
-
-    // 2. Standard URL fallback
-    const normalized = urlStr.replace(/^mysql:\/\//, "http://").replace(/^mariadb:\/\//, "http://");
-    const parsed = new URL(normalized);
-    return {
-      host: parsed.hostname || "localhost",
-      port: parsed.port ? parseInt(parsed.port, 10) : 3306,
-      user: decodeURIComponent(parsed.username || "root"),
-      password: decodeURIComponent(parsed.password || ""),
-      database: parsed.pathname.replace(/^\//, "") || "glowgoodly_db",
-      connectionLimit: 10,
-    };
-  } catch (e) {
-    console.warn("⚠️ Failed to parse DATABASE_URL, using default fallback parameters.", e);
-    return {
-      host: "localhost",
-      port: 3306,
-      user: "root",
-      password: "",
-      database: "glowgoodly_db",
-      connectionLimit: 10,
-    };
-  }
+  return process.env.DATABASE_URL || "mysql://root:@localhost:3306/sitecadh_glowgoodly_db";
 }
 
-const prisma = new PrismaClient();
+const activeDbUrl = buildDatabaseUrl();
+if (!process.env.DATABASE_URL || !process.env.DATABASE_URL.startsWith("mysql://")) {
+  process.env.DATABASE_URL = activeDbUrl;
+}
+
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: activeDbUrl,
+    },
+  },
+});
 
 export default prisma;
 

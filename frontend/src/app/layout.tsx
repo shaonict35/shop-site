@@ -4,6 +4,7 @@ import "./globals.css";
 import { AppProvider } from "../context/AppContext";
 import TrackingScripts from "../components/TrackingScripts";
 import ChatWidget from "../components/ChatWidget";
+import GlobalLoader from "../components/GlobalLoader";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -200,6 +201,18 @@ export default function RootLayout({
           `}
         </Script>
 
+        {/* PushAlert Web Push Notifications */}
+        <Script id="pushalert-script" strategy="afterInteractive">
+          {`
+            (function(d, t) {
+              var g = d.createElement(t),
+              s = d.getElementsByTagName(t)[0];
+              g.src = "https://cdn.pushalert.co/integrate_1df8c3ab448efee70f62d075027d65d7.js";
+              s.parentNode.insertBefore(g, s);
+            }(document, "script"));
+          `}
+        </Script>
+
         {/* Google Tag Manager (noscript) */}
         <noscript>
           <iframe
@@ -210,6 +223,7 @@ export default function RootLayout({
           />
         </noscript>
         <AppProvider>
+          <GlobalLoader />
           <TrackingScripts />
           {children}
           <ChatWidget />

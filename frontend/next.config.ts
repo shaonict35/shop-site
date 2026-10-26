@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
+const isExport = process.env.NODE_ENV === "production";
+
 const nextConfig: NextConfig = {
+  ...(isExport ? { output: "export" } : {}),
+  trailingSlash: true,
   reactStrictMode: true,
   compress: true,
   images: {
@@ -15,22 +19,6 @@ const nextConfig: NextConfig = {
   onDemandEntries: {
     maxInactiveAge: 120 * 1000,
     pagesBufferLength: 8,
-  },
-  async headers() {
-    if (process.env.NODE_ENV !== "production") {
-      return [];
-    }
-    return [
-      {
-        source: "/:all*(svg|jpg|png|webp|avif|woff2)",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=31536000, immutable",
-          },
-        ],
-      },
-    ];
   },
 };
 

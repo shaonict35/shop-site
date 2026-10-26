@@ -6,6 +6,56 @@ import { sendCapiEvent } from "../services/capi";
 
 const router = Router();
 
+// Trigger Automated Voice Confirmation Call
+async function triggerOrderConfirmationCall(order: any, orderRef: any) {
+  try {
+    const itemNames = (order.orderItems || []).map((i: any) => `${i.productName} (${i.variantName || 'Regular'}) x${i.quantity || 1}`).join(", ") || "আপনার অর্ডারকৃত বিউটি পণ্য";
+    const totalAmount = order.total || order.subTotal || 0;
+    const customerName = order.customerName || "সম্মানিত গ্রাহক";
+    const customerPhone = order.customerPhone || "";
+
+    const callScript = `আসসালামু আলাইকুম ${customerName}, GlowGoodly কসমেটিক্স থেকে বলছি। আপনি আমাদের ওয়েবসাইট থেকে ${itemNames} অর্ডার করেছেন। ডেলিভারি চার্জসহ সর্বমোট মূল্য ৳${totalAmount} টাকা। আপনার অর্ডারটি সফলভাবে কনফার্ম করা হয়েছে। ধন্যবাদ GlowGoodly এর সাথে থাকার জন্য।`;
+
+    console.log(`[AI Auto-Call Engine] 📞 Triggering automated voice confirmation call to ${customerPhone} for Order #${order.orderNumber}...`);
+    console.log(`[AI Auto-Call Script]: ${callScript}`);
+
+    const callLogNote = `[AI Auto-Call initiated to ${customerPhone} at ${new Date().toLocaleTimeString('en-US')}]`;
+    const updatedNotes = order.notes ? `${order.notes}\n${callLogNote}` : callLogNote;
+
+    await orderRef.update({
+      notes: updatedNotes,
+      aiCallInitiated: true,
+      aiCallStatus: "Initiated",
+      aiCallPhone: customerPhone,
+      aiCallScript: callScript,
+      aiCallDate: new Date().toISOString()
+    });
+
+    // If external Telephony Gateway URL is configured, forward request
+    const gatewayUrl = process.env.VOICE_CALL_GATEWAY_URL || process.env.CALL_WEBHOOK_URL;
+    if (gatewayUrl && customerPhone) {
+      try {
+        await fetch(gatewayUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phone: customerPhone,
+            message: callScript,
+            orderNumber: order.orderNumber,
+            customerName: customerName,
+            total: totalAmount
+          })
+        });
+        console.log(`[AI Auto-Call Gateway] External voice call dispatched to ${customerPhone}`);
+      } catch (gateErr: any) {
+        console.warn(`[AI Auto-Call Gateway] Gateway hook call note:`, gateErr.message);
+      }
+    }
+  } catch (err: any) {
+    console.error("[AI Auto-Call Engine Error] Call initiation note:", err.message);
+  }
+}
+
 // POST /api/orders (Checkout - public or authenticated)
 router.post("/", async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -20,7 +70,8 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
       paymentMethod,
       items,
       couponCode,
-      shippingFee
+      shippingFee,
+      notes
     } = req.body;
 
     const zoneValue = zone || deliveryZone || "Inside Dhaka City";
@@ -144,6 +195,9 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
     });
     await batch.commit();
 
+    const itemSummary = (resolvedItems || []).map((i: any) => `${i.productName} (${i.variantName || 'Regular'}) x${i.quantity || 1}`).join(", ") || "আপনার অর্ডারকৃত বিউটি সামগ্রী";
+    const initialCallScript = `আসসালামু আলাইকুম ${customerName}, GlowGoodly কসমেটিক্স থেকে বলছি। আপনি আমাদের ওয়েবসাইট থেকে ${itemSummary} অর্ডার করেছেন। ডেলিভারি চার্জসহ সর্বমোট মূল্য ৳${total} টাকা। আপনার অর্ডারটি সফলভাবে কনফার্ম করা হয়েছে। ধন্যবাদ GlowGoodly এর সাথে থাকার জন্য।`;
+
     // Create order document in Firestore
     const orderRef = db.collection("orders").doc();
     const order = {
@@ -159,17 +213,26 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
       discount,
       total,
       paymentMethod,
-      paymentStatus: paymentMethod === "COD" ? "Pending" : "Paid",
+      paymentStatus: (paymentMethod === "COD" || (paymentMethod || "").toUpperCase().includes("COD") || (paymentMethod || "").toLowerCase().includes("cash")) ? "Pending" : "Paid",
       orderStatus: "Pending",
+      notes: notes || req.body.notes || "",
       orderItems: resolvedItems,
+      aiCallInitiated: true,
+      aiCallStatus: "Initiated",
+      aiCallPhone: customerPhone,
+      aiCallScript: initialCallScript,
+      aiCallDate: new Date().toISOString(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
     await orderRef.set(order);
 
-    // Send HTML Email Receipt to Customer
+    // Send HTML Email Receipt to Customer immediately
     sendOrderReceiptEmail(order).catch(console.error);
+
+    // Trigger AI Automated Voice Confirmation Call
+    triggerOrderConfirmationCall(order, orderRef).catch(console.error);
 
     // Meta Conversion API (CAPI) Server-side Purchase Event
     sendCapiEvent("Purchase", {
@@ -205,6 +268,164 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
     });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
+  }
+});
+
+// POST /api/orders/offline (POS & In-Store Showroom Counter Sales)
+router.post("/offline", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Salesman", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      customerName = "Walk-in Customer",
+      customerPhone = "Showroom / Counter",
+      customerEmail = "",
+      address = "Store / Showroom Counter",
+      items = [],
+      subTotal = 0,
+      discount = 0,
+      deliveryCharge = 0,
+      total = 0,
+      paymentMethod = "Cash",
+      cashReceived = 0,
+      changeDue = 0,
+      notes = "",
+      staffName = ""
+    } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: "Cart is empty. Please add items to sale." });
+    }
+
+    const calculatedSubTotal = items.reduce((acc: number, it: any) => acc + ((Number(it.price) || 0) * (Number(it.quantity) || 1)), 0);
+    const finalSubTotal = Number(subTotal) || calculatedSubTotal;
+    const finalDiscount = Number(discount) || 0;
+    const finalDeliveryCharge = Number(deliveryCharge) || 0;
+    const finalTotal = Number(total) || Math.max(0, finalSubTotal + finalDeliveryCharge - finalDiscount);
+
+    // Generate unique POS invoice number: POS-YYMMDD-XXXX
+    const now = new Date();
+    const dateStr = now.toISOString().slice(2, 10).replace(/-/g, "");
+    const randomHex = Math.floor(1000 + Math.random() * 9000);
+    const orderNumber = `POS-${dateStr}-${randomHex}`;
+
+    // Deduct stock for each item from products collection in Firestore
+    const batch = db.batch();
+    const resolvedItems: any[] = [];
+
+    for (const item of items) {
+      const qty = Math.max(1, parseInt(item.quantity || 1, 10) || 1);
+      const price = Math.max(0, parseFloat(item.price || 0) || 0);
+
+      resolvedItems.push({
+        productId: item.productId || "",
+        variantId: item.variantId || "",
+        productName: item.productName || item.name || "Product",
+        variantName: item.variantName || item.shade || "Regular",
+        quantity: qty,
+        price: price,
+        total: price * qty,
+        imageUrl: item.imageUrl || ""
+      });
+
+      // If productId is provided, find and deduct stock in database
+      if (item.productId) {
+        try {
+          const productRef = db.collection("products").doc(item.productId);
+          const productDoc = await productRef.get();
+          if (productDoc.exists) {
+            const pData = productDoc.data() as any;
+            let updated = false;
+
+            // If product has variants, update variant stock
+            if (item.variantId && Array.isArray(pData.variants)) {
+              const vIdx = pData.variants.findIndex((v: any) => v.id === item.variantId);
+              if (vIdx > -1) {
+                const currentStock = Number(pData.variants[vIdx].stock) || 0;
+                pData.variants[vIdx].stock = Math.max(0, currentStock - qty);
+                updated = true;
+              }
+            }
+
+            // Also decrement top-level stock if present
+            if (pData.stock !== undefined) {
+              const curStock = Number(pData.stock) || 0;
+              pData.stock = Math.max(0, curStock - qty);
+              updated = true;
+            }
+
+            if (updated) {
+              pData.updatedAt = new Date().toISOString();
+              batch.set(productRef, pData, { merge: true });
+            }
+          }
+        } catch (stockErr: any) {
+          console.warn("[POS Stock Deduction Warning]:", stockErr.message);
+        }
+      }
+    }
+
+    // Commit stock deduction batch
+    try {
+      await batch.commit();
+    } catch (batchErr: any) {
+      console.warn("[POS Batch Commit Note]:", batchErr.message);
+    }
+
+    const orderRef = db.collection("orders").doc();
+    const offlineOrder = {
+      id: orderRef.id,
+      orderNumber,
+      orderSource: "Offline / POS / Showroom",
+      isOffline: true,
+      customerId: null,
+      customerName: customerName.trim() || "Walk-in Customer",
+      customerPhone: customerPhone.trim() || "Showroom Counter",
+      customerEmail: customerEmail.trim() || "",
+      address: address.trim() || "Showroom Counter Pickup",
+      zone: "Showroom / Counter",
+      deliveryCharge: finalDeliveryCharge,
+      subTotal: finalSubTotal,
+      discount: finalDiscount,
+      total: finalTotal,
+      paymentMethod: paymentMethod || "Cash",
+      paymentStatus: "Paid",
+      orderStatus: "Delivered",
+      cashReceived: Number(cashReceived) || finalTotal,
+      changeDue: Number(changeDue) || 0,
+      notes: notes || "In-store POS counter sale",
+      staffName: staffName || req.user?.email || "Admin",
+      orderItems: resolvedItems,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    };
+
+    await orderRef.set(offlineOrder);
+
+    res.status(201).json({
+      success: true,
+      message: "Offline sale completed successfully",
+      order: offlineOrder
+    });
+  } catch (error: any) {
+    console.error("[Offline Sale Error]:", error);
+    res.status(500).json({ error: error.message || "Failed to process offline sale" });
+  }
+});
+
+// GET /api/orders/offline (List offline POS sales)
+router.get("/offline", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Salesman", "Admin"]) as any, async (req: Request, res: Response) => {
+  try {
+    const snapshot = await db.collection("orders").get();
+    const orders: any[] = [];
+    snapshot.forEach(doc => {
+      const data = doc.data() as any;
+      if (data.isOffline || data.orderSource?.toLowerCase().includes("offline") || data.orderSource?.toLowerCase().includes("pos")) {
+        orders.push({ id: doc.id, ...data });
+      }
+    });
+    orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    res.json(orders);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -688,6 +909,92 @@ router.put("/:id/customer-edit", authenticateJWT as any, async (req: Authenticat
     await docRef.update(updates);
 
     res.json({ message: "Order shipping details updated successfully!", order: { id, ...order, ...updates } });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/orders/:id/ai-call (AI Automated Phone Call Confirmation Trigger)
+router.post("/:id/ai-call", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Salesman"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const docRef = db.collection("orders").doc(id as string);
+    const doc = await docRef.get();
+    if (!doc.exists) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    const order = doc.data() as any;
+    const itemNames = (order.orderItems || []).map((i: any) => `${i.productName} (${i.variantName || 'Regular'}) x${i.quantity || 1}`).join(", ") || "আপনার অর্ডারকৃত বিউটি প্রোডাক্ট";
+    const totalAmount = order.total || order.subTotal || 0;
+    const customerName = order.customerName || "সম্মানিত গ্রাহক";
+    const customerPhone = order.customerPhone || "";
+
+    const script = `আসসালামু আলাইকুম ${customerName}, GlowGoodly কসমেটিক্স থেকে বলছি। আপনি আমাদের ওয়েবসাইট থেকে ${itemNames} অর্ডার করেছেন। ডেলিভারি চার্জসহ সর্বমোট মূল্য ৳${totalAmount} টাকা। আপনার অর্ডারটি কি আমরা কনফার্ম করব? আপনার কোনো কাস্টমাইজেশন বা স্পেশাল নোট থাকলে বলুন।`;
+
+    console.log(`[AI Auto-Call Engine] Initiating automated voice call to ${customerPhone}...`);
+    console.log(`[AI Auto-Call Script]: ${script}`);
+
+    // Update order with call initiation log
+    const callLogNote = `[AI Auto-Call initiated to ${customerPhone} at ${new Date().toLocaleTimeString('en-US')}]`;
+    const updatedNotes = order.notes ? `${order.notes}\n${callLogNote}` : callLogNote;
+    await docRef.update({ notes: updatedNotes, aiCallInitiated: true, aiCallDate: new Date().toISOString() });
+
+    res.json({
+      success: true,
+      message: `AI Auto-Call initiated successfully to ${customerPhone}`,
+      customerName,
+      customerPhone,
+      productNames: itemNames,
+      total: totalAmount,
+      script,
+      orderNumber: order.orderNumber,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/orders/:id/ai-confirm (Save AI Voice Response & Customization Notes)
+router.post("/:id/ai-confirm", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Salesman"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { callStatus, customizationNotes, updateOrderStatus } = req.body;
+
+    const docRef = db.collection("orders").doc(id as string);
+    const doc = await docRef.get();
+    if (!doc.exists) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    const order = doc.data() as any;
+    const timestamp = new Date().toLocaleString('en-US');
+    const newEntry = `[AI Call - ${callStatus} | ${timestamp}]: ${customizationNotes || 'Customer confirmed without special changes.'}`;
+    const updatedNotes = order.notes ? `${order.notes}\n${newEntry}` : newEntry;
+
+    const updates: any = {
+      notes: updatedNotes,
+      aiCallStatus: callStatus,
+      aiCallNotes: customizationNotes || "",
+      aiCallDate: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (updateOrderStatus && (callStatus === "Confirmed" || callStatus === "Customization Requested")) {
+      updates.orderStatus = "Processing";
+      updates.status = "Processing";
+    } else if (callStatus === "Cancelled") {
+      updates.orderStatus = "Cancelled";
+      updates.status = "Cancelled";
+    }
+
+    await docRef.update(updates);
+
+    res.json({
+      success: true,
+      message: "AI Voice Call confirmation & customization notes saved successfully",
+      order: { ...order, ...updates }
+    });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

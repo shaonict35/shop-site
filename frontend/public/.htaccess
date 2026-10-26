@@ -1,6 +1,6 @@
 Options -Indexes -MultiViews
 DirectoryIndex index.html index.php
-DirectorySlash Off
+DirectorySlash On
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
@@ -10,45 +10,56 @@ DirectorySlash Off
   RewriteCond %{HTTPS} off
   RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
-  # 2. Security & Explicit Admin Routes
-  RewriteRule ^admin/?$ /404.html [L,R=301]
-  RewriteRule ^valobasa/?$ /valobasa.html [L]
+  # 2. Admin Routes (both /admin and /valobasa serve the full admin panel)
+  RewriteRule ^admin/?$ /valobasa/index.html [L]
+  RewriteRule ^valobasa/?$ /valobasa/index.html [L]
 
-  # 3. Clean Policy & Standard Pages: Map directly to .html (e.g. /about or /about/ -> /about.html)
-  RewriteCond %{DOCUMENT_ROOT}/$1.html -f
-  RewriteRule ^([^/]+)/?$ /$1.html [L]
+  # 3. Serve physical files directly if they exist (images, js, css, etc.)
+  RewriteCond %{REQUEST_FILENAME} -f
+  RewriteRule ^ - [L]
 
-  # 4. Clean Route Rewrites to HTML Files (Shop, Brands, Cart, etc.)
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{DOCUMENT_ROOT}/product/$1.html -f
-  RewriteRule ^product/([^/]+)/?$ /product/$1.html [L]
-
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule ^product/([^/]+)/?$ /product/default.html [L]
-
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{DOCUMENT_ROOT}/category/$1.html -f
-  RewriteRule ^category/([^/]+)/?$ /category/$1.html [L]
-
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule ^category/([^/]+)/?$ /category/skincare.html [L]
-
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule ^landing/([^/]+)/?$ /landing/seasonal-offer.html [L]
-
-  # 5. Clean URLs: Map page names to .html files first (e.g. /shop -> shop.html, /valobasa -> valobasa.html)
-  RewriteCond %{DOCUMENT_ROOT}/$1.html -f
-  RewriteRule ^([^\.]+)$ /$1.html [L]
-
-  # 6. Check if directory has an index.html
+  # 4. Check if directory has an index.html (primary for trailingSlash: true)
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteCond %{REQUEST_FILENAME}/index.html -f
   RewriteRule ^(.*)$ $1/index.html [L]
 
-  # 6. Fallback to 404 page for missing routes
+  # 5. Product Routes:
+  # 5a. If physical product directory with index.html exists, serve it
+  RewriteCond %{DOCUMENT_ROOT}/product/$1/index.html -f [OR]
+  RewriteCond %{REQUEST_FILENAME}/index.html -f
+  RewriteRule ^products?/([^/]+)/?$ /product/$1/index.html [L]
+
+  # 5b. If physical product .html exists, serve it
+  RewriteCond %{DOCUMENT_ROOT}/product/$1.html -f [OR]
+  RewriteCond %{REQUEST_FILENAME}.html -f
+  RewriteRule ^products?/([^/]+)/?$ /product/$1.html [L]
+
+  # 5c. Dynamic SPA fallback for any /product/* and /products/* routes not pre-rendered:
+  RewriteRule ^products?/([^/]+)/?$ /product/default/index.html [L]
+
+  # 6. Category Routes:
+  RewriteCond %{REQUEST_FILENAME}/index.html -f
+  RewriteRule ^category/([^/]+)/?$ /category/$1/index.html [L]
+
+  RewriteCond %{REQUEST_FILENAME}.html -f
+  RewriteRule ^category/([^/]+)/?$ /category/$1.html [L]
+
+  RewriteRule ^category/([^/]+)/?$ /category/index.html [L]
+
+  # 7. Landing Routes:
+  RewriteCond %{REQUEST_FILENAME}/index.html -f
+  RewriteRule ^landing/([^/]+)/?$ /landing/$1/index.html [L]
+
+  RewriteRule ^landing/([^/]+)/?$ /landing/seasonal-offer/index.html [L]
+
+  # 8. Clean URLs for standard pages: map /page to page/index.html or page.html
+  RewriteCond %{REQUEST_FILENAME}/index.html -f
+  RewriteRule ^(.*)$ $1/index.html [L]
+
+  RewriteCond %{REQUEST_FILENAME}.html -f
+  RewriteRule ^(.*)$ $1.html [L]
+
+  # 9. Fallback to 404 page for any other missing routes
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule ^ 404.html [L]
