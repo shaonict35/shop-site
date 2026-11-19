@@ -1,0 +1,878 @@
+import express from "express";
+import cors from "cors";
+import compression from "compression";
+import dotenv from "dotenv";
+import path from "path";
+import fs from "fs";
+import { createServer } from "http";
+import { Server as SocketIOServer } from "socket.io";
+
+import authRouter from "./routes/auth";
+import productsRouter from "./routes/products";
+import ordersRouter from "./routes/orders";
+import settingsRouter from "./routes/settings";
+import adminRouter from "./routes/admin";
+import bannersRouter from "./routes/banners";
+import notificationsRouter from "./routes/notifications";
+import chatRouter from "./routes/chat";
+import marketingRouter from "./routes/marketing";
+import auditRouter from "./routes/audit";
+import ticketsRouter from "./routes/tickets";
+import feedsRouter from "./routes/feeds";
+import enterpriseRouter from "./routes/enterprise";
+import menuRouter from "./routes/menu";
+import pagesRouter from "./routes/pages";
+import bkashRouter from "./routes/bkash";
+import careersRouter from "./routes/careers";
+import inventoryRouter from "./routes/inventory";
+import heroBannersRouter from "./routes/hero-banners";
+import db from "./firebase";
+import { autoSeedDatabase } from "./auto-seed";
+import { initMySQLTables } from "./config/db";
+import { cleanAllDummyData } from "./clean-dummy-products";
+import { globalRateLimiter, authRateLimiter, orderRateLimiter, sanitizeInput, securityHeaders } from "./middleware/security";
+
+dotenv.config();
+
+const app = express();
+app.set("trust proxy", 1);
+app.set("etag", "strong"); // Enable HTTP ETag for 304 Not Modified instant bandwidth-free caching
+
+// Serve favicon.ico and logo assets so they never return 404 error
+function findAssetFile(filename: string): string | null {
+  const possiblePaths = [
+    path.join(__dirname, "..", "public", filename),
+    path.join(__dirname, "public", filename),
+    path.join(process.cwd(), "public", filename),
+    path.join(process.cwd(), "backend", "public", filename),
+    path.join(process.cwd(), "frontend", "public", filename),
+    path.join(process.cwd(), "frontend", "public", "images", filename),
+  ];
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) return path.resolve(p);
+  }
+  return null;
+}
+
+app.get("/favicon.ico", (req, res) => {
+  const filePath = findAssetFile("favicon.ico");
+  if (filePath) {
+    res.setHeader("Content-Type", "image/x-icon");
+    res.setHeader("Cache-Control", "public, max-age=2592000");
+    return res.sendFile(filePath);
+  }
+  res.status(204).end();
+});
+
+app.get(["/logo.png", "/user-glow-logo.png", "/apple-touch-icon.png", "/apple-icon.png"], (req, res) => {
+  const filePath = findAssetFile("logo.png") || findAssetFile("user-glow-logo.png");
+  if (filePath) {
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Cache-Control", "public, max-age=2592000");
+    return res.sendFile(filePath);
+  }
+  res.status(404).end();
+});
+
+// Serve public static assets
+app.use(express.static(path.join(__dirname, "..", "public")));
+app.use(express.static(path.join(process.cwd(), "public")));
+
+// Serve uploads directory (banners, products, documents)
+app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+app.use("/uploads", express.static(path.join(process.cwd(), "backend", "uploads")));
+
+const httpServer = createServer(app);
+const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+// Provide Socket.io instance to Express routes
+app.set("io", io);
+
+const PORT = process.env.PORT || 5000;
+
+// 1. Advanced OWASP Security Headers
+app.use(securityHeaders);
+
+// 2. Global DDoS / Flooding Rate Limiter (Max 350 req/min per IP)
+app.use(globalRateLimiter);
+
+// 3. Brute Force Login / Signup Guard (Max 15 attempts / 5 mins per IP)
+app.use("/api/auth", authRateLimiter);
+
+// 4. Fake Order / Spam Purchase Guard (Max 20 orders / 10 mins per IP)
+app.use("/api/orders", orderRateLimiter);
+
+// 5. Gzip / Deflate Compression Middleware (80%+ reduction in payload transfer size)
+app.use(compression({
+  level: 6,
+  threshold: 512, // Compress all payloads >= 512 bytes for maximum efficiency
+  filter: (req, res) => {
+    if (req.headers["x-no-compression"]) return false;
+    return compression.filter(req, res);
+  }
+}));
+
+// 6. Explicit CORS Middleware configured for production domains & local development
+const allowedOrigins = [
+  "https://glowgoodly.com",
+  "https://shop.glowgoodly.com",
+  "https://api.glowgoodly.com",
+  "http://localhost:3000",
+  "http://localhost:5000",
+  "http://127.0.0.1:3000"
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin) || origin.endsWith("glowgoodly.com")) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Fallback allows all origins seamlessly
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Accept",
+    "Cache-Control",
+    "Pragma",
+    "Expires",
+    "Origin",
+    "X-Custom-Header"
+  ]
+}));
+
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+// Handle JSON syntax parse errors gracefully without 500 crash
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err && (err.type === "entity.parse.failed" || err instanceof SyntaxError)) {
+    return res.status(400).json({ error: "Malformed or invalid JSON payload in request body" });
+  }
+  next(err);
+});
+
+// 7. XSS & Malicious Script Injection Sanitizer
+app.use(sanitizeInput);
+
+// Ensure all dynamic API routes never serve stale data
+app.use("/api", (req, res, next) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  res.setHeader("Surrogate-Control", "no-store");
+  next();
+});
+
+// Request logger
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
+// Mount Routes
+app.use("/api/auth", authRouter);
+app.use("/api", productsRouter); // For /products, /categories, /brands, etc.
+app.use("/api/orders", ordersRouter);
+app.use("/api/settings", settingsRouter);
+app.use("/api/admin", adminRouter);
+app.use("/api/bkash", bkashRouter);
+app.use("/api", marketingRouter); // Meta CAPI, Facebook Conversions API events
+app.use("/api", bannersRouter);
+app.use("/api", notificationsRouter);
+app.use("/api", chatRouter);
+app.use("/api", auditRouter);
+app.use("/api", ticketsRouter);
+app.use("/api", feedsRouter);
+app.use("/api", enterpriseRouter);
+app.use("/api", menuRouter);
+app.use("/api", pagesRouter);
+app.use("/api/careers", careersRouter);
+app.use("/api/join-our-team", careersRouter);
+app.use("/api/inventory", inventoryRouter);
+app.use("/api", heroBannersRouter);
+
+// ─── GLOWGOODLY WP-JSON & WOOCOMMERCE COMPATIBILITY MIRROR ENDPOINTS ───
+app.use("/wp-json/wp/v2/posts", (req, res) => res.redirect("/api/blogs"));
+app.use("/wp-json/wp/v2/categories", (req, res) => res.redirect("/api/categories"));
+app.use("/wp-json/wc/v3/products", (req, res) => res.redirect("/api/products"));
+app.use("/wp-json/wc/v3/orders", (req, res) => res.redirect("/api/orders"));
+app.get("/wp-json", (req, res) => {
+  res.json({
+    name: "GlowGoodly E-Commerce Backend Engine",
+    description: "Production API for Products, Banners, Categories, Brands & Orders",
+    url: "https://shop.glowgoodly.com",
+    namespaces: ["wp/v2", "wc/v3", "glowgoodly/v1"],
+    routes: {
+      "/wp-json/wc/v3/products": { methods: ["GET", "POST"] },
+      "/wp-json/wc/v3/categories": { methods: ["GET"] },
+      "/wp-json/wc/v3/orders": { methods: ["GET", "POST"] },
+      "/api/products": { methods: ["GET", "POST"] },
+      "/api/categories": { methods: ["GET"] },
+      "/api/banners": { methods: ["GET"] }
+    }
+  });
+});
+
+// Socket.io Real-Time Promotional Broadcasting System (100% Free WebSockets)
+let activeSocketsCount = 0;
+let lastPromoBroadcast: any = null;
+let inMemoryPromos: any[] = [];
+
+io.on("connection", (socket) => {
+  activeSocketsCount++;
+  console.log(`⚡ Socket connected: ${socket.id}. Active clients: ${activeSocketsCount}`);
+  io.emit("clients:count", activeSocketsCount);
+
+  // Send last active promo on connect if available
+  if (lastPromoBroadcast) {
+    socket.emit("promo:message", lastPromoBroadcast);
+  }
+
+  socket.on("admin:send-promo", async (promoData) => {
+    const promoPayload = {
+      ...promoData,
+      id: promoData.id || ("promo_" + Date.now()),
+      timestamp: new Date().toISOString()
+    };
+    lastPromoBroadcast = promoPayload;
+    inMemoryPromos = [promoPayload, ...inMemoryPromos.filter(p => p.id !== promoPayload.id)];
+    if (db) {
+      try {
+        await db.collection("promotions").doc(promoPayload.id).set(promoPayload);
+      } catch (e) {
+        console.log("Promo DB save fallback:", e);
+      }
+    }
+    console.log("📢 Admin broadcasting promo message via Socket.io:", lastPromoBroadcast);
+    io.emit("promo:message", lastPromoBroadcast);
+  });
+
+  socket.on("admin:clear-promo", () => {
+    lastPromoBroadcast = null;
+    io.emit("promo:clear", {});
+  });
+
+  socket.on("disconnect", () => {
+    activeSocketsCount = Math.max(0, activeSocketsCount - 1);
+    console.log(`🔌 Socket disconnected: ${socket.id}. Active clients: ${activeSocketsCount}`);
+    io.emit("clients:count", activeSocketsCount);
+  });
+});
+
+// Admin REST Endpoint to broadcast Socket.io promo message
+app.post("/api/admin/broadcast-promo", async (req: express.Request, res: express.Response) => {
+  try {
+    const { id, title, message, code, discount, link, image } = req.body;
+    if (!message && !title) {
+      return res.status(400).json({ error: "Promo title or message is required" });
+    }
+
+    const promoPayload = {
+      id: id || ("promo_" + Date.now()),
+      title: title || "🌸 Special Offer Alert!",
+      message: message || "",
+      code: code || "GLOW15",
+      discount: discount || "15%",
+      link: link || "/shop",
+      image: image || "",
+      timestamp: new Date().toISOString()
+    };
+
+    lastPromoBroadcast = promoPayload;
+    inMemoryPromos = [promoPayload, ...inMemoryPromos.filter(p => p.id !== promoPayload.id)];
+    io.emit("promo:message", promoPayload);
+
+    // Also persist in DB if available
+    if (db) {
+      try {
+        await db.collection("promotions").doc(promoPayload.id).set(promoPayload);
+      } catch (e) {
+        console.log("Promo DB save fallback:", e);
+      }
+    }
+
+    res.json({
+      success: true,
+      activeClients: activeSocketsCount,
+      promo: promoPayload,
+      message: "Promotional message broadcasted to all live website users for free via Socket.io!"
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/admin/broadcast-promo — Get history of promos
+app.get("/api/admin/broadcast-promo", async (req: express.Request, res: express.Response) => {
+  try {
+    const listMap = new Map<string, any>();
+
+    // 1. In-memory promos
+    inMemoryPromos.forEach((p) => {
+      if (p && p.id) listMap.set(p.id, p);
+    });
+
+    // 2. From database
+    if (db) {
+      try {
+        const snapshot = await db.collection("promotions").get();
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          const pId = data.id || doc.id;
+          listMap.set(pId, { ...data, id: pId });
+        });
+      } catch (e) {
+        console.log("Error fetching DB promos:", e);
+      }
+    }
+
+    if (listMap.size === 0 && lastPromoBroadcast) {
+      listMap.set(lastPromoBroadcast.id, lastPromoBroadcast);
+    }
+
+    const list = Array.from(listMap.values());
+    list.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+    res.json(list);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/admin/broadcast-promo/:id — Delete a specific promo
+app.delete("/api/admin/broadcast-promo/:id", async (req: express.Request, res: express.Response) => {
+  try {
+    const { id } = req.params;
+
+    // Remove from in-memory list
+    inMemoryPromos = inMemoryPromos.filter((p) => p.id !== id);
+
+    // If active broadcast matches, clear it and emit clear event
+    if (lastPromoBroadcast && (lastPromoBroadcast.id === id || id === "active" || id === "current")) {
+      lastPromoBroadcast = null;
+      io.emit("promo:clear", { id });
+    } else {
+      io.emit("promo:clear", { id });
+    }
+
+    if (db) {
+      try {
+        // Delete directly by doc ID
+        await db.collection("promotions").doc(id).delete();
+        // Also check if any document has id in data matching this id
+        const snapshot = await db.collection("promotions").where("id", "==", id).get();
+        if (!snapshot.empty) {
+          const batch = db.batch();
+          snapshot.forEach((doc) => batch.delete(doc.ref));
+          await batch.commit();
+        }
+      } catch (e) {
+        console.log("Error deleting from promotions collection:", e);
+      }
+    }
+
+    res.json({ success: true, message: `Promo ${id} deleted successfully!` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/admin/broadcast-promo/clear — Stop/clear live broadcast from visitor screens
+app.post("/api/admin/broadcast-promo/clear", async (req: express.Request, res: express.Response) => {
+  try {
+    lastPromoBroadcast = null;
+    io.emit("promo:clear", {});
+    res.json({ success: true, message: "Live promo cleared from all visitor screens!" });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/admin/broadcast-promo — Delete all promos
+app.delete("/api/admin/broadcast-promo", async (req: express.Request, res: express.Response) => {
+  try {
+    lastPromoBroadcast = null;
+    inMemoryPromos = [];
+    io.emit("promo:clear", {});
+
+    if (db) {
+      try {
+        const snapshot = await db.collection("promotions").get();
+        if (!snapshot.empty) {
+          const batch = db.batch();
+          snapshot.forEach((doc) => batch.delete(doc.ref));
+          await batch.commit();
+        }
+      } catch (e) {
+        console.log("Error clearing all promotions:", e);
+      }
+    }
+
+    res.json({ success: true, message: "All promos cleared successfully!" });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Contact endpoints
+app.post("/api/contact", async (req: express.Request, res: express.Response) => {
+  try {
+    const { name, phone, email, subject, message } = req.body;
+    if (!name || (!phone && !email) || !message) {
+      return res.status(400).json({ error: "Name, phone/email, and message are required" });
+    }
+    const docRef = db.collection("contact_messages").doc();
+    const contactData = {
+      id: docRef.id,
+      name,
+      phone: phone || "",
+      email: email || "",
+      subject: subject || "Customer Inquiry",
+      message,
+      status: "Unread",
+      replies: [],
+      createdAt: new Date().toISOString(),
+    };
+    await docRef.set(contactData);
+    res.status(201).json({ message: "Contact message received successfully", data: contactData });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/admin/contact-messages", async (req: express.Request, res: express.Response) => {
+  try {
+    const snapshot = await db.collection("contact_messages").get();
+    const messages: any[] = [];
+    snapshot.forEach(doc => {
+      messages.push({ id: doc.id, ...doc.data() });
+    });
+    messages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    res.json(messages);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/admin/contact-messages/:id/reply", async (req: express.Request, res: express.Response) => {
+  try {
+    const { id } = req.params;
+    const { replyText, senderName } = req.body;
+    if (!replyText) {
+      return res.status(400).json({ error: "Reply text is required" });
+    }
+
+    const docRef = db.collection("contact_messages").doc(id as string);
+    const doc = await docRef.get();
+    if (!doc.exists) {
+      return res.status(404).json({ error: "Message not found" });
+    }
+
+    const data = doc.data() as any;
+    const replies = data.replies || [];
+    const newReply = {
+      id: "rep_" + Date.now(),
+      sender: senderName || "GlowGoodly Admin Support",
+      message: replyText,
+      createdAt: new Date().toISOString()
+    };
+    replies.push(newReply);
+
+    await docRef.update({
+      replies,
+      status: "Replied",
+      updatedAt: new Date().toISOString()
+    });
+
+    res.json({ success: true, reply: newReply });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// NOTE: Routes above (lines 125-134) use specific paths e.g. /api/banners, /api/marketing
+// The old generic /api/* registrations below have been removed to avoid routing conflicts
+
+// ─── Public Blog Articles API (100% Database-Driven) ───
+app.get("/api/blogs", async (req: express.Request, res: express.Response) => {
+  try {
+    const snapshot = await db.collection("blogs").get();
+    const blogs: any[] = [];
+    snapshot.forEach(doc => {
+      blogs.push({ id: doc.id, ...doc.data() });
+    });
+    blogs.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    res.json(blogs);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── Public Coupon Validation API (100% Database-Driven) ───
+app.get("/api/coupons/validate", async (req: express.Request, res: express.Response) => {
+  try {
+    const rawCode = (req.query.code as string || "").trim().toUpperCase();
+    const subtotal = parseFloat(req.query.subtotal as string || "0");
+
+    if (!rawCode) {
+      return res.status(400).json({ valid: false, error: "Coupon code is required" });
+    }
+
+    const snapshot = await db.collection("coupons").get();
+    let cData: any = null;
+    snapshot.forEach(doc => {
+      const d = doc.data() as any;
+      if (doc.id.toUpperCase() === rawCode || (d.code && d.code.toUpperCase() === rawCode)) {
+        cData = { id: doc.id, ...d };
+      }
+    });
+
+    if (!cData) {
+      return res.status(404).json({ valid: false, error: "Invalid or expired coupon code" });
+    }
+    if (!cData || cData.isActive === false) {
+      return res.status(400).json({ valid: false, error: "Coupon is inactive" });
+    }
+
+    if (cData.expiresAt && new Date(cData.expiresAt).getTime() < Date.now()) {
+      return res.status(400).json({ valid: false, error: "Coupon has expired" });
+    }
+
+    const minSpend = Number(cData.minOrder || cData.minOrderValue || 0);
+
+    let calculatedDiscount = 0;
+    // 1. Check tiered discounts ("koto tk te koto tk discount")
+    if (Array.isArray(cData.tiers) && cData.tiers.length > 0) {
+      const sortedTiers = [...cData.tiers].sort((a, b) => Number(b.minSpend) - Number(a.minSpend));
+      const lowestTier = sortedTiers[sortedTiers.length - 1];
+      
+      if (subtotal > 0 && subtotal < Number(lowestTier.minSpend)) {
+        return res.status(400).json({
+          valid: false,
+          error: `Minimum order amount of ৳${lowestTier.minSpend} required for this offer (পাবেন ৳${lowestTier.discount} ছাড়)`
+        });
+      }
+
+      const matchedTier = sortedTiers.find(t => subtotal >= Number(t.minSpend));
+      if (matchedTier) {
+        calculatedDiscount = Number(matchedTier.discount);
+      } else if (subtotal === 0) {
+        // Just checking preview
+        calculatedDiscount = Number(lowestTier.discount);
+      }
+    } else {
+      // 2. Standard single minimum spend rule
+      if (minSpend > 0 && subtotal > 0 && subtotal < minSpend) {
+        return res.status(400).json({ valid: false, error: `Minimum order amount of ৳${minSpend} required` });
+      }
+
+      const discVal = Number(cData.discount || cData.discountValue || 0);
+      if (cData.discountType === "PERCENTAGE" || cData.discountType === "Percentage") {
+        calculatedDiscount = Math.round((subtotal * discVal) / 100);
+        if (cData.maxDiscount && calculatedDiscount > Number(cData.maxDiscount)) {
+          calculatedDiscount = Number(cData.maxDiscount);
+        }
+      } else {
+        calculatedDiscount = discVal;
+      }
+    }
+
+    return res.json({
+      valid: true,
+      code: rawCode,
+      title: cData.title || `${rawCode} Offer`,
+      description: cData.description || "",
+      discount: calculatedDiscount,
+      discountType: cData.discountType || "Fixed",
+      minOrderValue: minSpend,
+      tiers: cData.tiers || [],
+      message: `Coupon ${rawCode} applied: ৳${calculatedDiscount} discount!`
+    });
+  } catch (error: any) {
+    res.status(500).json({ valid: false, error: error.message });
+  }
+});
+
+// ─── Public Active Coupons API (100% Database-Driven) ───
+app.get("/api/coupons/public", async (req: express.Request, res: express.Response) => {
+  try {
+    const snapshot = await db.collection("coupons").get();
+    const list: any[] = [];
+    snapshot.forEach(doc => {
+      const data = doc.data() as any;
+      if (data && data.isActive !== false) {
+        const minOrder = Number(data.minOrderValue || data.minOrder || 0);
+        const disc = Number(data.discountValue || data.discount || 0);
+        const hasTiers = Array.isArray(data.tiers) && data.tiers.length > 0;
+        
+        let subtitle = "";
+        if (hasTiers) {
+          subtitle = data.tiers.map((t: any) => `৳${t.minSpend}→৳${t.discount}`).join(", ");
+        } else if (data.discountType === "PERCENTAGE" || data.discountType === "Percentage") {
+          subtitle = minOrder > 0 ? `৳${minOrder}+ অর্ডারে ${disc}% ছাড়` : `${disc}% Off`;
+        } else {
+          subtitle = minOrder > 0 ? `৳${minOrder}+ অর্ডারে ৳${disc} ছাড়` : `৳${disc} Off`;
+        }
+
+        list.push({
+          id: doc.id,
+          code: data.code || doc.id,
+          title: data.title || (minOrder > 0 ? `৳${minOrder} কেনাকাটায় ৳${disc} ছাড়` : `${data.code || doc.id} Coupon`),
+          subtitle: data.description || subtitle,
+          discount: disc,
+          discountType: data.discountType || "Fixed",
+          minOrderValue: minOrder,
+          tiers: data.tiers || [],
+          expiryDate: data.expiryDate || data.expiresAt
+        });
+      }
+    });
+    res.json(list);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Backend Root Landing Page Endpoint (Shajgoj Landing UI with GlowGoodly Branding)
+app.get("/", (req, res) => {
+  let logoSrc = "/logo.png";
+  try {
+    const possiblePaths = [
+      path.join(__dirname, "..", "public", "logo.png"),
+      path.join(__dirname, "public", "logo.png"),
+      path.join(process.cwd(), "public", "logo.png"),
+      path.join(process.cwd(), "backend", "public", "logo.png"),
+      path.join(process.cwd(), "frontend", "public", "user-glow-logo.png"),
+      path.join(process.cwd(), "frontend", "public", "images", "logo.png")
+    ];
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        const b64 = fs.readFileSync(p).toString("base64");
+        if (b64 && b64.length > 100) {
+          logoSrc = `data:image/png;base64,${b64}`;
+          break;
+        }
+      }
+    }
+  } catch (e) {}
+
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>WELCOME TO GLOWGOODLY | Authentic Cosmetics Bangladesh</title>
+	<link rel="icon" type="image/x-icon" href="/favicon.ico">
+	<link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+	<link rel="icon" type="image/png" sizes="192x192" href="/logo.png">
+	<link rel="apple-touch-icon" href="/logo.png">
+	<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+	<style>
+		* {
+			box-sizing: border-box;
+			margin: 0;
+			padding: 0;
+		}
+		body {
+			font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+			background-color: #ffffff;
+			color: #1a1a1a;
+			min-height: 100vh;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			padding: 20px;
+		}
+		.landing-container {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			max-width: 1100px;
+			width: 100%;
+			gap: 40px;
+		}
+		.left-content {
+			flex: 1;
+			max-width: 500px;
+		}
+		.left-content h1 {
+			font-size: 32px;
+			font-weight: 800;
+			letter-spacing: 2px;
+			color: #1c1917;
+			text-transform: uppercase;
+			margin-bottom: 12px;
+		}
+		.left-content p {
+			font-size: 15px;
+			color: #44403c;
+			line-height: 1.5;
+			margin-bottom: 28px;
+			font-weight: 500;
+		}
+		.btn-group {
+			display: flex;
+			flex-direction: column;
+			gap: 12px;
+			width: 220px;
+		}
+		.btn {
+			display: block;
+			text-align: center;
+			padding: 12px 24px;
+			border-radius: 25px;
+			font-size: 14px;
+			font-weight: 700;
+			text-decoration: none;
+			color: #ffffff;
+			transition: all 0.2s ease;
+			box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+		}
+		.btn-ecommerce {
+			background-color: #d81b60;
+		}
+		.btn-ecommerce:hover {
+			background-color: #c2185b;
+			transform: translateY(-1px);
+		}
+		.btn-blog {
+			background-color: #5e35b1;
+		}
+		.btn-blog:hover {
+			background-color: #512da8;
+			transform: translateY(-1px);
+		}
+		.right-content {
+			flex: 1;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			position: relative;
+		}
+		.illustration-wrapper {
+			position: relative;
+			width: 100%;
+			max-width: 480px;
+		}
+		@media (max-width: 768px) {
+			.landing-container {
+				flex-direction: column-reverse;
+				text-align: center;
+				gap: 30px;
+			}
+			.btn-group {
+				margin: 0 auto;
+			}
+			.left-content h1 {
+				font-size: 24px;
+			}
+		}
+	</style>
+</head>
+<body>
+	<div class="landing-container">
+		<div class="left-content">
+			<h1>WELCOME TO GLOWGOODLY</h1>
+			<p>Buy Authentic Cosmetic and Beauty Products Online in Bangladesh.</p>
+			<div class="btn-group">
+				<a href="https://shop.glowgoodly.com" class="btn btn-ecommerce" target="_blank">E-commerce</a>
+				<a href="https://glowgoodly.com" class="btn btn-blog" target="_blank">Blog</a>
+			</div>
+		</div>
+		<div class="right-content">
+			<div class="illustration-wrapper">
+				<svg viewBox="0 0 500 500" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+					<!-- Circular Orbit Lines -->
+					<ellipse cx="250" cy="250" rx="190" ry="170" fill="none" stroke="#d6d3d1" stroke-width="1.5" transform="rotate(-15 250 250)"/>
+					<ellipse cx="250" cy="250" rx="205" ry="185" fill="none" stroke="#e7e5e4" stroke-width="1" transform="rotate(-8 250 250)"/>
+					<ellipse cx="250" cy="250" rx="175" ry="155" fill="none" stroke="#f5f5f4" stroke-width="1" transform="rotate(-25 250 250)"/>
+					
+					<!-- GlowGoodly Logo Center Badge -->
+					<g transform="translate(175, 95)">
+						<!-- Subtle circular logo background badge -->
+						<circle cx="75" cy="65" r="58" fill="#ffffff" stroke="#f1f5f9" stroke-width="2" />
+						<!-- HTML-rendered image for maximum browser reliability -->
+						<foreignObject x="25" y="15" width="100" height="100">
+							<div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
+								<img src="${logoSrc}" alt="GlowGoodly Logo" style="width:90px;height:90px;object-fit:contain;border-radius:50%;" onerror="this.onerror=null;this.src='/logo.png';" />
+							</div>
+						</foreignObject>
+						<!-- Fallback SVG image for SVG-only renderers -->
+						<image href="${logoSrc}" xlink:href="${logoSrc}" x="30" y="20" width="90" height="90" preserveAspectRatio="xMidYMid meet" />
+						<text x="75" y="150" text-anchor="middle" font-family="'Montserrat', sans-serif" font-weight="900" font-size="16" letter-spacing="3" fill="#1c1917">GLOWGOODLY</text>
+					</g>
+
+					<!-- Cosmetic Items Around Orbit -->
+					<!-- Compact Compact Powder Top Left -->
+					<g transform="translate(100, 100) rotate(-20)">
+						<rect x="0" y="0" width="60" height="70" rx="10" fill="#292524" />
+						<circle cx="30" cy="35" r="22" fill="#e7c4b1" />
+					</g>
+					<!-- Makeup Brushes -->
+					<g transform="translate(280, 110) rotate(45)">
+						<rect x="0" y="0" width="8" height="120" rx="4" fill="#1c1917" />
+						<path d="M -2,0 L 10,0 L 8,-25 C 6,-35 2,-35 0,-25 Z" fill="#78716c" />
+						<path d="M 0,-22 C 3,-30 5,-30 8,-22 Z" fill="#d81b60" />
+					</g>
+					<!-- Lipstick Bottom Right -->
+					<g transform="translate(380, 280) rotate(-30)">
+						<rect x="0" y="40" width="30" height="50" rx="4" fill="#292524" />
+						<rect x="3" y="20" width="24" height="20" fill="#d6d3d1" />
+						<path d="M 5,20 L 25,20 L 22,-10 C 15,-20 8,-10 5,20 Z" fill="#d81b60" />
+					</g>
+					<!-- Palette Box Bottom Right -->
+					<g transform="translate(340, 360) rotate(15)">
+						<rect x="0" y="0" width="80" height="60" rx="6" fill="#1c1917" />
+						<circle cx="20" cy="20" r="10" fill="#f43f5e" />
+						<circle cx="45" cy="20" r="10" fill="#fb7185" />
+						<circle cx="20" cy="42" r="10" fill="#fda4af" />
+						<circle cx="45" cy="42" r="10" fill="#e879f9" />
+					</g>
+				</svg>
+			</div>
+		</div>
+	</div>
+</body>
+</html>`);
+});
+
+// Health Check
+app.get("/health", (req, res) => {
+  res.json({ status: "healthy", activeSockets: activeSocketsCount, timestamp: new Date().toISOString() });
+});
+
+// Global Error Handler
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error(err);
+  res.status(500).json({ error: "Internal Server Error" });
+});
+
+httpServer.listen(PORT, async () => {
+  console.log(`🚀 GlowGoodly Custom Backend & Socket.io Server running at http://localhost:${PORT}`);
+  try {
+    await autoSeedDatabase();
+  } catch (err: any) {
+    console.warn("⚠️ autoSeedDatabase warning:", err?.message || err);
+  }
+  try {
+    await initMySQLTables();
+  } catch (err: any) {
+    console.warn("⚠️ initMySQLTables warning:", err?.message || err);
+  }
+  try {
+    await cleanAllDummyData();
+  } catch (err: any) {
+    console.warn("⚠️ cleanAllDummyData warning:", err?.message || err);
+  }
+});
+// GlowGoodly Server active

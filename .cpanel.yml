@@ -1,0 +1,6 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/sitecadh/shop.glowgoodly.com
+    - /bin/cp -R frontend/out/* $DEPLOYPATH
+

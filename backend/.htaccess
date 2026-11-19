@@ -1,0 +1,15 @@
+# ─── CPANEL PASSENGER & NODE.JS REVERSE PROXY CONFIGURATION ─────────────────
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION WILL BE ATTACHED HERE.
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Pass Authorization Header to Express middleware
+  RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+  # WebSocket Proxy Support
+  RewriteCond %{HTTP:Upgrade} =websocket [NC]
+  RewriteRule /(.*)           ws://127.0.0.1:5000/$1 [P,L]
+  RewriteCond %{HTTP:Upgrade} !=websocket [NC]
+  RewriteRule /(.*)           http://127.0.0.1:5000/$1 [P,L]
+</IfModule>

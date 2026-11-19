@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" width="200" height="60">
+  <rect width="200" height="60" fill="transparent"/>
+  <text x="100" y="35" font-family="'Century Gothic', sans-serif" font-size="20" font-weight="900" fill="#92400e" text-anchor="middle" letter-spacing="2">
+    SKIN CAFE
+  </text>
+  <text x="100" y="47" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="6.5" font-weight="700" fill="#b45309" text-anchor="middle" letter-spacing="1">
+    100% NATURAL &amp; PURE
+  </text>
+</svg>
