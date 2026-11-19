@@ -377,6 +377,8 @@ function cleanBannerData(data: any): any {
       console.error(err);
       res.status(500).json({ error: "Failed to create banner" });
     }
+  });
+
   const markBannerAsDeleted = async (id: string) => {
     try {
       invalidateBannersCache();
