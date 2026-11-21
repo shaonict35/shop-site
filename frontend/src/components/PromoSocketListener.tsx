@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import Link from "next/link";
 import { Sparkles, X, Tag, ExternalLink, Copy, Check } from "lucide-react";
-import { API_ROOT } from "../utils/api";
+import { API_ROOT, clearAllCache, triggerGlobalDataSync } from "../utils/api";
 
 interface PromoData {
   id: string;
@@ -69,6 +69,21 @@ export default function PromoSocketListener() {
         setPromo((curr) => (curr && curr.id === data.id ? null : curr));
       }
     });
+
+    const handleSync = (data?: any) => {
+      try {
+        clearAllCache();
+        triggerGlobalDataSync();
+      } catch (e) {
+        console.warn("Socket sync trigger error:", e);
+      }
+    };
+
+    socket.on("storefront:updated", handleSync);
+    socket.on("data:sync", handleSync);
+    socket.on("glowgoodly:data-sync", handleSync);
+    socket.on("content_updated", handleSync);
+    socket.on("data_sync", handleSync);
 
     const handleTestPromo = (e: any) => {
       if (e.detail) {

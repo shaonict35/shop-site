@@ -9,28 +9,30 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsToolti
 import SocketIoPromoBroadcaster from "../../components/SocketIoPromoBroadcaster";
 import CloudflareTurnstile from "../../components/CloudflareTurnstile";
 import AdminPushNotifications from "../../components/AdminPushNotifications";
-import { Home, ShoppingCart, Users, Package, Star, Image as ImageIcon, Settings, Bell, Search, Grid, Activity, Layout, Layers, Box, Calendar, User, FileText, CheckSquare, MessageSquare, Menu, LogOut, ExternalLink, ChevronDown, Mail, Camera, DollarSign, TrendingUp, QrCode, Send, Plus, Edit, Trash2, ArrowLeft, Printer, Download, Smartphone, Tablet, Monitor, RefreshCw, Award, Radio, Eye, EyeOff, Tag, Sparkles, Briefcase } from 'lucide-react';
+import { Home, ShoppingCart, Users, Package, Star, Image as ImageIcon, Settings, Bell, Search, Grid, Activity, Layout, Layers, Box, Calendar, User, FileText, CheckSquare, MessageSquare, Menu, LogOut, ExternalLink, ChevronDown, Mail, Camera, DollarSign, TrendingUp, QrCode, Send, Plus, Edit, Trash2, ArrowLeft, Printer, Download, Smartphone, Tablet, Monitor, RefreshCw, Award, Radio, Eye, EyeOff, Tag, Sparkles, Briefcase, Gift } from 'lucide-react';
+
+const getAuthHeader = (explicitToken?: string | null): Record<string, string> => {
+  let activeToken = explicitToken;
+  if (!activeToken && typeof window !== "undefined") {
+    activeToken =
+      localStorage.getItem("gg_token") ||
+      localStorage.getItem("glowgoodly_token") ||
+      localStorage.getItem("glowgoodly_auth_token") ||
+      localStorage.getItem("token") ||
+      "";
+  }
+  if (activeToken === "null" || activeToken === "undefined") {
+    activeToken = "";
+  }
+  return activeToken ? { Authorization: `Bearer ${activeToken}` } : {};
+};
 
 export default function ValobasaAdminPanel() {
   const { user, token, login, logout } = useApp();
   const [mounted, setMounted] = useState<boolean>(false);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
-  const getAuthHeader = (): Record<string, string> => {
-    let activeToken = token;
-    if (!activeToken && typeof window !== "undefined") {
-      activeToken = 
-        localStorage.getItem("gg_token") || 
-        localStorage.getItem("glowgoodly_token") || 
-        localStorage.getItem("glowgoodly_auth_token") || 
-        localStorage.getItem("token") || 
-        "";
-    }
-    if (activeToken === "null" || activeToken === "undefined") {
-      activeToken = "";
-    }
-    return activeToken ? { Authorization: `Bearer ${activeToken}` } : {};
-  };
+  // module-level getAuthHeader is used
 
   // Active Tab & Navigation History
   const [activeTab, setActiveTab] = useState<string>("dashboard");
@@ -51,11 +53,17 @@ export default function ValobasaAdminPanel() {
     if (target === "customer-messages" || target === "messages") target = "customer-messages";
     if (target === "damage" || target === "returns" || target === "damage-and-returns") target = "damage-returns";
     if (target === "live-chat" || target === "chat") target = "live-chat";
+    if (target === "combo-builder" || target === "combos" || target === "combo") target = "combo-builder";
 
     if (target !== activeTab) {
       setTabHistory(prev => [...prev, activeTab]);
       setActiveTab(target);
 
+      if (target === "combo-builder") {
+        fetchAdminCombos();
+        if (adminProducts.length === 0) fetchAdminProducts();
+        if (adminCategories.length === 0) fetchAdminCategories();
+      }
       if (target === "products" || target === "inventory") {
         if (adminProducts.length === 0) fetchAdminProducts();
         if (adminCategories.length === 0) fetchAdminCategories();
@@ -257,40 +265,6 @@ export default function ValobasaAdminPanel() {
 
   // Master Homepage Banners & Card Slots
   const MASTER_HOMEPAGE_BANNERS = [
-    // Hero Slides Carousel (3 Slides)
-    {
-      id: "hero-slide-1",
-      title: "Hero Slide 1 - Nirvana Makeup",
-      page: "Hero Slides",
-      imageUrl: "/images/sliders/slider-1.png",
-      mobileImageUrl: "/images/sliders/slider-1.png",
-      tabletImageUrl: "/images/sliders/slider-1.png",
-      linkUrl: "/shop?brand=nirvana",
-      isActive: true,
-      sortOrder: 1
-    },
-    {
-      id: "hero-slide-2",
-      title: "Hero Slide 2 - July Jaw Droppers",
-      page: "Hero Slides",
-      imageUrl: "/images/sliders/slider-2.png",
-      mobileImageUrl: "/images/sliders/slider-2.png",
-      tabletImageUrl: "/images/sliders/slider-2.png",
-      linkUrl: "/shop?deal=jaw-droppers",
-      isActive: true,
-      sortOrder: 2
-    },
-    {
-      id: "hero-slide-3",
-      title: "Hero Slide 3 - Treasure of Glow",
-      page: "Hero Slides",
-      imageUrl: "/images/sliders/slider-3.png",
-      mobileImageUrl: "/images/sliders/slider-3.png",
-      tabletImageUrl: "/images/sliders/slider-3.png",
-      linkUrl: "/shop?deal=treasure-of-glow",
-      isActive: true,
-      sortOrder: 3
-    },
     // Homepage Wide Banner (Original Beauty Must Haves banner)
     {
       id: "homepage-wide-banner",
@@ -639,7 +613,18 @@ export default function ValobasaAdminPanel() {
   };
 
   // Banners (Desktop, Mobile, Tablet)
-  const [banners, setBanners] = useState<any[]>(() => mergeBannersWithMaster([]));
+  const [banners, setBanners] = useState<any[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("gg_admin_banners_cache");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {}
+    }
+    return [];
+  });
   const [bannerCategoryFilter, setBannerCategoryFilter] = useState<string>("All");
   const [bannerForm, setBannerForm] = useState({
     id: "", title: "", imageUrl: "", mobileImageUrl: "", tabletImageUrl: "",
@@ -823,6 +808,55 @@ export default function ValobasaAdminPanel() {
   const [selectedRestockItem, setSelectedRestockItem] = useState<any | null>(null);
   const [restockForm, setRestockForm] = useState({ quantity: "10", note: "Standard Restock", changeType: "restock" });
   const [isRestocking, setIsRestocking] = useState(false);
+
+  // Combo Builder State
+  const [adminCombos, setAdminCombos] = useState<any[]>([]);
+  const [isCombosLoading, setIsCombosLoading] = useState(false);
+  const [comboSearchQuery, setComboSearchQuery] = useState("");
+  const [comboCategoryFilter, setComboCategoryFilter] = useState("All");
+  const [editingComboId, setEditingComboId] = useState<string | null>(null);
+  const [selectedComboIds, setSelectedComboIds] = useState<string[]>([]);
+  const [comboBannerPreview, setComboBannerPreview] = useState<string>("");
+  const [comboBannerFile, setComboBannerFile] = useState<File | null>(null);
+
+  const [comboForm, setComboForm] = useState<{
+    title: string;
+    slug: string;
+    description: string;
+    categoryId: string;
+    subcategoryId: string;
+    regularPrice: number | string;
+    comboPrice: number | string;
+    isActive: boolean;
+    items: Array<{
+      productId: string;
+      productName: string;
+      variantId?: string | null;
+      variantName?: string | null;
+      shadeName?: string | null;
+      price: number;
+      quantity: number;
+      isFreeGift: boolean;
+      imageUrl: string;
+    }>;
+  }>({
+    title: "",
+    slug: "",
+    description: "",
+    categoryId: "",
+    subcategoryId: "",
+    regularPrice: "",
+    comboPrice: "",
+    isActive: true,
+    items: []
+  });
+
+  // Product & Variant Picker State for Combo Form
+  const [comboPickerProductId, setComboPickerProductId] = useState("");
+  const [comboPickerVariantId, setComboPickerVariantId] = useState("");
+  const [comboPickerQuantity, setComboPickerQuantity] = useState(1);
+  const [comboPickerIsFreeGift, setComboPickerIsFreeGift] = useState(false);
+  const [comboProductSearch, setComboProductSearch] = useState("");
 
   // Manual POS Order State
   const [manualOrderModalOpen, setManualOrderModalOpen] = useState(false);
@@ -1296,16 +1330,55 @@ export default function ValobasaAdminPanel() {
 
   const fetchAdminBanners = async (bypass: boolean = false) => {
     try {
-      const url = `${API_BASE}/banners?t=${Date.now()}`;
-      let bnData = await fetchWithCache(url, true);
-      if (!bnData || !Array.isArray(bnData) || bnData.length === 0) {
-        const directRes = await fetch(`${API_BASE}/admin/banners?t=${Date.now()}`).catch(() => null);
-        if (directRes && directRes.ok) bnData = await directRes.json().catch(() => null);
+      const timestamp = Date.now();
+      const [backendRes, localRes] = await Promise.all([
+        fetchWithCache(`${API_BASE}/banners?t=${timestamp}`, true).catch(() => null),
+        fetch(`/api/local-banners?t=${timestamp}`, { cache: "no-store" }).then(r => r.ok ? r.json() : null).catch(() => null)
+      ]);
+
+      let backendList: any[] = Array.isArray(backendRes) ? backendRes : [];
+      if (backendList.length === 0) {
+        const directRes = await fetch(`${API_BASE}/admin/banners?t=${timestamp}`).catch(() => null);
+        if (directRes && directRes.ok) backendList = await directRes.json().catch(() => []);
       }
-      setBanners(mergeBannersWithMaster(bnData && Array.isArray(bnData) ? bnData : []));
+
+      const flattenedLocal: any[] = [];
+      if (localRes) {
+        Object.entries(localRes).forEach(([secKey, items]: [string, any]) => {
+          if (Array.isArray(items)) {
+            items.forEach((item: any) => {
+              if (!item) return;
+              let page = item.page;
+              if (!page) {
+                if (secKey === "shopByCategory") page = item.title?.includes("Category:") ? item.title : `Category: ${item.title?.replace(" Card", "")}`;
+                else if (secKey === "shopByConcern") page = item.title?.includes("Concern:") ? item.title : `Concern: ${item.title?.replace(" Card", "").replace(" Treatment", "").replace(" Solution", "")}`;
+                else if (secKey === "heroBanners") page = "Hero Slides";
+                else if (secKey === "dealsYouCannotMiss") page = item.title;
+                else if (secKey === "topBrandsOffers") page = item.title;
+                else if (secKey === "limitedTimeOffers") page = item.title;
+                else if (secKey === "promoBanner") page = "Homepage Wide Banner";
+                else page = "Homepage";
+              }
+              flattenedLocal.push({
+                ...item,
+                page,
+                sectionKey: secKey
+              });
+            });
+          }
+        });
+      }
+
+      const combined = [...flattenedLocal, ...backendList];
+      const merged = mergeBannersWithMaster(combined);
+      setBanners(merged);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("gg_admin_banners_cache", JSON.stringify(merged));
+        } catch (_) {}
+      }
     } catch (e) {
       console.warn("Could not fetch admin banners:", e);
-      setBanners(mergeBannersWithMaster([]));
     }
   };
 
@@ -1332,7 +1405,7 @@ export default function ValobasaAdminPanel() {
     try {
       let oData = null;
       if (activeToken) {
-        const res = await safeFetch(`${API_BASE}/orders/all` + (bypass ? `?t=${Date.now()}` : ""), { headers: { Authorization: `Bearer ${activeToken}` } });
+        const res = await safeFetch(`${API_BASE}/orders/all` + (bypass ? `?t=${Date.now()}` : ""), { headers: getAuthHeader(activeToken) });
         if (res && res.ok) oData = await res.json();
       }
       if (!oData || !Array.isArray(oData) || oData.length === 0) {
@@ -1521,7 +1594,7 @@ export default function ValobasaAdminPanel() {
     try {
       const res = await fetch(`${API_BASE}/banners/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` }
+        headers: getAuthHeader(token)
       });
       if (res.ok) {
         clearAllCache();
@@ -2021,7 +2094,7 @@ export default function ValobasaAdminPanel() {
       }
       const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : "");
       if (activeToken) {
-        const aRes = await safeFetch(`${API_BASE}/careers/applications`, { headers: { Authorization: `Bearer ${activeToken}` } });
+        const aRes = await safeFetch(`${API_BASE}/careers/applications`, { headers: getAuthHeader(activeToken) });
         if (aRes && aRes.ok) {
           const aData = await aRes.json().catch(() => []);
           setCareersApplicationsList(Array.isArray(aData) ? aData : []);
@@ -2042,7 +2115,7 @@ export default function ValobasaAdminPanel() {
       const method = isEdit ? "PUT" : "POST";
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${activeToken}` },
+        headers: { "Content-Type": "application/json", ...getAuthHeader(activeToken) },
         body: JSON.stringify(jobFormData)
       });
       if (res.ok) {
@@ -2066,7 +2139,7 @@ export default function ValobasaAdminPanel() {
     try {
       const res = await fetch(`${API_BASE}/careers/jobs/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${activeToken}` }
+        headers: getAuthHeader(activeToken)
       });
       if (res.ok) {
         alert("Job opening deleted successfully.");
@@ -2085,7 +2158,7 @@ export default function ValobasaAdminPanel() {
     try {
       const res = await fetch(`${API_BASE}/careers/applications/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${activeToken}` }
+        headers: getAuthHeader(activeToken)
       });
       if (res.ok) {
         alert("Application deleted successfully.");
@@ -2376,18 +2449,27 @@ export default function ValobasaAdminPanel() {
     try {
       setHeroBanners(prev => prev.filter(b => b.id !== banner.id));
       const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : "");
-      const res = await fetch(`${API_BASE}/hero-banners/${banner.id}`, {
-        method: "DELETE",
-        headers: activeToken ? { Authorization: `Bearer ${activeToken}` } : {}
-      });
-      if (res.ok) {
+      
+      // Delete across backend and local stores
+      const [res] = await Promise.all([
+        fetch(`${API_BASE}/hero-banners/${banner.id}`, {
+          method: "DELETE",
+          headers: activeToken ? { Authorization: `Bearer ${activeToken}` } : {}
+        }).catch(() => null),
+        fetch(`/api/hero-banners-local?id=${banner.id}`, { method: "DELETE" }).catch(() => null),
+        fetch(`/api/local-banners?sectionKey=heroBanners&id=${banner.id}`, { method: "DELETE" }).catch(() => null)
+      ]);
+
+      if (typeof window !== "undefined") {
+        try { localStorage.removeItem("gg_synced_dynamic_slides"); } catch (_) {}
+      }
+
+      if (res && res.ok) {
         alert("Hero banner and media file permanently deleted!");
         clearAllCache();
         triggerGlobalDataSync();
         fetchHeroBanners(true);
       } else {
-        const err = await res.json().catch(() => ({}));
-        alert(err.error || "Failed to delete hero banner.");
         fetchHeroBanners(true);
       }
     } catch (e) {
@@ -2423,6 +2505,59 @@ export default function ValobasaAdminPanel() {
       }
 
       if (res.ok) {
+        // Also update /api/local-banners so frontend homepage-banners.json is immediately updated
+        try {
+          const p = (bannerForm.page || "").toLowerCase();
+          const idLower = (bannerForm.id || "").toLowerCase();
+          let targetSection = "heroBanners";
+          if (p.includes("category") || idLower.startsWith("cat-card-") || idLower.startsWith("cat-")) {
+            targetSection = "shopByCategory";
+          } else if (p.includes("concern") || idLower.startsWith("concern-card-") || idLower.startsWith("concern-")) {
+            targetSection = "shopByConcern";
+          } else if (p.includes("deal") || idLower.startsWith("deal-")) {
+            targetSection = "dealsYouCannotMiss";
+          } else if (p.includes("brand offer") || idLower.startsWith("brand-offer-")) {
+            targetSection = "topBrandsOffers";
+          } else if (p.includes("bogo") || p.includes("combo") || p.includes("offers") || p.includes("clearance") || idLower.startsWith("lto-") || idLower.startsWith("limited-")) {
+            targetSection = "limitedTimeOffers";
+          } else if (p.includes("wide") || p.includes("promo") || idLower.includes("wide") || idLower.startsWith("promo-")) {
+            targetSection = "promoBanner";
+          }
+
+          let localId = bannerForm.id;
+          if (!localId) {
+            if (targetSection === "shopByCategory") {
+              const cleanTitle = bannerForm.title.toLowerCase().replace(/[^a-z0-9]/g, "");
+              localId = `cat-${cleanTitle.replace("categorycard", "").replace("category", "")}`;
+            } else if (targetSection === "shopByConcern") {
+              const cleanTitle = bannerForm.title.toLowerCase().replace(/[^a-z0-9]/g, "");
+              localId = `concern-card-${cleanTitle.replace("concerncard", "").replace("concern", "")}`;
+            } else {
+              localId = `banner-${Date.now()}`;
+            }
+          }
+
+          await fetch("/api/local-banners", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sectionKey: targetSection,
+              item: {
+                id: localId,
+                title: bannerForm.title,
+                imageUrl: bannerForm.imageUrl,
+                mobileImageUrl: bannerForm.mobileImageUrl || bannerForm.imageUrl,
+                tabletImageUrl: bannerForm.tabletImageUrl || bannerForm.imageUrl,
+                linkUrl: bannerForm.linkUrl || "/shop",
+                page: bannerForm.page,
+                isActive: bannerForm.isActive !== false,
+                sortOrder: Number(bannerForm.sortOrder) || 1,
+                updatedAt: Date.now()
+              }
+            })
+          }).catch(() => {});
+        } catch (_) {}
+
         if (typeof window !== "undefined") {
           try {
             const stored = localStorage.getItem("gg_deleted_banner_ids");
@@ -2464,9 +2599,26 @@ export default function ValobasaAdminPanel() {
         } catch (e) {}
       }
 
-      setBanners((prev) => prev.filter((b) => b.id !== id && (pageKey ? b.page !== pageKey : true)));
+      setBanners((prev) => {
+        const updated = prev.filter((b) => b.id !== id && (pageKey ? b.page !== pageKey : true));
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem("gg_admin_banners_cache", JSON.stringify(updated));
+          } catch (_) {}
+        }
+        return updated;
+      });
       await fetch(`${API_BASE}/banners/${id}`, { method: "DELETE", headers: getAuthHeader() }).catch(() => {});
       await fetch(`${API_BASE}/admin/banners/${id}`, { method: "DELETE", headers: getAuthHeader() }).catch(() => {});
+      
+      // Also delete from /api/local-banners across all sections
+      try {
+        const sections = ["heroBanners", "dealsYouCannotMiss", "topBrandsOffers", "limitedTimeOffers", "shopByCategory", "shopByConcern", "promoBanner"];
+        await Promise.all(sections.map(s => 
+          fetch(`/api/local-banners?sectionKey=${s}&id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {})
+        ));
+      } catch (_) {}
+
       clearAllCache();
       triggerGlobalDataSync();
       fetchData(true);
@@ -2610,6 +2762,248 @@ export default function ValobasaAdminPanel() {
     }
   };
 
+  // ─── COMBO BUILDER HANDLERS ──────────────────────────────────────
+  const fetchAdminCombos = async () => {
+    setIsCombosLoading(true);
+    try {
+      const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("gg_token") || localStorage.getItem("glowgoodly_token") || localStorage.getItem("token") || "" : "");
+      const res = await fetch(`${API_BASE}/combos?all=true&t=${Date.now()}`, {
+        headers: getAuthHeader(activeToken),
+        cache: "no-store"
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAdminCombos(Array.isArray(data) ? data : []);
+      }
+    } catch (e) {
+      console.error("Failed to fetch combos:", e);
+    } finally {
+      setIsCombosLoading(false);
+    }
+  };
+
+  const handleAddComboItem = () => {
+    if (!comboPickerProductId) {
+      alert("Please select a product first");
+      return;
+    }
+    const product = adminProducts.find(p => p.id === comboPickerProductId);
+    if (!product) return;
+
+    let variantName = "Standard";
+    let shadeName: string | null = null;
+    let price = Number(product.discountPrice || product.price || 0);
+
+    if (comboPickerVariantId && Array.isArray(product.variants)) {
+      const variant = product.variants.find((v: any) => v.id === comboPickerVariantId);
+      if (variant) {
+        variantName = variant.name || variant.shade || "Standard";
+        shadeName = variant.shade || variant.shadeColor || variant.name || null;
+        price = Number(variant.discountPrice || variant.price || price);
+      }
+    }
+
+    if (comboPickerIsFreeGift) {
+      price = 0;
+    }
+
+    const newItem = {
+      productId: product.id,
+      productName: product.name,
+      variantId: comboPickerVariantId || null,
+      variantName,
+      shadeName,
+      price,
+      quantity: Number(comboPickerQuantity) || 1,
+      isFreeGift: comboPickerIsFreeGift,
+      imageUrl: product.imageUrl || product.images?.[0]?.url || "/placeholder-product.svg"
+    };
+
+    const updatedItems = [...comboForm.items, newItem];
+    const autoRegularPrice = updatedItems.reduce((acc, it) => acc + (it.isFreeGift ? 0 : (it.price * it.quantity)), 0);
+
+    setComboForm(prev => ({
+      ...prev,
+      items: updatedItems,
+      regularPrice: prev.regularPrice ? prev.regularPrice : autoRegularPrice
+    }));
+
+    setComboPickerProductId("");
+    setComboPickerVariantId("");
+    setComboPickerQuantity(1);
+    setComboPickerIsFreeGift(false);
+  };
+
+  const handleRemoveComboItem = (index: number) => {
+    const updatedItems = comboForm.items.filter((_, i) => i !== index);
+    const autoRegularPrice = updatedItems.reduce((acc, it) => acc + (it.isFreeGift ? 0 : (it.price * it.quantity)), 0);
+    setComboForm(prev => ({
+      ...prev,
+      items: updatedItems,
+      regularPrice: autoRegularPrice
+    }));
+  };
+
+  const handleSaveCombo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!comboForm.title.trim()) {
+      alert("Please enter a combo title");
+      return;
+    }
+    if (comboForm.items.length === 0) {
+      alert("Please add at least 1 product to the combo");
+      return;
+    }
+
+    try {
+      const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("gg_token") || localStorage.getItem("glowgoodly_token") || localStorage.getItem("token") || "" : "");
+      
+      const formData = new FormData();
+      formData.append("title", comboForm.title.trim());
+      formData.append("slug", comboForm.slug.trim() || comboForm.title.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
+      formData.append("description", comboForm.description || "");
+      formData.append("categoryId", comboForm.categoryId || "");
+      formData.append("subcategoryId", comboForm.subcategoryId || "");
+      formData.append("regularPrice", String(comboForm.regularPrice || 0));
+      formData.append("comboPrice", String(comboForm.comboPrice || 0));
+      formData.append("isActive", String(comboForm.isActive));
+      formData.append("items", JSON.stringify(comboForm.items));
+
+      if (comboBannerFile) {
+        formData.append("bannerImage", comboBannerFile);
+      } else if (comboBannerPreview) {
+        formData.append("bannerImage", comboBannerPreview);
+      }
+
+      const isEditing = Boolean(editingComboId);
+      const url = isEditing ? `${API_BASE}/admin/combos/${editingComboId}` : `${API_BASE}/admin/combos`;
+      const method = isEditing ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: getAuthHeader(activeToken),
+        body: formData
+      });
+
+      if (res.ok) {
+        alert(isEditing ? "Combo updated successfully!" : "Combo created successfully!");
+        setComboForm({
+          title: "",
+          slug: "",
+          description: "",
+          categoryId: "",
+          subcategoryId: "",
+          regularPrice: "",
+          comboPrice: "",
+          isActive: true,
+          items: []
+        });
+        setEditingComboId(null);
+        setComboBannerPreview("");
+        setComboBannerFile(null);
+        clearAllCache();
+        triggerGlobalDataSync();
+        fetchAdminCombos();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || "Failed to save combo");
+      }
+    } catch (err: any) {
+      alert(`Error saving combo: ${err.message || err}`);
+    }
+  };
+
+  const handleEditCombo = (c: any) => {
+    setEditingComboId(c.id);
+    setComboBannerPreview(c.bannerImage || "");
+    setComboBannerFile(null);
+    setComboForm({
+      title: c.title || "",
+      slug: c.slug || "",
+      description: c.description || "",
+      categoryId: c.categoryId || "",
+      subcategoryId: c.subcategoryId || "",
+      regularPrice: c.regularPrice || "",
+      comboPrice: c.comboPrice || "",
+      isActive: c.isActive !== false,
+      items: (c.items || []).map((it: any) => ({
+        productId: it.productId,
+        productName: it.product?.name || "Product",
+        variantId: it.variantId || null,
+        variantName: it.shadeName || "Standard",
+        shadeName: it.shadeName || null,
+        price: it.isFreeGift ? 0 : (it.product?.price || 0),
+        quantity: it.quantity || 1,
+        isFreeGift: Boolean(it.isFreeGift),
+        imageUrl: it.product?.images?.[0]?.url || it.product?.imageUrl || "/placeholder-product.svg"
+      }))
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleDeleteCombo = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this combo?")) return;
+    try {
+      const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("gg_token") || localStorage.getItem("glowgoodly_token") || localStorage.getItem("token") || "" : "");
+      const res = await fetch(`${API_BASE}/admin/combos/${id}`, {
+        method: "DELETE",
+        headers: getAuthHeader(activeToken)
+      });
+      if (res.ok) {
+        alert("Combo deleted successfully");
+        clearAllCache();
+        triggerGlobalDataSync();
+        fetchAdminCombos();
+      } else {
+        alert("Failed to delete combo");
+      }
+    } catch (err) {
+      alert("Error deleting combo");
+    }
+  };
+
+  const handleBulkDeleteCombos = async () => {
+    if (selectedComboIds.length === 0) return;
+    if (!confirm(`Delete ${selectedComboIds.length} selected combos?`)) return;
+    try {
+      const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("gg_token") || localStorage.getItem("glowgoodly_token") || localStorage.getItem("token") || "" : "");
+      const res = await fetch(`${API_BASE}/admin/combos/bulk-delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeader(activeToken) },
+        body: JSON.stringify({ ids: selectedComboIds })
+      });
+      if (res.ok) {
+        alert(`Successfully deleted ${selectedComboIds.length} combos`);
+        setSelectedComboIds([]);
+        clearAllCache();
+        triggerGlobalDataSync();
+        fetchAdminCombos();
+      } else {
+        alert("Failed to bulk delete combos");
+      }
+    } catch (err) {
+      alert("Error bulk deleting combos");
+    }
+  };
+
+  const handleToggleComboActive = async (c: any) => {
+    try {
+      const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("gg_token") || localStorage.getItem("glowgoodly_token") || localStorage.getItem("token") || "" : "");
+      const res = await fetch(`${API_BASE}/admin/combos/${c.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...getAuthHeader(activeToken) },
+        body: JSON.stringify({ isActive: !c.isActive })
+      });
+      if (res.ok) {
+        clearAllCache();
+        triggerGlobalDataSync();
+        fetchAdminCombos();
+      }
+    } catch (err) {
+      console.warn("Toggle active error:", err);
+    }
+  };
+
   // Brand Upload
   const handleBrandUpload = async (brandId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2622,7 +3016,7 @@ export default function ValobasaAdminPanel() {
       try {
         const res = await fetch(`${API_BASE}/admin/brands/${brandId}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
           body: JSON.stringify({ logoUrl })
         });
         if (res.ok) {
@@ -2645,7 +3039,7 @@ export default function ValobasaAdminPanel() {
       const activeAuthToken = token || (typeof window !== "undefined" ? localStorage.getItem("gg_token") || localStorage.getItem("glowgoodly_token") || localStorage.getItem("token") || "" : "");
       const res = await fetch(`${API_BASE}/settings/bulk`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${activeAuthToken}` },
+        headers: { "Content-Type": "application/json", ...getAuthHeader(activeAuthToken) },
         body: JSON.stringify(settings)
       });
       if (res.ok) {
@@ -2671,7 +3065,7 @@ export default function ValobasaAdminPanel() {
       const res = await fetch(`${API_BASE}/orders/${orderId}/send-${provider.toLowerCase()}`, {
         method: "POST",
         headers: { 
-          Authorization: `Bearer ${token}`,
+          ...getAuthHeader(token),
           "Content-Type": "application/json"
         }
       });
@@ -3307,6 +3701,13 @@ export default function ValobasaAdminPanel() {
             <Package size={18} /><span>Products</span>
           </div>
 
+          {/* Combo Builder Menu Item */}
+          <div onClick={() => navigateTo("combo-builder")} className={`admin-menu-item ${activeTab === "combo-builder" ? "active" : ""}`} style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", color: activeTab === "combo-builder" ? "#fff" : "inherit" }}>
+            <Gift size={18} color="#e63b7a" />
+            <span>Combo Builder</span>
+            <span style={{ backgroundColor: "#e63b7a", color: "#fff", fontSize: "10px", fontWeight: "900", padding: "1px 6px", borderRadius: "8px", marginLeft: "auto" }}>NEW</span>
+          </div>
+
           <div onClick={() => navigateTo("brands")} className={`admin-menu-item ${activeTab === "brands" ? "active" : ""}`} style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", color: activeTab === "brands" ? "#fff" : "inherit" }}>
             <Star size={18} /><span>Brands</span>
           </div>
@@ -3321,11 +3722,6 @@ export default function ValobasaAdminPanel() {
           {/* Join Our Team / Careers & Hiring */}
           <div onClick={() => navigateTo("careers")} className={`admin-menu-item ${activeTab === "careers" ? "active" : ""}`} style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", color: activeTab === "careers" ? "#fff" : "inherit" }}>
             <Briefcase size={18} /><span>Careers & Hiring</span>
-          </div>
-
-          {/* Push & Offer Notifications */}
-          <div onClick={() => navigateTo("push-notifications")} className={`admin-menu-item ${activeTab === "push-notifications" ? "active" : ""}`} style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", color: activeTab === "push-notifications" ? "#fff" : "inherit" }}>
-            <Bell size={18} /><span>Push Notifications</span>
           </div>
 
           <div onClick={() => navigateTo("top-customers")} className={`admin-menu-item ${activeTab === "top-customers" ? "active" : ""}`} style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", color: activeTab === "top-customers" ? "#fff" : "inherit" }}>
@@ -3741,12 +4137,7 @@ export default function ValobasaAdminPanel() {
 
           {/* SOCKET.IO PROMO BROADCAST */}
           {(activeTab === "socket-promo" || activeTab === "socket-live-promo") && (
-            <SocketIoPromoBroadcaster token={token || undefined} />
-          )}
-
-          {/* PUSH & OFFER NOTIFICATIONS BROADCASTER */}
-          {(activeTab === "push-notifications" || activeTab === "notifications") && (
-            <AdminPushNotifications token={token || undefined} />
+            <SocketIoPromoBroadcaster token={token || null} />
           )}
 
           {/* AVAILABLE OFFERS & MARKETING CODES MANAGER */}
@@ -4239,7 +4630,7 @@ export default function ValobasaAdminPanel() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
                   <div>
                     <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e293b", margin: 0 }}>Customer Messages & Contact Tickets</h2>
-                    <p style={{ color: "#64748b", fontSize: "13px", margin: "2px 0 0 0" }}>View customer inquiries from Contact Us form and send direct support replies.</p>
+                    <p style={{ color: "#ffffffff", fontSize: "13px", margin: "2px 0 0 0" }}>View customer inquiries from Contact Us form and send direct support replies.</p>
                   </div>
                 </div>
 
@@ -6430,7 +6821,7 @@ export default function ValobasaAdminPanel() {
                           try {
                             const res = await fetch(`${API_BASE}/admin/staff`, {
                               method: "POST",
-                              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                              headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
                               body: JSON.stringify(staffForm)
                             });
                             if (res.ok) {
@@ -8538,6 +8929,49 @@ export default function ValobasaAdminPanel() {
                     </div>
                     <div>
                       <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Upload / Change Image</label>
+                      <input type="file" accept="image/*" onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setEditingCategory((prev: any) => ({ ...prev, imageUrl: reader.result as string }));
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }} style={{ fontSize: "12px" }} />
+                      {editingCategory.imageUrl && (
+                        <div style={{ marginTop: "6px" }}>
+                          <img src={editingCategory.imageUrl} alt="preview" style={{ width: "48px", height: "48px", objectFit: "cover", borderRadius: "6px" }} />
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "10px" }}>
+                      <button onClick={() => setEditingCategory(null)} style={{ padding: "8px 16px", borderRadius: "6px", border: "1px solid #cbd5e1", backgroundColor: "#f1f5f9", cursor: "pointer", fontWeight: "700" }}>Cancel</button>
+                      <button onClick={async () => {
+                        try {
+                          const res = await fetch(`${API_BASE}/categories/${editingCategory.id}`, {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json", ...getAuthHeader() },
+                            body: JSON.stringify({ name: editingCategory.name, imageUrl: editingCategory.imageUrl })
+                          });
+                          if (res.ok) {
+                            alert("Category updated successfully!");
+                            setEditingCategory(null);
+                            clearAllCache();
+                            triggerGlobalDataSync();
+                            fetchData(true);
+                          } else {
+                            alert("Failed to update category.");
+                          }
+                        } catch (e) { alert("Error updating category"); }
+                      }} style={{ padding: "8px 16px", borderRadius: "6px", border: "none", backgroundColor: "#e63b7a", color: "#fff", cursor: "pointer", fontWeight: "700" }}>Save</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {activeTab === "add-sub-category" && (
             <div style={{ backgroundColor: "#ffffff", borderRadius: "10px", border: "1px solid #e5e7eb", padding: "24px" }}>
               <h2 style={{ fontSize: "18px", fontWeight: "800", marginBottom: "16px" }}>Add A Sub Category</h2>
@@ -9440,7 +9874,7 @@ export default function ValobasaAdminPanel() {
                           try {
                             const res = await fetch(`${API_BASE}/admin/products/${editingProduct.id}`, {
                               method: "PATCH",
-                              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                              headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
                               body: JSON.stringify({
                                 name: editingProduct.name,
                                 description: editingProduct.description,
@@ -9475,7 +9909,615 @@ export default function ValobasaAdminPanel() {
             </div>
           )}
 
-          {/* 9. BRANDS */}
+          {/* 8.5 COMBO BUILDER */}
+          {activeTab === "combo-builder" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+              {/* Header Banner */}
+              <div style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", padding: "24px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <div style={{ backgroundColor: "#fce7f3", color: "#e63b7a", padding: "10px", borderRadius: "10px", display: "flex" }}>
+                      <Gift size={24} />
+                    </div>
+                    <div>
+                      <h2 style={{ fontSize: "20px", fontWeight: "900", color: "#0f172a", margin: 0 }}>
+                        {editingComboId ? "✏️ Edit Combo Package" : "🎁 Combo Builder (Products, Shades & Free Gifts)"}
+                      </h2>
+                      <p style={{ color: "#64748b", fontSize: "13px", margin: "3px 0 0 0" }}>
+                        Create bundles with specific product shades, optional free gift items (৳0), and custom combo offer pricing. Saved permanently in database.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button
+                    onClick={() => fetchAdminCombos()}
+                    style={{ display: "flex", alignItems: "center", gap: "6px", backgroundColor: "#f1f5f9", color: "#334155", border: "1px solid #cbd5e1", padding: "8px 16px", borderRadius: "8px", fontWeight: "700", fontSize: "13px", cursor: "pointer" }}
+                  >
+                    <RefreshCw size={14} className={isCombosLoading ? "animate-spin" : ""} /> Refresh
+                  </button>
+                  {editingComboId && (
+                    <button
+                      onClick={() => {
+                        setEditingComboId(null);
+                        setComboBannerPreview("");
+                        setComboBannerFile(null);
+                        setComboForm({ title: "", slug: "", description: "", categoryId: "", subcategoryId: "", regularPrice: "", comboPrice: "", isActive: true, items: [] });
+                      }}
+                      style={{ backgroundColor: "#f1f5f9", color: "#64748b", border: "1px solid #cbd5e1", padding: "8px 16px", borderRadius: "8px", fontWeight: "700", fontSize: "13px", cursor: "pointer" }}
+                    >
+                      Cancel Edit
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Combo Creation & Editing Form */}
+              <div style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", padding: "26px", boxShadow: "0 2px 10px rgba(0,0,0,0.04)" }}>
+                <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#1e293b", marginBottom: "20px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Package size={18} color="#e63b7a" />
+                  {editingComboId ? "Update Combo Details" : "Step 1: Combo Details & Category"}
+                </h3>
+
+                <form onSubmit={handleSaveCombo} style={{ display: "flex", flexDirection: "column", gap: "22px" }}>
+                  {/* Basic Info Grid */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "18px" }}>
+                    <div>
+                      <label style={{ display: "block", fontSize: "12.5px", fontWeight: "700", color: "#334155", marginBottom: "6px" }}>
+                        Combo Title *
+                      </label>
+                      <input
+                        required
+                        type="text"
+                        placeholder="e.g. Glowing Glass Skin 4-Step Routine"
+                        value={comboForm.title}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setComboForm(prev => ({
+                            ...prev,
+                            title: val,
+                            slug: editingComboId ? prev.slug : val.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+                          }));
+                        }}
+                        style={{ width: "100%", padding: "10px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "13.5px" }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: "block", fontSize: "12.5px", fontWeight: "700", color: "#334155", marginBottom: "6px" }}>
+                        URL Slug
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="glowing-glass-skin-4-step-routine"
+                        value={comboForm.slug}
+                        onChange={(e) => setComboForm({ ...comboForm, slug: e.target.value })}
+                        style={{ width: "100%", padding: "10px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "13.5px" }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: "block", fontSize: "12.5px", fontWeight: "700", color: "#334155", marginBottom: "6px" }}>
+                        Main Category
+                      </label>
+                      <select
+                        value={comboForm.categoryId}
+                        onChange={(e) => setComboForm({ ...comboForm, categoryId: e.target.value, subcategoryId: "" })}
+                        style={{ width: "100%", padding: "10px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "13.5px", backgroundColor: "#fff" }}
+                      >
+                        <option value="">Select Category (Optional)</option>
+                        <option value="cat-combo">Combo / Combo Deals</option>
+                        <option value="perfect-match-combo">Perfect Match Combo</option>
+                        <option value="clearance-sale">Clearance Sale Combos</option>
+                        {adminCategories.filter(c => !c.parentId).map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: "block", fontSize: "12.5px", fontWeight: "700", color: "#334155", marginBottom: "6px" }}>
+                        Subcategory
+                      </label>
+                      <select
+                        value={comboForm.subcategoryId}
+                        onChange={(e) => setComboForm({ ...comboForm, subcategoryId: e.target.value })}
+                        style={{ width: "100%", padding: "10px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "13.5px", backgroundColor: "#fff" }}
+                      >
+                        <option value="">Select Subcategory (Optional)</option>
+                        <option value="sub-skin-combo">Skin Care Combos</option>
+                        <option value="sub-makeup-combo">Makeup Combos</option>
+                        <option value="sub-hair-combo">Hair Care Combos</option>
+                        <option value="sub-winter-combo">Winter Essential Combos</option>
+                        {adminCategories.filter(c => c.parentId && (!comboForm.categoryId || c.parentId === comboForm.categoryId)).map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <label style={{ display: "block", fontSize: "12.5px", fontWeight: "700", color: "#334155", marginBottom: "6px" }}>
+                      Combo Description & Benefits
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder="Describe what is inside this combo, instructions, and who it is suitable for..."
+                      value={comboForm.description}
+                      onChange={(e) => setComboForm({ ...comboForm, description: e.target.value })}
+                      style={{ width: "100%", padding: "10px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "13.5px", resize: "vertical" }}
+                    />
+                  </div>
+
+                  {/* Banner Image Upload with Live Preview */}
+                  <div>
+                    <label style={{ display: "block", fontSize: "12.5px", fontWeight: "700", color: "#334155", marginBottom: "6px" }}>
+                      Combo Banner / Cover Image
+                    </label>
+                    <div style={{ display: "flex", gap: "16px", alignItems: "center", flexWrap: "wrap" }}>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setComboBannerFile(file);
+                            const reader = new FileReader();
+                            reader.onload = () => setComboBannerPreview(reader.result as string);
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        style={{ padding: "8px", border: "1px dashed #cbd5e1", borderRadius: "8px", fontSize: "13px" }}
+                      />
+                      {comboBannerPreview && (
+                        <div style={{ position: "relative", width: "90px", height: "90px", borderRadius: "8px", overflow: "hidden", border: "1px solid #e2e8f0" }}>
+                          <img src={comboBannerPreview} alt="Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          <button
+                            type="button"
+                            onClick={() => { setComboBannerPreview(""); setComboBannerFile(null); }}
+                            style={{ position: "absolute", top: "2px", right: "2px", backgroundColor: "rgba(0,0,0,0.6)", color: "#fff", border: "none", borderRadius: "50%", width: "20px", height: "20px", fontSize: "11px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Step 2: Product & Variant / Shade Picker */}
+                  <div style={{ backgroundColor: "#f8fafc", borderRadius: "10px", border: "1px solid #e2e8f0", padding: "20px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
+                      <h4 style={{ fontSize: "15px", fontWeight: "800", color: "#0f172a", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span>Step 2: Add Products & Variants to this Combo</span>
+                      </h4>
+                      <input
+                        type="text"
+                        placeholder="🔍 Filter catalog products..."
+                        value={comboProductSearch}
+                        onChange={(e) => setComboProductSearch(e.target.value)}
+                        style={{ padding: "6px 12px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "12.5px", width: "220px" }}
+                      />
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px", alignItems: "flex-end" }}>
+                      {/* Product Selector */}
+                      <div>
+                        <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#475569", marginBottom: "4px" }}>
+                          Select Product
+                        </label>
+                        <select
+                          value={comboPickerProductId}
+                          onChange={(e) => {
+                            setComboPickerProductId(e.target.value);
+                            setComboPickerVariantId("");
+                          }}
+                          style={{ width: "100%", padding: "9px 12px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px", backgroundColor: "#fff" }}
+                        >
+                          <option value="">-- Choose Product --</option>
+                          {adminProducts
+                            .filter(p => !comboProductSearch.trim() || p.name.toLowerCase().includes(comboProductSearch.toLowerCase()))
+                            .map(p => (
+                              <option key={p.id} value={p.id}>
+                                {p.name} {p.brand?.name ? `(${p.brand.name})` : ""} - ৳{p.discountPrice || p.price}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+
+                      {/* Variant / Shade Selector */}
+                      <div>
+                        <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#475569", marginBottom: "4px" }}>
+                          Variant / Shade (Optional)
+                        </label>
+                        {(() => {
+                          const selProd = adminProducts.find(p => p.id === comboPickerProductId);
+                          const variants = (selProd && Array.isArray(selProd.variants)) ? selProd.variants : [];
+                          return (
+                            <select
+                              value={comboPickerVariantId}
+                              onChange={(e) => setComboPickerVariantId(e.target.value)}
+                              disabled={variants.length === 0}
+                              style={{ width: "100%", padding: "9px 12px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px", backgroundColor: variants.length === 0 ? "#f1f5f9" : "#fff" }}
+                            >
+                              <option value="">{variants.length > 0 ? "-- Choose Shade / Variant --" : "Standard (No variants)"}</option>
+                              {variants.map((v: any) => (
+                                <option key={v.id} value={v.id}>
+                                  {v.name || v.shade || "Option"} {v.shadeColor ? `(${v.shadeColor})` : ""} - ৳{v.discountPrice || v.price} (Stock: {v.stock ?? 50})
+                                </option>
+                              ))}
+                            </select>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Quantity */}
+                      <div style={{ maxWidth: "110px" }}>
+                        <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#475569", marginBottom: "4px" }}>
+                          Quantity
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={20}
+                          value={comboPickerQuantity}
+                          onChange={(e) => setComboPickerQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                          style={{ width: "100%", padding: "9px 12px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px" }}
+                        />
+                      </div>
+
+                      {/* Free Gift Toggle */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", paddingBottom: "10px" }}>
+                        <input
+                          type="checkbox"
+                          id="freeGiftCheck"
+                          checked={comboPickerIsFreeGift}
+                          onChange={(e) => setComboPickerIsFreeGift(e.target.checked)}
+                          style={{ width: "18px", height: "18px", accentColor: "#e63b7a", cursor: "pointer" }}
+                        />
+                        <label htmlFor="freeGiftCheck" style={{ fontSize: "12.5px", fontWeight: "700", color: comboPickerIsFreeGift ? "#e63b7a" : "#334155", cursor: "pointer" }}>
+                          🎁 Add As Free Gift (৳0)
+                        </label>
+                      </div>
+
+                      {/* Add Button */}
+                      <div>
+                        <button
+                          type="button"
+                          onClick={handleAddComboItem}
+                          style={{ backgroundColor: "#0284c7", color: "#fff", border: "none", padding: "10px 18px", borderRadius: "6px", fontWeight: "700", fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", height: "40px" }}
+                        >
+                          <Plus size={16} /> Add To Combo
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Included Items List Table */}
+                    <div style={{ marginTop: "18px" }}>
+                      <div style={{ fontSize: "13px", fontWeight: "800", color: "#334155", marginBottom: "10px" }}>
+                        Items Currently Included ({comboForm.items.length}):
+                      </div>
+
+                      {comboForm.items.length === 0 ? (
+                        <div style={{ padding: "20px", textAlign: "center", color: "#94a3b8", fontSize: "13px", border: "1px dashed #cbd5e1", borderRadius: "8px" }}>
+                          No products added yet. Use the picker above to add items to this combo package.
+                        </div>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                          {comboForm.items.map((it, idx) => (
+                            <div
+                              key={idx}
+                              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", backgroundColor: it.isFreeGift ? "#fdf2f8" : "#ffffff", border: `1px solid ${it.isFreeGift ? "#fbcfe8" : "#e2e8f0"}`, borderRadius: "8px", gap: "12px", flexWrap: "wrap" }}
+                            >
+                              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                                <img
+                                  src={it.imageUrl || "/placeholder-product.svg"}
+                                  alt={it.productName}
+                                  style={{ width: "40px", height: "40px", objectFit: "contain", borderRadius: "6px", backgroundColor: "#fff", border: "1px solid #f1f5f9" }}
+                                />
+                                <div>
+                                  <div style={{ fontSize: "13.5px", fontWeight: "700", color: "#0f172a" }}>
+                                    {it.productName}
+                                  </div>
+                                  <div style={{ fontSize: "11.5px", color: "#64748b" }}>
+                                    {it.shadeName ? `Shade: ${it.shadeName} • ` : it.variantName !== "Standard" ? `Variant: ${it.variantName} • ` : ""}
+                                    Qty: <strong>{it.quantity}</strong>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                                {it.isFreeGift ? (
+                                  <span style={{ backgroundColor: "#e63b7a", color: "#ffffff", padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "900", letterSpacing: "0.5px" }}>
+                                    🎁 FREE GIFT (৳0)
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: "13.5px", fontWeight: "800", color: "#0f172a" }}>
+                                    ৳{it.price * it.quantity} <span style={{ fontSize: "11px", color: "#94a3b8", fontWeight: "normal" }}>(৳{it.price} each)</span>
+                                  </span>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveComboItem(idx)}
+                                  style={{ backgroundColor: "#fee2e2", color: "#dc2626", border: "none", width: "28px", height: "28px", borderRadius: "6px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                                  title="Remove item"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Step 3: Pricing & Savings Calculator */}
+                  <div style={{ backgroundColor: "#fff7ed", borderRadius: "10px", border: "1px solid #ffedd5", padding: "20px" }}>
+                    <h4 style={{ fontSize: "15px", fontWeight: "800", color: "#9a3412", margin: "0 0 14px 0", display: "flex", alignItems: "center", gap: "8px" }}>
+                      <DollarSign size={18} color="#ea580c" />
+                      Step 3: Pricing & Combo Discount
+                    </h4>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", alignItems: "center" }}>
+                      <div>
+                        <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#9a3412", marginBottom: "4px" }}>
+                          Total Regular Value (৳)
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="Calculated or custom"
+                          value={comboForm.regularPrice}
+                          onChange={(e) => setComboForm({ ...comboForm, regularPrice: e.target.value })}
+                          style={{ width: "100%", padding: "10px 14px", border: "1px solid #fdba74", borderRadius: "8px", fontSize: "14px", fontWeight: "700", backgroundColor: "#fff" }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#9a3412", marginBottom: "4px" }}>
+                          Combo Offer Price (৳) *
+                        </label>
+                        <input
+                          required
+                          type="number"
+                          placeholder="e.g. 2450"
+                          value={comboForm.comboPrice}
+                          onChange={(e) => setComboForm({ ...comboForm, comboPrice: e.target.value })}
+                          style={{ width: "100%", padding: "10px 14px", border: "2px solid #e63b7a", borderRadius: "8px", fontSize: "15px", fontWeight: "800", color: "#e63b7a", backgroundColor: "#fff" }}
+                        />
+                      </div>
+
+                      {/* Savings Calculation Box */}
+                      {(() => {
+                        const reg = Number(comboForm.regularPrice) || 0;
+                        const off = Number(comboForm.comboPrice) || 0;
+                        const savings = Math.max(0, reg - off);
+                        const percent = reg > 0 ? Math.round((savings / reg) * 100) : 0;
+                        return (
+                          <div style={{ backgroundColor: "#ffffff", padding: "12px 16px", borderRadius: "8px", border: "1px solid #fed7aa" }}>
+                            <div style={{ fontSize: "11px", fontWeight: "700", color: "#9a3412", textTransform: "uppercase" }}>
+                              Customer Savings
+                            </div>
+                            <div style={{ fontSize: "18px", fontWeight: "900", color: "#059669" }}>
+                              ৳{savings} OFF <span style={{ fontSize: "13px", color: "#e63b7a" }}>({percent}%)</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Active Status Toggle */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <input
+                          type="checkbox"
+                          id="comboActiveToggle"
+                          checked={comboForm.isActive}
+                          onChange={(e) => setComboForm({ ...comboForm, isActive: e.target.checked })}
+                          style={{ width: "18px", height: "18px", accentColor: "#059669", cursor: "pointer" }}
+                        />
+                        <label htmlFor="comboActiveToggle" style={{ fontSize: "13px", fontWeight: "700", color: "#334155", cursor: "pointer" }}>
+                          Publish Active on Website
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Submit Button */}
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+                    <button
+                      type="submit"
+                      style={{ backgroundColor: "#e63b7a", color: "#fff", border: "none", padding: "13px 32px", borderRadius: "8px", fontWeight: "800", fontSize: "14px", cursor: "pointer", boxShadow: "0 4px 14px rgba(230, 59, 122, 0.3)" }}
+                    >
+                      {editingComboId ? "✓ UPDATE COMBO" : "✨ CREATE & PUBLISH COMBO"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Combo List Table */}
+              <div style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", padding: "24px", boxShadow: "0 2px 10px rgba(0,0,0,0.04)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px", flexWrap: "wrap", gap: "12px" }}>
+                  <div>
+                    <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#1e293b", margin: 0 }}>
+                      All Created Combos ({adminCombos.length})
+                    </h3>
+                    <p style={{ color: "#64748b", fontSize: "12.5px", margin: "2px 0 0 0" }}>
+                      Managed bundles are displayed live on storefront /shop and category pages.
+                    </p>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+                    {selectedComboIds.length > 0 && (
+                      <button
+                        onClick={handleBulkDeleteCombos}
+                        style={{ backgroundColor: "#fee2e2", color: "#dc2626", border: "1px solid #fca5a5", padding: "8px 14px", borderRadius: "6px", fontWeight: "700", fontSize: "12.5px", cursor: "pointer" }}
+                      >
+                        Delete Selected ({selectedComboIds.length})
+                      </button>
+                    )}
+
+                    <input
+                      type="text"
+                      placeholder="Search combos..."
+                      value={comboSearchQuery}
+                      onChange={(e) => setComboSearchQuery(e.target.value)}
+                      style={{ padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "12.5px", width: "180px" }}
+                    />
+
+                    <select
+                      value={comboCategoryFilter}
+                      onChange={(e) => setComboCategoryFilter(e.target.value)}
+                      style={{ padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "12.5px", backgroundColor: "#fff" }}
+                    >
+                      <option value="All">All Categories</option>
+                      <option value="cat-combo">Combo Deals</option>
+                      <option value="perfect-match-combo">Perfect Match Combo</option>
+                      {adminCategories.filter(c => !c.parentId).map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Combos Table */}
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                    <thead>
+                      <tr style={{ backgroundColor: "#f8fafc", borderBottom: "2px solid #e2e8f0", textAlign: "left" }}>
+                        <th style={{ padding: "12px 14px", width: "40px" }}>
+                          <input
+                            type="checkbox"
+                            checked={adminCombos.length > 0 && selectedComboIds.length === adminCombos.length}
+                            onChange={(e) => {
+                              if (e.target.checked) setSelectedComboIds(adminCombos.map(c => c.id));
+                              else setSelectedComboIds([]);
+                            }}
+                            style={{ cursor: "pointer" }}
+                          />
+                        </th>
+                        <th style={{ padding: "12px 14px", width: "80px" }}>Image</th>
+                        <th style={{ padding: "12px 14px" }}>Combo Title & Slug</th>
+                        <th style={{ padding: "12px 14px" }}>Included Items</th>
+                        <th style={{ padding: "12px 14px" }}>Pricing</th>
+                        <th style={{ padding: "12px 14px" }}>Status</th>
+                        <th style={{ padding: "12px 14px", textAlign: "right" }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adminCombos
+                        .filter(c => {
+                          const matchesSearch = !comboSearchQuery.trim() || c.title?.toLowerCase().includes(comboSearchQuery.toLowerCase());
+                          const matchesCat = comboCategoryFilter === "All" || c.categoryId === comboCategoryFilter;
+                          return matchesSearch && matchesCat;
+                        })
+                        .map(c => {
+                          const savings = Math.max(0, (c.regularPrice || 0) - (c.comboPrice || 0));
+                          const percent = c.regularPrice > 0 ? Math.round((savings / c.regularPrice) * 100) : 0;
+                          return (
+                            <tr key={c.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                              <td style={{ padding: "12px 14px" }}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedComboIds.includes(c.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) setSelectedComboIds([...selectedComboIds, c.id]);
+                                    else setSelectedComboIds(selectedComboIds.filter(id => id !== c.id));
+                                  }}
+                                  style={{ cursor: "pointer" }}
+                                />
+                              </td>
+                              <td style={{ padding: "12px 14px" }}>
+                                <img
+                                  src={c.bannerImage || c.items?.[0]?.product?.images?.[0]?.url || "/placeholder-product.svg"}
+                                  alt={c.title}
+                                  style={{ width: "55px", height: "55px", objectFit: "contain", borderRadius: "8px", border: "1px solid #e2e8f0", backgroundColor: "#fff" }}
+                                />
+                              </td>
+                              <td style={{ padding: "12px 14px" }}>
+                                <div style={{ fontWeight: "700", color: "#0f172a" }}>{c.title}</div>
+                                <div style={{ fontSize: "11px", color: "#64748b" }}>slug: {c.slug}</div>
+                                {c.category?.name && (
+                                  <span style={{ display: "inline-block", marginTop: "4px", backgroundColor: "#f1f5f9", color: "#475569", fontSize: "10.5px", fontWeight: "700", padding: "1px 6px", borderRadius: "4px" }}>
+                                    {c.category.name}
+                                  </span>
+                                )}
+                              </td>
+                              <td style={{ padding: "12px 14px", maxWidth: "260px" }}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                                  {(c.items || []).map((it: any, i: number) => (
+                                    <div key={i} style={{ fontSize: "11.5px", color: "#334155" }}>
+                                      • {it.product?.name || "Product"}
+                                      {it.shadeName && <span style={{ color: "#e63b7a" }}> ({it.shadeName})</span>}
+                                      {it.isFreeGift && <span style={{ color: "#059669", fontWeight: "800" }}> [🎁 FREE]</span>}
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                              <td style={{ padding: "12px 14px" }}>
+                                <div style={{ fontSize: "14px", fontWeight: "800", color: "#e63b7a" }}>
+                                  ৳{c.comboPrice}
+                                </div>
+                                {c.regularPrice > c.comboPrice && (
+                                  <div style={{ fontSize: "11.5px", color: "#94a3b8", textDecoration: "line-through" }}>
+                                    ৳{c.regularPrice}
+                                  </div>
+                                )}
+                                {percent > 0 && (
+                                  <span style={{ fontSize: "10.5px", fontWeight: "800", color: "#059669" }}>
+                                    Save {percent}%
+                                  </span>
+                                )}
+                              </td>
+                              <td style={{ padding: "12px 14px" }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleComboActive(c)}
+                                  style={{
+                                    border: "none",
+                                    padding: "4px 10px",
+                                    borderRadius: "12px",
+                                    fontSize: "11px",
+                                    fontWeight: "800",
+                                    cursor: "pointer",
+                                    backgroundColor: c.isActive ? "#dcfce7" : "#f1f5f9",
+                                    color: c.isActive ? "#15803d" : "#64748b"
+                                  }}
+                                >
+                                  {c.isActive ? "● Active" : "○ Inactive"}
+                                </button>
+                              </td>
+                              <td style={{ padding: "12px 14px", textAlign: "right" }}>
+                                <div style={{ display: "inline-flex", gap: "6px" }}>
+                                  <button
+                                    onClick={() => handleEditCombo(c)}
+                                    style={{ backgroundColor: "#e0f2fe", color: "#0284c7", border: "none", padding: "6px 10px", borderRadius: "6px", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", fontWeight: "700" }}
+                                  >
+                                    <Edit size={13} /> Edit
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteCombo(c.id)}
+                                    style={{ backgroundColor: "#fee2e2", color: "#dc2626", border: "none", padding: "6px 10px", borderRadius: "6px", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", fontWeight: "700" }}
+                                  >
+                                    <Trash2 size={13} /> Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      {adminCombos.length === 0 && (
+                        <tr>
+                          <td colSpan={7} style={{ padding: "30px", textAlign: "center", color: "#94a3b8" }}>
+                            No combos created yet. Create your first combo above!
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
           {activeTab === "brands" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
               <div style={{ backgroundColor: "#ffffff", borderRadius: "10px", border: "1px solid #e5e7eb", padding: "24px" }}>
@@ -9486,7 +10528,7 @@ export default function ValobasaAdminPanel() {
                   try {
                     const res = await fetch(`${API_BASE}/admin/brands`, {
                       method: "POST",
-                      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                      headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
                       body: JSON.stringify(brandForm)
                     });
                     if (res.ok) {
@@ -9648,7 +10690,7 @@ export default function ValobasaAdminPanel() {
                                   <td style={{ textAlign: "center" }}>
                                     <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
                                       <button onClick={() => setEditingBrand({ ...b })} style={{ backgroundColor: "#f1f5f9", color: "#334155", border: "1px solid #cbd5e1", padding: "4px 10px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>✏️ Edit</button>
-                                      <button onClick={async () => { if (!confirm(`Delete brand ${b.name}?`)) return; try { await fetch(`${API_BASE}/admin/brands/${b.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); setAdminBrands(prev => prev.filter(item => item.id !== b.id)); clearAllCache(); triggerGlobalDataSync(); fetchAdminBrands(true); } catch (e) { alert("Error deleting brand"); } }} style={{ backgroundColor: "#fee2e2", color: "#ef4444", border: "none", padding: "4px 10px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Delete</button>
+                                      <button onClick={async () => { if (!confirm(`Delete brand ${b.name}?`)) return; try { await fetch(`${API_BASE}/admin/brands/${b.id}`, { method: "DELETE", headers: getAuthHeader(token) }); setAdminBrands(prev => prev.filter(item => item.id !== b.id)); clearAllCache(); triggerGlobalDataSync(); fetchAdminBrands(true); } catch (e) { alert("Error deleting brand"); } }} style={{ backgroundColor: "#fee2e2", color: "#ef4444", border: "none", padding: "4px 10px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Delete</button>
                                     </div>
                                   </td>
                                 </tr>
@@ -9721,7 +10763,7 @@ export default function ValobasaAdminPanel() {
                             setAdminBrands((prev) => prev.map((b) => b.id === editingBrand.id ? { ...b, name: editingBrand.name, originCountry: editingBrand.originCountry, logoUrl: editingBrand.logoUrl } : b));
                             const res = await fetch(`${API_BASE}/admin/brands/${editingBrand.id}`, {
                               method: "PATCH",
-                              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                              headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
                               body: JSON.stringify({ name: editingBrand.name, originCountry: editingBrand.originCountry, logoUrl: editingBrand.logoUrl })
                             });
                             if (res.ok) {
@@ -10697,7 +11739,7 @@ export default function ValobasaAdminPanel() {
                               try {
                                 const res = await fetch(`${API_BASE}/admin/courier/pathao/test`, {
                                   method: "POST",
-                                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                                  headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
                                   body: JSON.stringify({
                                     client_id: settings.PATHAO_CLIENT_ID,
                                     client_secret: settings.PATHAO_CLIENT_SECRET,
@@ -10739,7 +11781,7 @@ export default function ValobasaAdminPanel() {
                               try {
                                 const res = await fetch(`${API_BASE}/admin/courier/steadfast/test`, {
                                   method: "POST",
-                                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                                  headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
                                   body: JSON.stringify({
                                     api_key: settings.STEADFAST_API_KEY,
                                     secret_key: settings.STEADFAST_SECRET_KEY,
@@ -10778,7 +11820,7 @@ export default function ValobasaAdminPanel() {
                               try {
                                 const res = await fetch(`${API_BASE}/admin/courier/redx/test`, {
                                   method: "POST",
-                                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                                  headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
                                   body: JSON.stringify({
                                     access_token: settings.REDX_ACCESS_TOKEN,
                                     base_url: settings.REDX_BASE_URL || "https://openapi.redx.com.bd/v1.0.0"
@@ -10842,7 +11884,7 @@ export default function ValobasaAdminPanel() {
                               try {
                                 const res = await fetch(`${API_BASE}/admin/courier/carrybee/issue-token`, {
                                   method: "POST",
-                                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                                  headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
                                   body: JSON.stringify({
                                     client_id: settings.CARRYBEE_CLIENT_ID,
                                     client_secret: settings.CARRYBEE_CLIENT_SECRET,
@@ -11058,7 +12100,7 @@ function LiveChatPanel({ token, staffList }: { token: string | null; staffList?:
     const fetchThreads = async () => {
       try {
         const res = await fetch(`${API_BASE}/chat/admin/threads`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: getAuthHeader(token),
         });
         if (res.ok) {
           const data = await res.json();
@@ -11107,7 +12149,7 @@ function LiveChatPanel({ token, staffList }: { token: string | null; staffList?:
     try {
       await fetch(`${API_BASE}/chat/admin/reply`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
         body: JSON.stringify({ chatId: selectedChatId, message: text }),
       });
     } catch (e) {}
@@ -11320,7 +12362,7 @@ function AbandonedCartsPanel({ token }: { token: string | null }) {
   const fetchCarts = async () => {
     try {
       const res = await fetch(`${API_BASE}/admin/abandoned-carts`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: getAuthHeader(token)
       });
       if (res.ok) setCarts(await res.json());
     } catch (e) {}
@@ -11333,7 +12375,7 @@ function AbandonedCartsPanel({ token }: { token: string | null }) {
     try {
       const res = await fetch(`${API_BASE}/admin/abandoned-carts/notify`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
         body: JSON.stringify({ cartId, method: "Email & SMS" })
       });
       if (res.ok) {
@@ -11417,7 +12459,7 @@ function UpsellOffersPanel({ token }: { token: string | null }) {
     try {
       const res = await fetch(`${API_BASE}/admin/upsells`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
         body: JSON.stringify(form)
       });
       if (res.ok) {
@@ -11488,7 +12530,7 @@ function InfluencersPanel({ token }: { token: string | null }) {
   const fetchInfluencers = async () => {
     try {
       const res = await fetch(`${API_BASE}/admin/influencers`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: getAuthHeader(token)
       });
       if (res.ok) setList(await res.json());
     } catch (e) {}
@@ -11501,7 +12543,7 @@ function InfluencersPanel({ token }: { token: string | null }) {
     try {
       const res = await fetch(`${API_BASE}/admin/influencers`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
         body: JSON.stringify(form)
       });
       if (res.ok) {
@@ -11767,7 +12809,7 @@ function SupportTicketsPanel({ token }: { token: string | null }) {
   const fetchTickets = async () => {
     try {
       const res = await fetch(`${API_BASE}/admin/tickets`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: getAuthHeader(token)
       });
       if (res.ok) setTickets(await res.json());
     } catch (e) {}
@@ -11779,7 +12821,7 @@ function SupportTicketsPanel({ token }: { token: string | null }) {
     try {
       const res = await fetch(`${API_BASE}/admin/tickets/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
         body: JSON.stringify({ status })
       });
       if (res.ok) { fetchTickets(); }
@@ -12045,7 +13087,7 @@ function AuditLogsPanel({ token }: { token: string | null }) {
     const fetchLogs = async () => {
       try {
         const res = await fetch(`${API_BASE}/admin/audit-logs`, {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: getAuthHeader(token)
         });
         if (res.ok) setLogs(await res.json());
       } catch (e) {}
@@ -12128,7 +13170,7 @@ function BatchExpiryPanel({ token }: { token: string | null }) {
   const fetchBatches = async () => {
     try {
       const res = await fetch(`${API_BASE}/admin/batches`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: getAuthHeader(token)
       });
       if (res.ok) setBatches(await res.json());
     } catch (e) {}
@@ -12141,7 +13183,7 @@ function BatchExpiryPanel({ token }: { token: string | null }) {
     try {
       const res = await fetch(`${API_BASE}/admin/batches`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
         body: JSON.stringify(form)
       });
       if (res.ok) {
@@ -12209,7 +13251,7 @@ function SubscriptionsPanel({ token }: { token: string | null }) {
     const fetchSubs = async () => {
       try {
         const res = await fetch(`${API_BASE}/admin/subscriptions`, {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: getAuthHeader(token)
         });
         if (res.ok) setSubs(await res.json());
       } catch (e) {}
@@ -12288,7 +13330,7 @@ function CustomerWalletPanel({ token, customerList }: { token: string | null; cu
   const fetchWallets = async () => {
     try {
       const res = await fetch(`${API_BASE}/admin/wallet`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: getAuthHeader(token)
       });
       if (res.ok) setWallets(await res.json());
     } catch (e) {}
@@ -12301,7 +13343,7 @@ function CustomerWalletPanel({ token, customerList }: { token: string | null; cu
     try {
       const res = await fetch(`${API_BASE}/admin/wallet/credit`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
         body: JSON.stringify(creditForm)
       });
       if (res.ok) {
@@ -12360,7 +13402,7 @@ function SystemHealthPanel({ token }: { token: string | null }) {
     const fetchHealth = async () => {
       try {
         const res = await fetch(`${API_BASE}/admin/system-health`, {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: getAuthHeader(token)
         });
         if (res.ok) setHealth(await res.json());
       } catch (e) {}
@@ -12410,7 +13452,7 @@ function RmaWorkflowPanel({ token }: { token: string | null }) {
   const fetchRMA = async () => {
     try {
       const res = await fetch(`${API_BASE}/admin/rma`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: getAuthHeader(token)
       });
       if (res.ok) setRmas(await res.json());
     } catch (e) {}
@@ -12422,7 +13464,7 @@ function RmaWorkflowPanel({ token }: { token: string | null }) {
     try {
       const res = await fetch(`${API_BASE}/admin/rma/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
         body: JSON.stringify({ rmaStep })
       });
       if (res.ok) fetchRMA();
@@ -12510,7 +13552,7 @@ function MenuManagementPanel({ token }: { token: string | null }) {
     try {
       const res = await fetch(`${API_BASE}/admin/menus`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
         body: JSON.stringify(form)
       });
       if (res.ok) {
@@ -12535,7 +13577,7 @@ function MenuManagementPanel({ token }: { token: string | null }) {
     try {
       const res = await fetch(`${API_BASE}/admin/menus/${editingItem.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
         body: JSON.stringify(editingItem)
       });
       if (res.ok) {
@@ -12557,7 +13599,7 @@ function MenuManagementPanel({ token }: { token: string | null }) {
     try {
       const res = await fetch(`${API_BASE}/admin/menus/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` }
+        headers: getAuthHeader(token)
       });
       if (res.ok) {
         alert("Menu item deleted!");

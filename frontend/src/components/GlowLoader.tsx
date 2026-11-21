@@ -1,241 +1,413 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ShoppingBag, Sparkles } from "lucide-react";
+import { usePathname } from "next/navigation";
 
 interface GlowLoaderProps {
   text?: string;
   subtext?: string;
   fullScreen?: boolean;
+  autoDismiss?: boolean;
+  dismissMs?: number;
 }
 
 export default function GlowLoader({
-  text = "Loading Products...",
-  subtext = "Authentic Skincare & Cosmetics",
+  text = "GLOWGOODLY",
+  subtext = "100% Authentic Beauty & Cosmetics • Bangladesh",
   fullScreen = false,
+  autoDismiss = true,
+  dismissMs = 850,
 }: GlowLoaderProps) {
-  const [activeItem, setActiveItem] = useState(0);
+  const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
+  const [visible, setVisible] = useState(true);
+  const [fading, setFading] = useState(false);
+  const [progress, setProgress] = useState(25);
+  const [navProgress, setNavProgress] = useState(0);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [logoError, setLogoError] = useState(false);
 
-  const productIcons = [
-    { emoji: "✨", name: "Serums & Toners" },
-    { emoji: "💄", name: "Lipsticks & Makeup" },
-    { emoji: "🧴", name: "Glow Moisturizers" },
-    { emoji: "🌸", name: "Korean K-Beauty" },
-    { emoji: "🛍️", name: "Packing Your Bag" },
-  ];
-
+  // Initial page load smooth progress & auto-dismiss
   useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveItem((prev) => (prev + 1) % productIcons.length);
-    }, 900);
-    return () => clearInterval(timer);
-  }, [productIcons.length]);
+    setMounted(true);
 
-  return (
+    const t1 = setTimeout(() => setProgress(65), 180);
+    const t2 = setTimeout(() => setProgress(92), 450);
+    const t3 = setTimeout(() => setProgress(100), 700);
+
+    let fadeTimer: NodeJS.Timeout;
+    let dismissTimer: NodeJS.Timeout;
+
+    if (autoDismiss) {
+      fadeTimer = setTimeout(() => {
+        setFading(true);
+      }, dismissMs);
+
+      dismissTimer = setTimeout(() => {
+        setVisible(false);
+      }, dismissMs + 280);
+    }
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      if (fadeTimer) clearTimeout(fadeTimer);
+      if (dismissTimer) clearTimeout(dismissTimer);
+    };
+  }, [autoDismiss, dismissMs]);
+
+  // Route change instant feedback: top progress bar animation across pages
+  useEffect(() => {
+    if (!mounted) return;
+    setIsNavigating(true);
+    setNavProgress(35);
+
+    const nav1 = setTimeout(() => setNavProgress(80), 120);
+    const nav2 = setTimeout(() => setNavProgress(100), 320);
+    const navDone = setTimeout(() => {
+      setIsNavigating(false);
+      setNavProgress(0);
+    }, 550);
+
+    return () => {
+      clearTimeout(nav1);
+      clearTimeout(nav2);
+      clearTimeout(navDone);
+    };
+  }, [pathname, mounted]);
+
+  // Render top navigation progress bar on any route navigation
+  const topNavBar = isNavigating ? (
     <div
+      aria-hidden="true"
       style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: fullScreen ? "0" : "50px 20px",
-        minHeight: fullScreen ? "80vh" : "280px",
+        position: "fixed",
+        top: 0,
+        left: 0,
         width: "100%",
-        fontFamily: "'Montserrat', 'Inter', system-ui, sans-serif",
+        height: "3.5px",
+        zIndex: 9999999,
+        pointerEvents: "none",
+        backgroundColor: "rgba(230, 59, 122, 0.15)",
+        overflow: "hidden",
       }}
     >
-      <style jsx>{`
-        @keyframes bagFloat {
-          0%, 100% {
-            transform: translateY(0) scale(1);
-          }
-          50% {
-            transform: translateY(-5px) scale(1.03);
-          }
-        }
+      <div
+        style={{
+          height: "100%",
+          width: `${navProgress}%`,
+          background: "linear-gradient(90deg, #e63b7a 0%, #d81b60 50%, #9333ea 100%)",
+          boxShadow: "0 0 12px rgba(230, 59, 122, 0.8)",
+          borderRadius: "0 2px 2px 0",
+          transition: "width 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+        }}
+      />
+    </div>
+  ) : null;
 
-        @keyframes itemDrop {
-          0% {
-            transform: translateY(-26px) scale(0.6) rotate(-15deg);
-            opacity: 0;
-          }
-          50% {
-            transform: translateY(0px) scale(1.1) rotate(5deg);
-            opacity: 1;
-          }
-          85% {
-            transform: translateY(6px) scale(0.95);
-            opacity: 0.9;
-          }
-          100% {
-            transform: translateY(12px) scale(0.8);
-            opacity: 0;
-          }
-        }
+  if (!mounted) return topNavBar;
+  if (!fullScreen) return topNavBar;
+  if (!visible && !isNavigating) return null;
+  if (!visible) return topNavBar;
 
-        @keyframes shimmerLine {
-          0% {
-            transform: translateX(-100%);
+  return (
+    <>
+      {topNavBar}
+      <div
+        aria-hidden="true"
+        style={{
+          position: fullScreen ? "fixed" : "relative",
+          inset: fullScreen ? 0 : "auto",
+          width: "100%",
+          height: fullScreen ? "100vh" : "290px",
+          backgroundColor: fullScreen ? "rgba(255, 255, 255, 0.94)" : "transparent",
+          backdropFilter: fullScreen ? "blur(10px)" : "none",
+          WebkitBackdropFilter: fullScreen ? "blur(10px)" : "none",
+          zIndex: fullScreen ? 999998 : 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "24px",
+          opacity: fading ? 0 : 1,
+          pointerEvents: fading ? "none" : "auto",
+          transition: "opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1), transform 0.28s ease",
+          transform: fading ? "scale(1.02)" : "scale(1)",
+          userSelect: "none",
+        }}
+      >
+        <style>{`
+          @keyframes ggOrbitSpin {
+            0% {
+              transform: rotate(0deg);
+            }
+            100% {
+              transform: rotate(360deg);
+            }
           }
-          100% {
-            transform: translateX(100%);
+
+          @keyframes ggOrbitCounter {
+            0% {
+              transform: rotate(360deg);
+            }
+            100% {
+              transform: rotate(0deg);
+            }
           }
-        }
 
-        .bag-container {
-          animation: bagFloat 2.2s ease-in-out infinite;
-        }
+          @keyframes ggBreathingPulse {
+            0%, 100% {
+              transform: translateY(0) scale(1);
+              box-shadow: 0 10px 30px rgba(230, 59, 122, 0.25), 0 0 0 1px rgba(230, 59, 122, 0.15);
+            }
+            50% {
+              transform: translateY(-5px) scale(1.04);
+              box-shadow: 0 16px 40px rgba(230, 59, 122, 0.4), 0 0 0 2px rgba(230, 59, 122, 0.3);
+            }
+          }
 
-        .dropping-item {
-          animation: itemDrop 0.9s cubic-bezier(0.34, 1.3, 0.64, 1) infinite;
-        }
+          @keyframes ggShimmerText {
+            0% {
+              background-position: -200% center;
+            }
+            100% {
+              background-position: 200% center;
+            }
+          }
 
-        .shimmer-progress {
-          animation: shimmerLine 1.6s ease-in-out infinite;
-        }
-      `}</style>
+          @keyframes ggGlowPulse {
+            0%, 100% {
+              opacity: 0.55;
+              transform: scale(0.96);
+            }
+            50% {
+              opacity: 0.95;
+              transform: scale(1.06);
+            }
+          }
 
-      {/* Center Animation: Products Dropping into Glow Shopping Bag */}
-      <div style={{ position: "relative", width: "90px", height: "90px", marginBottom: "18px" }}>
+          .gg-orbit-outer {
+            animation: ggOrbitSpin 3.8s linear infinite;
+          }
+
+          .gg-orbit-inner {
+            animation: ggOrbitCounter 2.6s linear infinite;
+          }
+
+          .gg-center-circle {
+            animation: ggBreathingPulse 2.2s ease-in-out infinite;
+          }
+
+          .gg-shimmer-title {
+            background: linear-gradient(90deg, #0f172a 0%, #e63b7a 40%, #d81b60 60%, #0f172a 100%);
+            background-size: 250% 100%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: ggShimmerText 3.2s ease-in-out infinite;
+          }
+
+          .gg-ambient-aura {
+            animation: ggGlowPulse 2.4s ease-in-out infinite;
+          }
+        `}</style>
+
+        {/* Ambient Radial Soft Glow */}
         <div
+          className="gg-ambient-aura"
           style={{
             position: "absolute",
-            inset: "-10px",
-            background: "radial-gradient(circle, rgba(229, 40, 96, 0.2) 0%, rgba(229, 40, 96, 0) 70%)",
+            width: "240px",
+            height: "240px",
             borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(230, 59, 122, 0.2) 0%, rgba(216, 27, 96, 0.08) 50%, transparent 70%)",
+            filter: "blur(20px)",
+            pointerEvents: "none",
+            zIndex: 0,
           }}
         />
 
+        {/* Main Brand Logo Solar Orbiting Centerpiece */}
         <div
-          key={activeItem}
-          className="dropping-item"
           style={{
-            position: "absolute",
-            top: "2px",
-            left: "calc(50% - 16px)",
-            fontSize: "28px",
-            zIndex: 10,
-            pointerEvents: "none",
-            filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.15))",
-          }}
-        >
-          {productIcons[activeItem].emoji}
-        </div>
-
-        <div
-          className="bag-container"
-          style={{
-            position: "absolute",
-            bottom: "0",
-            left: "calc(50% - 32px)",
-            width: "64px",
-            height: "64px",
-            borderRadius: "18px",
-            backgroundColor: "#ffffff",
-            border: "2px solid #fce7f0",
-            boxShadow: "0 8px 25px rgba(229, 40, 96, 0.22)",
+            position: "relative",
+            width: "140px",
+            height: "140px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 5,
+            marginBottom: "20px",
+            zIndex: 1,
+          }}
+        >
+          {/* Ring 1: Solar Orbit Ring with Glowing Satellite Planet */}
+          <div
+            className="gg-orbit-outer"
+            style={{
+              position: "absolute",
+              inset: "-12px",
+              borderRadius: "50%",
+              border: "1.5px solid rgba(230, 59, 122, 0.28)",
+              boxShadow: "0 0 16px rgba(230, 59, 122, 0.12)",
+            }}
+          >
+            {/* Glowing Orbiting Planet Dot on the Ring Line */}
+            <div
+              style={{
+                position: "absolute",
+                top: "-6px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                width: "12px",
+                height: "12px",
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #ffffff 0%, #e63b7a 60%, #be185d 100%)",
+                boxShadow: "0 0 10px #e63b7a, 0 0 18px rgba(230, 59, 122, 0.8)",
+                border: "2px solid #ffffff",
+              }}
+            />
+          </div>
+
+          {/* Ring 2: Counter-Rotating Dashed Inner Aura Ring */}
+          <div
+            className="gg-orbit-inner"
+            style={{
+              position: "absolute",
+              inset: "-3px",
+              borderRadius: "50%",
+              border: "2px dashed rgba(15, 23, 42, 0.25)",
+              borderTopColor: "#e63b7a",
+              borderRightColor: "#0f172a",
+            }}
+          />
+
+          {/* Center Brand Glassmorphism Disc with Logo */}
+          <div
+            className="gg-center-circle"
+            style={{
+              width: "100px",
+              height: "100px",
+              borderRadius: "50%",
+              backgroundColor: "#ffffff",
+              border: "2.5px solid rgba(230, 59, 122, 0.35)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              position: "relative",
+              zIndex: 10,
+              overflow: "hidden",
+              padding: "12px",
+              backdropFilter: "blur(6px)",
+            }}
+          >
+            {!logoError ? (
+              <img
+                src="/logo.png"
+                alt="GlowGoodly Logo"
+                onError={() => setLogoError(true)}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "contain",
+                  display: "block",
+                  filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.08))",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  textAlign: "center",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "26px",
+                    fontWeight: "900",
+                    color: "#e63b7a",
+                    lineHeight: 1,
+                    letterSpacing: "-0.5px",
+                  }}
+                >
+                  GG
+                </span>
+                <span
+                  style={{
+                    fontSize: "8px",
+                    fontWeight: "800",
+                    color: "#0f172a",
+                    letterSpacing: "1px",
+                    marginTop: "2px",
+                  }}
+                >
+                  GLOW
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Shimmering Brand Typography */}
+        <div
+          className="gg-shimmer-title"
+          style={{
+            fontSize: "20px",
+            fontWeight: "900",
+            letterSpacing: "3.5px",
+            marginBottom: "6px",
+            textTransform: "uppercase",
+            fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif",
+            zIndex: 1,
+          }}
+        >
+          {text}
+        </div>
+
+        {/* Luxury Subtitle & Authenticity Seal */}
+        <div
+          style={{
+            fontSize: "11px",
+            fontWeight: "700",
+            letterSpacing: "1px",
+            color: "#64748b",
+            marginBottom: "18px",
+            textTransform: "uppercase",
+            textAlign: "center",
+            maxWidth: "320px",
+            zIndex: 1,
+          }}
+        >
+          {subtext}
+        </div>
+
+        {/* Brand Smooth Animated Progress Bar */}
+        <div
+          style={{
+            width: "190px",
+            height: "4px",
+            backgroundColor: "#f1f5f9",
+            borderRadius: "999px",
+            overflow: "hidden",
+            position: "relative",
+            boxShadow: "inset 0 1px 2px rgba(0,0,0,0.06)",
+            zIndex: 1,
           }}
         >
           <div
             style={{
-              width: "48px",
-              height: "48px",
-              borderRadius: "14px",
-              background: "linear-gradient(135deg, #e52860 0%, #db2777 100%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#ffffff",
+              height: "100%",
+              width: `${progress}%`,
+              background: "linear-gradient(90deg, #0f172a 0%, #e63b7a 50%, #d81b60 100%)",
+              borderRadius: "999px",
+              transition: "width 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+              boxShadow: "0 0 10px rgba(230, 59, 122, 0.6)",
             }}
-          >
-            <ShoppingBag size={24} strokeWidth={2.4} />
-          </div>
-
-          <div
-            style={{
-              position: "absolute",
-              top: "-4px",
-              right: "-4px",
-              backgroundColor: "#ffedd5",
-              border: "1.5px solid #fdba74",
-              borderRadius: "50%",
-              width: "20px",
-              height: "20px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Sparkles size={11} color="#ea580c" />
-          </div>
+          />
         </div>
       </div>
-
-      <div
-        style={{
-          fontSize: "16px",
-          fontWeight: "900",
-          letterSpacing: "0.5px",
-          color: "#0e1e38",
-          marginBottom: "4px",
-          display: "flex",
-          alignItems: "center",
-          gap: "6px",
-        }}
-      >
-        <span>{text}</span>
-      </div>
-
-      <div
-        style={{
-          fontSize: "12px",
-          color: "#e52860",
-          fontWeight: "700",
-          marginBottom: "12px",
-          height: "18px",
-          transition: "opacity 0.2s",
-        }}
-      >
-        {productIcons[activeItem].name}
-      </div>
-
-      <div
-        style={{
-          width: "160px",
-          height: "4px",
-          backgroundColor: "#f1f5f9",
-          borderRadius: "999px",
-          overflow: "hidden",
-          position: "relative",
-          marginBottom: "8px",
-        }}
-      >
-        <div
-          className="shimmer-progress"
-          style={{
-            width: "50%",
-            height: "100%",
-            background: "linear-gradient(90deg, #e52860 0%, #fb7185 100%)",
-            borderRadius: "999px",
-          }}
-        />
-      </div>
-
-      <div
-        style={{
-          fontSize: "11px",
-          color: "#94a3b8",
-          fontWeight: "600",
-          letterSpacing: "0.4px",
-          textTransform: "uppercase",
-        }}
-      >
-        {subtext}
-      </div>
-    </div>
+    </>
   );
 }

@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import compression from "compression";
+import helmet from "helmet";
+import hpp from "hpp";
 import dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
@@ -23,9 +25,13 @@ import enterpriseRouter from "./routes/enterprise";
 import menuRouter from "./routes/menu";
 import pagesRouter from "./routes/pages";
 import bkashRouter from "./routes/bkash";
+import pathaoRouter from "./routes/pathao";
 import careersRouter from "./routes/careers";
 import inventoryRouter from "./routes/inventory";
 import heroBannersRouter from "./routes/hero-banners";
+import sectionsRouter from "./routes/sections";
+import combosRouter from "./routes/combos";
+import { ensureDefaultSectionsSeeded } from "./controllers/sectionController";
 import db from "./firebase";
 import { autoSeedDatabase } from "./auto-seed";
 import { initMySQLTables } from "./config/db";
@@ -74,6 +80,16 @@ app.get(["/logo.png", "/user-glow-logo.png", "/apple-touch-icon.png", "/apple-ic
   res.status(404).end();
 });
 
+app.get("/cosmetics_circle_illustration.png", (req, res) => {
+  const filePath = findAssetFile("cosmetics_circle_illustration.png");
+  if (filePath) {
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Cache-Control", "public, max-age=2592000");
+    return res.sendFile(filePath);
+  }
+  res.status(404).end();
+});
+
 // Serve public static assets
 app.use(express.static(path.join(__dirname, "..", "public")));
 app.use(express.static(path.join(process.cwd(), "public")));
@@ -96,8 +112,21 @@ app.set("io", io);
 
 const PORT = process.env.PORT || 5000;
 
-// 1. Advanced OWASP Security Headers
+// 1. Advanced OWASP Security Headers & Helmet Protection
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: false, // Prevents blocking embedded images & frontend media
+}));
+app.use(hpp());
 app.use(securityHeaders);
+
+// Block dotfiles & sensitive path probing (e.g. .env, .git, .db, .sqlite)
+app.use((req, res, next) => {
+  if (req.path.includes("/.") || req.path.endsWith(".env") || req.path.endsWith(".db")) {
+    return res.status(403).json({ error: "Access Denied: Protected resource." });
+  }
+  next();
+});
 
 // 2. Global DDoS / Flooding Rate Limiter (Max 350 req/min per IP)
 app.use(globalRateLimiter);
@@ -186,7 +215,10 @@ app.use("/api", productsRouter); // For /products, /categories, /brands, etc.
 app.use("/api/orders", ordersRouter);
 app.use("/api/settings", settingsRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/admin/pathao", pathaoRouter);
+app.use("/api/admin", pathaoRouter);
 app.use("/api/bkash", bkashRouter);
+app.use("/api/payments", bkashRouter);
 app.use("/api", marketingRouter); // Meta CAPI, Facebook Conversions API events
 app.use("/api", bannersRouter);
 app.use("/api", notificationsRouter);
@@ -199,8 +231,13 @@ app.use("/api", menuRouter);
 app.use("/api", pagesRouter);
 app.use("/api/careers", careersRouter);
 app.use("/api/join-our-team", careersRouter);
+app.use("/api/admin/careers", careersRouter);
 app.use("/api/inventory", inventoryRouter);
+app.use("/api/admin/inventory", inventoryRouter);
+app.use("/api/combos", combosRouter);
+app.use("/api/admin/combos", combosRouter);
 app.use("/api", heroBannersRouter);
+app.use("/api", sectionsRouter);
 
 // ─── GLOWGOODLY WP-JSON & WOOCOMMERCE COMPATIBILITY MIRROR ENDPOINTS ───
 app.use("/wp-json/wp/v2/posts", (req, res) => res.redirect("/api/blogs"));
@@ -676,7 +713,7 @@ app.get("/", (req, res) => {
 	<link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
 	<link rel="icon" type="image/png" sizes="192x192" href="/logo.png">
 	<link rel="apple-touch-icon" href="/logo.png">
-	<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 	<style>
 		* {
 			box-sizing: border-box;
@@ -685,75 +722,195 @@ app.get("/", (req, res) => {
 		}
 		body {
 			font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
-			background-color: #ffffff;
-			color: #1a1a1a;
+			background: radial-gradient(circle at 80% 30%, #fce7f3 0%, #fdf2f8 40%, #faf5ff 75%, #ffffff 100%);
+			color: #1e293b;
 			min-height: 100vh;
+			display: flex;
+			flex-direction: column;
+			overflow-x: hidden;
+		}
+		.top-nav {
+			width: 100%;
+			max-width: 1280px;
+			margin: 0 auto;
+			padding: 36px 48px 10px 48px;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+		}
+		.nav-brand {
+			font-size: 20px;
+			font-weight: 900;
+			letter-spacing: 3px;
+			color: #0f172a;
+			text-transform: uppercase;
+		}
+		.nav-tagline {
+			font-size: 11px;
+			font-weight: 700;
+			letter-spacing: 2px;
+			color: #94a3b8;
+			text-transform: uppercase;
+		}
+		.page-wrapper {
+			flex: 1;
 			display: flex;
 			align-items: center;
 			justify-content: center;
-			padding: 20px;
+			padding: 20px 48px 24px 48px;
 		}
 		.landing-container {
 			display: flex;
 			align-items: center;
 			justify-content: space-between;
-			max-width: 1100px;
+			max-width: 1200px;
 			width: 100%;
-			gap: 40px;
+			gap: 60px;
 		}
 		.left-content {
-			flex: 1;
-			max-width: 500px;
+			flex: 1.1;
+			max-width: 540px;
 		}
-		.left-content h1 {
-			font-size: 32px;
+		.welcome-pill {
+			display: inline-flex;
+			align-items: center;
+			gap: 8px;
+			padding: 6px 16px;
+			background: #ffffff;
+			border: 1px solid #fce7f3;
+			border-radius: 30px;
+			font-size: 11.5px;
 			font-weight: 800;
-			letter-spacing: 2px;
-			color: #1c1917;
+			letter-spacing: 1.5px;
+			color: #64748b;
 			text-transform: uppercase;
-			margin-bottom: 12px;
+			margin-bottom: 24px;
+			box-shadow: 0 2px 10px rgba(226, 19, 110, 0.06);
 		}
-		.left-content p {
-			font-size: 15px;
-			color: #44403c;
-			line-height: 1.5;
-			margin-bottom: 28px;
+		.welcome-pill .pill-dot {
+			width: 8px;
+			height: 8px;
+			border-radius: 50%;
+			background-color: #e2136e;
+			box-shadow: 0 0 8px rgba(226, 19, 110, 0.8);
+		}
+		.hero-title {
+			font-size: 64px;
+			font-weight: 800;
+			line-height: 1.08;
+			color: #1e1b4b;
+			letter-spacing: -1px;
+			margin-bottom: 18px;
+		}
+		.hero-title .accent-text {
+			background: linear-gradient(135deg, #e2136e 0%, #7c3aed 100%);
+			-webkit-background-clip: text;
+			-webkit-text-fill-color: transparent;
+			font-weight: 900;
+		}
+		.hero-desc {
+			font-size: 15.5px;
+			color: #64748b;
+			line-height: 1.6;
+			margin-bottom: 32px;
 			font-weight: 500;
 		}
-		.btn-group {
+		.card-btn-group {
 			display: flex;
 			flex-direction: column;
-			gap: 12px;
-			width: 220px;
+			gap: 16px;
+			max-width: 400px;
+			margin-bottom: 32px;
 		}
-		.btn {
-			display: block;
-			text-align: center;
-			padding: 12px 24px;
-			border-radius: 25px;
+		.action-card {
+			display: flex;
+			align-items: center;
+			gap: 16px;
+			background: #ffffff;
+			border: 1px solid #f1f5f9;
+			border-radius: 20px;
+			padding: 14px 20px;
+			text-decoration: none;
+			color: #0f172a;
+			box-shadow: 0 4px 18px rgba(0, 0, 0, 0.04);
+			transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+		}
+		.action-card:hover {
+			transform: translateY(-2px);
+			box-shadow: 0 10px 28px rgba(226, 19, 110, 0.12);
+			border-color: #fbcfe8;
+		}
+		.card-icon-box {
+			width: 48px;
+			height: 48px;
+			border-radius: 14px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			flex-shrink: 0;
+			color: #ffffff;
+		}
+		.card-icon-ecommerce {
+			background: linear-gradient(135deg, #e2136e 0%, #f43f5e 100%);
+			box-shadow: 0 4px 14px rgba(226, 19, 110, 0.3);
+		}
+		.card-icon-blog {
+			background: linear-gradient(135deg, #6d28d9 0%, #8b5cf6 100%);
+			box-shadow: 0 4px 14px rgba(109, 40, 217, 0.3);
+		}
+		.card-text {
+			flex: 1;
+		}
+		.card-title {
+			font-size: 15px;
+			font-weight: 800;
+			color: #0f172a;
+			margin-bottom: 2px;
+		}
+		.card-subtitle {
+			font-size: 12px;
+			color: #94a3b8;
+			font-weight: 500;
+		}
+		.card-arrow {
+			width: 32px;
+			height: 32px;
+			border-radius: 50%;
+			background: #f8fafc;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			color: #0f172a;
 			font-size: 14px;
 			font-weight: 700;
-			text-decoration: none;
-			color: #ffffff;
 			transition: all 0.2s ease;
-			box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 		}
-		.btn-ecommerce {
-			background-color: #d81b60;
+		.action-card:hover .card-arrow {
+			background: #fdf2f8;
+			color: #e2136e;
+			transform: translateX(3px);
 		}
-		.btn-ecommerce:hover {
-			background-color: #c2185b;
-			transform: translateY(-1px);
+		.trust-badges {
+			display: flex;
+			align-items: center;
+			gap: 20px;
+			flex-wrap: wrap;
+			margin-top: 4px;
+			padding-top: 4px;
 		}
-		.btn-blog {
-			background-color: #5e35b1;
+		.trust-badge-item {
+			display: inline-flex;
+			align-items: center;
+			gap: 6px;
+			font-size: 12.5px;
+			font-weight: 700;
+			color: #be185d;
 		}
-		.btn-blog:hover {
-			background-color: #512da8;
-			transform: translateY(-1px);
+		.trust-badge-icon {
+			font-size: 14px;
 		}
 		.right-content {
-			flex: 1;
+			flex: 1.1;
 			display: flex;
 			justify-content: center;
 			align-items: center;
@@ -762,86 +919,281 @@ app.get("/", (req, res) => {
 		.illustration-wrapper {
 			position: relative;
 			width: 100%;
-			max-width: 480px;
+			max-width: 520px;
+			aspect-ratio: 1 / 1;
+			display: flex;
+			align-items: center;
+			justify-content: center;
 		}
-		@media (max-width: 768px) {
+		/* Delicate concentric sketch orbit rings */
+		.wreath-sketch-ring {
+			position: absolute;
+			border-radius: 50%;
+			pointer-events: none;
+		}
+		.sketch-ring-1 {
+			width: 95%;
+			height: 95%;
+			border: 1.2px dashed rgba(226, 19, 110, 0.25);
+			animation: rotateSlow 60s linear infinite;
+		}
+		.sketch-ring-2 {
+			width: 84%;
+			height: 84%;
+			border: 1px solid rgba(226, 19, 110, 0.14);
+		}
+		.sketch-ring-3 {
+			width: 72%;
+			height: 72%;
+			border: 1.2px dashed rgba(124, 58, 237, 0.2);
+			animation: rotateSlowRev 45s linear infinite;
+		}
+		@keyframes rotateSlow {
+			from { transform: rotate(0deg); }
+			to { transform: rotate(360deg); }
+		}
+		@keyframes rotateSlowRev {
+			from { transform: rotate(360deg); }
+			to { transform: rotate(0deg); }
+		}
+		.wreath-img {
+			position: absolute;
+			width: 100%;
+			height: 100%;
+			object-fit: contain;
+			pointer-events: none;
+			z-index: 2;
+			background: transparent;
+		}
+
+		/* Center Solar System Orbit Ring & Revolving Glowing Planet */
+		.center-solar-system {
+			position: relative;
+			width: 220px;
+			height: 220px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			z-index: 4;
+		}
+		.center-logo-disc {
+			position: relative;
+			width: 126px;
+			height: 126px;
+			border-radius: 50%;
+			background: radial-gradient(circle at 35% 35%, #ffffff 65%, #fff1f2 100%);
+			border: 2px solid rgba(255, 255, 255, 0.95);
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			box-shadow: 0 14px 38px rgba(226, 19, 110, 0.18), 0 0 0 6px rgba(255, 255, 255, 0.7);
+			z-index: 5;
+			animation: floatPulse 3.5s ease-in-out infinite alternate;
+		}
+		.center-logo-disc img {
+			width: 72px;
+			height: 72px;
+			object-fit: contain;
+		}
+		.center-logo-text {
+			font-size: 10px;
+			font-weight: 900;
+			letter-spacing: 2px;
+			color: #0f172a;
+			text-transform: uppercase;
+			margin-top: 4px;
+		}
+		@keyframes floatPulse {
+			0% {
+				transform: translateY(0px) scale(1);
+			}
+			50% {
+				transform: translateY(-6px) scale(1.04);
+			}
+			100% {
+				transform: translateY(0px) scale(1);
+			}
+		}
+		.orbit-ring {
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			width: 184px;
+			height: 184px;
+			margin-top: -92px;
+			margin-left: -92px;
+			border-radius: 50%;
+			border: 1.5px solid rgba(226, 19, 110, 0.4);
+			box-shadow: 0 0 18px rgba(226, 19, 110, 0.15), inset 0 0 18px rgba(226, 19, 110, 0.08);
+			animation: orbitSpin 5.5s linear infinite;
+			pointer-events: none;
+			z-index: 4;
+		}
+		.orbit-ball {
+			position: absolute;
+			top: -6px;
+			left: calc(50% - 6px);
+			width: 13px;
+			height: 13px;
+			border-radius: 50%;
+			background: radial-gradient(circle at 35% 35%, #ff4d94 0%, #e2136e 70%, #9d174d 100%);
+			box-shadow: 0 0 10px #e2136e, 0 0 20px rgba(226, 19, 110, 0.8), 0 0 28px rgba(244, 63, 94, 0.45);
+		}
+		@keyframes orbitSpin {
+			from {
+				transform: rotate(0deg);
+			}
+			to {
+				transform: rotate(360deg);
+			}
+		}
+		.page-footer {
+			width: 100%;
+			text-align: center;
+			padding: 16px;
+			font-size: 12px;
+			color: #94a3b8;
+			font-weight: 500;
+		}
+		@media (max-width: 900px) {
+			.top-nav {
+				padding: 24px 20px 0 20px;
+			}
+			.page-wrapper {
+				padding: 20px;
+			}
 			.landing-container {
 				flex-direction: column-reverse;
 				text-align: center;
-				gap: 30px;
+				gap: 36px;
 			}
-			.btn-group {
-				margin: 0 auto;
+			.card-btn-group {
+				margin: 0 auto 24px auto;
 			}
-			.left-content h1 {
-				font-size: 24px;
+			.trust-badges {
+				justify-content: center;
+			}
+			.hero-title {
+				font-size: 42px;
+			}
+			.illustration-wrapper {
+				max-width: 320px;
+			}
+			.center-solar-system {
+				width: 170px;
+				height: 170px;
+			}
+			.center-logo-disc {
+				width: 100px;
+				height: 100px;
+			}
+			.center-logo-disc img {
+				width: 55px;
+				height: 55px;
+			}
+			.orbit-ring {
+				width: 140px;
+				height: 140px;
+				margin-top: -70px;
+				margin-left: -70px;
 			}
 		}
 	</style>
 </head>
 <body>
-	<div class="landing-container">
-		<div class="left-content">
-			<h1>WELCOME TO GLOWGOODLY</h1>
-			<p>Buy Authentic Cosmetic and Beauty Products Online in Bangladesh.</p>
-			<div class="btn-group">
-				<a href="https://shop.glowgoodly.com" class="btn btn-ecommerce" target="_blank">E-commerce</a>
-				<a href="https://glowgoodly.com" class="btn btn-blog" target="_blank">Blog</a>
-			</div>
-		</div>
-		<div class="right-content">
-			<div class="illustration-wrapper">
-				<svg viewBox="0 0 500 500" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-					<!-- Circular Orbit Lines -->
-					<ellipse cx="250" cy="250" rx="190" ry="170" fill="none" stroke="#d6d3d1" stroke-width="1.5" transform="rotate(-15 250 250)"/>
-					<ellipse cx="250" cy="250" rx="205" ry="185" fill="none" stroke="#e7e5e4" stroke-width="1" transform="rotate(-8 250 250)"/>
-					<ellipse cx="250" cy="250" rx="175" ry="155" fill="none" stroke="#f5f5f4" stroke-width="1" transform="rotate(-25 250 250)"/>
-					
-					<!-- GlowGoodly Logo Center Badge -->
-					<g transform="translate(175, 95)">
-						<!-- Subtle circular logo background badge -->
-						<circle cx="75" cy="65" r="58" fill="#ffffff" stroke="#f1f5f9" stroke-width="2" />
-						<!-- HTML-rendered image for maximum browser reliability -->
-						<foreignObject x="25" y="15" width="100" height="100">
-							<div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
-								<img src="${logoSrc}" alt="GlowGoodly Logo" style="width:90px;height:90px;object-fit:contain;border-radius:50%;" onerror="this.onerror=null;this.src='/logo.png';" />
-							</div>
-						</foreignObject>
-						<!-- Fallback SVG image for SVG-only renderers -->
-						<image href="${logoSrc}" xlink:href="${logoSrc}" x="30" y="20" width="90" height="90" preserveAspectRatio="xMidYMid meet" />
-						<text x="75" y="150" text-anchor="middle" font-family="'Montserrat', sans-serif" font-weight="900" font-size="16" letter-spacing="3" fill="#1c1917">GLOWGOODLY</text>
-					</g>
+	<header class="top-nav">
+		<div class="nav-brand">GLOWGOODLY</div>
+		<div class="nav-tagline">BEAUTY &bull; BANGLADESH</div>
+	</header>
 
-					<!-- Cosmetic Items Around Orbit -->
-					<!-- Compact Compact Powder Top Left -->
-					<g transform="translate(100, 100) rotate(-20)">
-						<rect x="0" y="0" width="60" height="70" rx="10" fill="#292524" />
-						<circle cx="30" cy="35" r="22" fill="#e7c4b1" />
-					</g>
-					<!-- Makeup Brushes -->
-					<g transform="translate(280, 110) rotate(45)">
-						<rect x="0" y="0" width="8" height="120" rx="4" fill="#1c1917" />
-						<path d="M -2,0 L 10,0 L 8,-25 C 6,-35 2,-35 0,-25 Z" fill="#78716c" />
-						<path d="M 0,-22 C 3,-30 5,-30 8,-22 Z" fill="#d81b60" />
-					</g>
-					<!-- Lipstick Bottom Right -->
-					<g transform="translate(380, 280) rotate(-30)">
-						<rect x="0" y="40" width="30" height="50" rx="4" fill="#292524" />
-						<rect x="3" y="20" width="24" height="20" fill="#d6d3d1" />
-						<path d="M 5,20 L 25,20 L 22,-10 C 15,-20 8,-10 5,20 Z" fill="#d81b60" />
-					</g>
-					<!-- Palette Box Bottom Right -->
-					<g transform="translate(340, 360) rotate(15)">
-						<rect x="0" y="0" width="80" height="60" rx="6" fill="#1c1917" />
-						<circle cx="20" cy="20" r="10" fill="#f43f5e" />
-						<circle cx="45" cy="20" r="10" fill="#fb7185" />
-						<circle cx="20" cy="42" r="10" fill="#fda4af" />
-						<circle cx="45" cy="42" r="10" fill="#e879f9" />
-					</g>
-				</svg>
+	<div class="page-wrapper">
+		<div class="landing-container">
+			<div class="left-content">
+				<div class="welcome-pill">
+					<span class="pill-dot"></span>
+					WELCOME TO GLOWGOODLY
+				</div>
+				<h1 class="hero-title">It's you,<br/>but <span class="accent-text">new</span></h1>
+				<p class="hero-desc">Buy Authentic Cosmetic and Beauty Products Online in Bangladesh.</p>
+				
+				<div class="card-btn-group">
+					<a href="http://localhost:3000" class="action-card" target="_blank">
+						<div class="card-icon-box card-icon-ecommerce">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+								<path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+								<line x1="3" y1="6" x2="21" y2="6"></line>
+								<path d="M16 10a4 4 0 0 1-8 0"></path>
+							</svg>
+						</div>
+						<div class="card-text">
+							<div class="card-title">Shop E-commerce</div>
+							<div class="card-subtitle">Makeup, skincare &amp; more</div>
+						</div>
+						<div class="card-arrow">&rarr;</div>
+					</a>
+
+					<a href="https://glowgoodly.com" class="action-card" target="_blank">
+						<div class="card-icon-box card-icon-blog">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+								<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+								<path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+							</svg>
+						</div>
+						<div class="card-text">
+							<div class="card-title">Read the Blog</div>
+							<div class="card-subtitle">Beauty tips, guides &amp; trends</div>
+						</div>
+						<div class="card-arrow">&rarr;</div>
+					</a>
+				</div>
+
+				<div class="trust-badges">
+					<div class="trust-badge-item">
+						<span class="trust-badge-icon">&#x1F6E1;&#xFE0F;</span>
+						<span>100% Authentic</span>
+					</div>
+					<div class="trust-badge-item">
+						<span class="trust-badge-icon">&#x2B50;</span>
+						<span>Trusted Brands</span>
+					</div>
+					<div class="trust-badge-item">
+						<span class="trust-badge-icon">&#x1F69A;</span>
+						<span>Delivery Across Bangladesh</span>
+					</div>
+				</div>
+			</div>
+
+			<div class="right-content">
+				<div class="illustration-wrapper">
+					<!-- Concentric delicate sketched orbit rings -->
+					<div class="wreath-sketch-ring sketch-ring-1"></div>
+					<div class="wreath-sketch-ring sketch-ring-2"></div>
+					<div class="wreath-sketch-ring sketch-ring-3"></div>
+
+					<!-- Circular cosmetics wreath image with multiply blend for 100% transparent background -->
+					<img src="/cosmetics_circle_illustration.png" alt="Cosmetics Frame" class="wreath-img" onerror="this.style.opacity='0.25';" />
+
+					<!-- GlowGoodly Logo Center Solar System Orbit Ring & Revolving Planet -->
+					<div class="center-solar-system">
+						<!-- Outer Circular Orbit Ring with revolving glowing ball -->
+						<div class="orbit-ring">
+							<div class="orbit-ball"></div>
+						</div>
+						<!-- Central round GlowGoodly logo circle with floating/breathing animation -->
+						<div class="center-logo-disc">
+							<img src="${logoSrc}" alt="GlowGoodly Logo" onerror="this.onerror=null;this.src='/logo.png';" />
+							<div class="center-logo-text">GLOWGOODLY</div>
+						</div>
+					</div>
+				</div>
 			</div>
 		</div>
 	</div>
+
+	<footer class="page-footer">
+		&copy; 2026 GlowGoodly. All rights reserved.
+	</footer>
 </body>
 </html>`);
 });
@@ -853,8 +1205,20 @@ app.get("/health", (req, res) => {
 
 // Global Error Handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err);
-  res.status(500).json({ error: "Internal Server Error" });
+  console.error("🔥 Global Express Error Handler caught:", err);
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || "Internal Server Error",
+    error: process.env.NODE_ENV === "production" ? undefined : String(err),
+  });
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("💥 Global uncaughtException intercepted:", err);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("💥 Global unhandledRejection intercepted at:", promise, "reason:", reason);
 });
 
 httpServer.listen(PORT, async () => {
@@ -873,6 +1237,11 @@ httpServer.listen(PORT, async () => {
     await cleanAllDummyData();
   } catch (err: any) {
     console.warn("⚠️ cleanAllDummyData warning:", err?.message || err);
+  }
+  try {
+    await ensureDefaultSectionsSeeded();
+  } catch (err: any) {
+    console.warn("⚠️ ensureDefaultSectionsSeeded warning:", err?.message || err);
   }
 });
 // GlowGoodly Server active

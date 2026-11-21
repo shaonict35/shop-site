@@ -1,5 +1,5 @@
 // Client-side memory cache for API endpoints with robust error fallbacks.
-const cache: Record<string, { data: any; expiry: number }> = {};
+const cache: Record<string, { data: any; expiry: number; timestamp?: number }> = {};
 
 // On every page load/refresh, clear API cache so admin changes are visible immediately
 if (typeof window !== "undefined") {
@@ -60,7 +60,7 @@ export const INLINE_SVG_FALLBACK = "/placeholder-product.svg";
 
 export const DEFAULT_PRODUCT_FALLBACK = "/placeholder-product.svg";
 
-export function safeImageUrl(url?: string | null, fallback: string = DEFAULT_PRODUCT_FALLBACK): string {
+export function safeImageUrl(url?: string | null, fallback: string = DEFAULT_PRODUCT_FALLBACK, version?: any): string {
   const defaultFallback = fallback !== undefined ? fallback : DEFAULT_PRODUCT_FALLBACK;
   if (!url || typeof url !== "string") return defaultFallback;
   let clean = url.trim();
@@ -68,34 +68,72 @@ export function safeImageUrl(url?: string | null, fallback: string = DEFAULT_PRO
     return defaultFallback;
   }
 
-  // Normalize any double slashes or missing leading slashes for uploads
+  // 1. Strip accidental backend host (:5000 or api.glowgoodly.com) from frontend static paths (/images, /banners, /icons, /logo, /public)
+  clean = clean.replace(/^https?:\/\/[^\/]+(?=\/(images|banners|public|icons|logo|favicon|placeholder)\/)/i, "");
+  clean = clean.replace(/^https?:\/\/(localhost:5000|127\.0\.0\.1:5000|api\.glowgoodly\.com)(?=\/(images|banners|public|icons|logo|favicon|placeholder))/i, "");
+
+  // 2. Normalize leading slashes
   clean = clean.replace(/^\/+uploads\//, "/uploads/");
   if (clean.startsWith("uploads/")) {
     clean = `/${clean}`;
   }
 
+  let finalUrl = clean;
+
+  // 3. Prepend backend API URL ONLY to /uploads/... paths
   if (clean.startsWith("/uploads/")) {
     const base = API_ROOT.replace(/\/+$/, "");
-    return `${base}${clean}`;
-  }
-
-  if (clean.startsWith("http://") || clean.startsWith("https://") || clean.startsWith("data:")) {
+    finalUrl = `${base}${clean}`;
+  } else if (clean.startsWith("/")) {
+    // Keep all local frontend paths (/images/..., /banners/..., /public/..., etc.) relative to frontend domain (:3000 / glowgoodly.com)
+    finalUrl = clean;
+  } else if (clean.startsWith("http://") || clean.startsWith("https://") || clean.startsWith("data:")) {
     // Avoid double hosts like http://localhost:5000http://localhost:5000/...
     if (clean.includes("http://localhost:5000http://localhost:5000")) {
       clean = clean.replace("http://localhost:5000http://localhost:5000", "http://localhost:5000");
     }
-    return clean;
+    finalUrl = clean;
   }
 
-  if (clean.startsWith("/")) {
-    return clean;
+  // Append cache busting parameter if version or timestamp provided
+  if (version && !finalUrl.startsWith("data:")) {
+    const vStr = typeof version === "string" || typeof version === "number" ? String(version) : Date.now().toString();
+    const cleanV = vStr.replace(/[^a-zA-Z0-9_-]/g, "");
+    finalUrl += (finalUrl.includes("?") ? "&" : "?") + `v=${cleanV || Date.now()}`;
   }
 
-  return defaultFallback;
+  return finalUrl;
 }
 
 // In-flight request deduplication map
 const inFlightRequests = new Map<string, Promise<any>>();
+
+export function normalizeDedupeKey(url: string): string {
+  try {
+    return url
+      .replace(/([?&])(t|_t|v|timestamp|_|ts|cb|nocache)=[^&]*/gi, "")
+      .replace(/\?&/, "?")
+      .replace(/[?&]$/, "");
+  } catch (e) {
+    return url;
+  }
+}
+
+export async function dedupedFetch(url: string, options?: RequestInit): Promise<Response> {
+  const method = (options?.method || "GET").toUpperCase();
+  if (method !== "GET") {
+    return fetch(url, options);
+  }
+  const key = "raw_" + normalizeDedupeKey(url);
+  if (inFlightRequests.has(key)) {
+    return inFlightRequests.get(key);
+  }
+  const promise = fetch(url, options).finally(() => {
+    inFlightRequests.delete(key);
+  });
+  inFlightRequests.set(key, promise);
+  return promise;
+}
 
 function sanitizeForStorage(data: any) {
   if (Array.isArray(data) && data.length > 50) {
@@ -133,15 +171,26 @@ function sanitizeForStorage(data: any) {
 const CACHE_DURATION = 60 * 1000; // 1 minute fresh duration
 
 export async function fetchWithCache(url: string, bypassCache: boolean = false) {
-  const isDynamicContent = url.includes("/products") || url.includes("/banners") || url.includes("/hero-banners") || url.includes("/categories") || url.includes("/brands");
-  const forceFresh = bypassCache || isDynamicContent;
+  const dedupeKey = normalizeDedupeKey(url);
+
+  // If identical request is currently in-flight, reuse it immediately (deduplicate simultaneous requests)
+  if (inFlightRequests.has(dedupeKey)) {
+    return inFlightRequests.get(dedupeKey);
+  }
 
   const now = Date.now();
-  const cached = cache[url];
+  const cached = cache[dedupeKey] || cache[url];
 
-  if (!forceFresh && cached && cached.expiry > now) {
+  const isDynamicContent = dedupeKey.includes("/products") || dedupeKey.includes("/banners") || dedupeKey.includes("/hero-banners");
+  // Short 10-second memory cache for dynamic content unless bypassCache is explicitly requested
+  const dynamicTtl = 10 * 1000;
+  const isFresh = cached && (bypassCache ? false : isDynamicContent ? (now - (cached.timestamp || 0) < dynamicTtl) : (cached.expiry > now));
+
+  if (!bypassCache && isFresh) {
     return cached.data;
   }
+
+  const forceFresh = bypassCache || isDynamicContent;
 
   let existingData: any = null;
   let isExpired = true;
@@ -152,12 +201,12 @@ export async function fetchWithCache(url: string, bypassCache: boolean = false) 
       isExpired = cached.expiry <= now;
     } else if (typeof window !== "undefined") {
       try {
-        const stored = localStorage.getItem(`gg_cache_${url}`);
+        const stored = localStorage.getItem(`gg_cache_${dedupeKey}`);
         if (stored) {
           const parsed = JSON.parse(stored);
           if (parsed && parsed.data) {
             existingData = parsed.data;
-            cache[url] = parsed;
+            cache[dedupeKey] = parsed;
             isExpired = !parsed.expiry || parsed.expiry <= now;
           }
         }
@@ -170,36 +219,32 @@ export async function fetchWithCache(url: string, bypassCache: boolean = false) 
       return existingData;
     }
 
-    if (!inFlightRequests.has(url)) {
-      const bgPromise = (async () => {
-        try {
-          const res = await fetch(url, { headers: { Accept: "application/json" } });
-          if (res.ok) {
-            const text = await res.text();
-            if (text && text.trim()) {
-              const data = JSON.parse(text);
-              cache[url] = { data, expiry: Date.now() + CACHE_DURATION };
-              if (typeof window !== "undefined") {
-                try {
-                  const sanitized = sanitizeForStorage(data);
-                  localStorage.setItem(`gg_cache_${url}`, JSON.stringify({ data: sanitized, expiry: Date.now() + CACHE_DURATION }));
-                } catch (e) {}
-              }
+    const bgPromise = (async () => {
+      try {
+        const res = await fetch(url, { headers: { Accept: "application/json" } });
+        if (res.ok) {
+          const text = await res.text();
+          if (text && text.trim()) {
+            const data = JSON.parse(text);
+            const entry = { data, expiry: Date.now() + CACHE_DURATION, timestamp: Date.now() };
+            cache[dedupeKey] = entry;
+            cache[url] = entry;
+            if (typeof window !== "undefined") {
+              try {
+                const sanitized = sanitizeForStorage(data);
+                localStorage.setItem(`gg_cache_${dedupeKey}`, JSON.stringify({ data: sanitized, expiry: Date.now() + CACHE_DURATION }));
+              } catch (e) {}
             }
           }
-        } catch (err) {
-        } finally {
-          inFlightRequests.delete(url);
         }
-      })();
-      inFlightRequests.set(url, bgPromise);
-    }
+      } catch (err) {
+      } finally {
+        inFlightRequests.delete(dedupeKey);
+      }
+    })();
+    inFlightRequests.set(dedupeKey, bgPromise);
 
     return existingData;
-  }
-
-  if (inFlightRequests.has(url)) {
-    return inFlightRequests.get(url);
   }
 
   const fetchPromise = (async () => {
@@ -229,19 +274,22 @@ export async function fetchWithCache(url: string, bypassCache: boolean = false) 
         return cached ? cached.data : null;
       }
 
-      cache[url] = {
+      const entry = {
         data,
         expiry: Date.now() + CACHE_DURATION,
+        timestamp: Date.now(),
       };
+      cache[dedupeKey] = entry;
+      cache[url] = entry;
 
       if (typeof window !== "undefined") {
         try {
           const sanitized = sanitizeForStorage(data);
-          localStorage.setItem(`gg_cache_${url}`, JSON.stringify({ data: sanitized, expiry: Date.now() + CACHE_DURATION }));
+          localStorage.setItem(`gg_cache_${dedupeKey}`, JSON.stringify({ data: sanitized, expiry: Date.now() + CACHE_DURATION }));
         } catch (e) {
           try {
             Object.keys(localStorage).forEach(k => {
-              if (k.startsWith("gg_cache_") && k !== `gg_cache_${url}`) {
+              if (k.startsWith("gg_cache_") && k !== `gg_cache_${dedupeKey}`) {
                 localStorage.removeItem(k);
               }
             });
@@ -254,18 +302,23 @@ export async function fetchWithCache(url: string, bypassCache: boolean = false) 
       if (cached) return cached.data;
       return null;
     } finally {
-      inFlightRequests.delete(url);
+      inFlightRequests.delete(dedupeKey);
     }
   })();
 
-  inFlightRequests.set(url, fetchPromise);
+  inFlightRequests.set(dedupeKey, fetchPromise);
   return fetchPromise;
 }
 
 export function clearCache(url: string) {
   delete cache[url];
+  const dedupeKey = normalizeDedupeKey(url);
+  delete cache[dedupeKey];
   if (typeof window !== "undefined") {
-    try { localStorage.removeItem(`gg_cache_${url}`); } catch (e) {}
+    try { 
+      localStorage.removeItem(`gg_cache_${url}`); 
+      localStorage.removeItem(`gg_cache_${dedupeKey}`); 
+    } catch (e) {}
   }
 }
 

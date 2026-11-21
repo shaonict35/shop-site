@@ -231,6 +231,27 @@ class MockCollection {
         createdAt: b.createdAt ? (typeof b.createdAt === "string" ? b.createdAt : b.createdAt.toISOString()) : new Date().toISOString(),
         updatedAt: b.updatedAt ? (typeof b.updatedAt === "string" ? b.updatedAt : b.updatedAt.toISOString()) : new Date().toISOString()
       }));
+    } else if (this.colName === "homepage_sections" || this.colName === "homepageSectionBanners") {
+      let items: any[] = [];
+      try {
+        if ((prisma as any).homepageSectionBanner) {
+          items = await (prisma as any).homepageSectionBanner.findMany({ orderBy: { order: "asc" } });
+        }
+      } catch (e) {
+        items = [];
+      }
+      data = items.map((b: any) => ({
+        id: b.id,
+        sectionKey: b.sectionKey,
+        title: b.title || "",
+        subtitle: b.subtitle || null,
+        imageUrl: b.imageUrl,
+        linkUrl: b.linkUrl || null,
+        order: b.order !== undefined ? Number(b.order) : 0,
+        isActive: b.isActive !== undefined ? Boolean(b.isActive) : true,
+        createdAt: b.createdAt ? (typeof b.createdAt === "string" ? b.createdAt : b.createdAt.toISOString()) : new Date().toISOString(),
+        updatedAt: b.updatedAt ? (typeof b.updatedAt === "string" ? b.updatedAt : b.updatedAt.toISOString()) : new Date().toISOString()
+      }));
     } else if (this.colName === "settings") {
       const items = await prisma.setting.findMany();
       data = items.map(s => ({
@@ -572,6 +593,40 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
       }
       inMemoryCollections.get(colName)!.set(id, { id, ...data });
     }
+  } else if (colName === "homepage_sections" || colName === "homepageSectionBanners") {
+    try {
+      if ((prisma as any).homepageSectionBanner) {
+        await (prisma as any).homepageSectionBanner.upsert({
+          where: { id },
+          update: {
+            sectionKey: data.sectionKey,
+            title: data.title || null,
+            subtitle: data.subtitle || null,
+            imageUrl: data.imageUrl,
+            linkUrl: data.linkUrl || null,
+            isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
+            order: data.order !== undefined ? Number(data.order) : 0,
+          },
+          create: {
+            id,
+            sectionKey: data.sectionKey,
+            title: data.title || null,
+            subtitle: data.subtitle || null,
+            imageUrl: data.imageUrl,
+            linkUrl: data.linkUrl || null,
+            isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
+            order: data.order !== undefined ? Number(data.order) : 0,
+          }
+        });
+      }
+    } catch (e) {
+      console.warn("Prisma homepageSectionBanner save fallback:", e);
+    } finally {
+      if (!inMemoryCollections.has(colName)) {
+        inMemoryCollections.set(colName, new Map());
+      }
+      inMemoryCollections.get(colName)!.set(id, { id, ...data });
+    }
   } else if (colName === "settings") {
     await prisma.setting.upsert({
       where: { key: data.key || id },
@@ -685,6 +740,9 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
         role: data.role || "Customer",
         points: data.points || 0,
         status: data.status || "Active",
+        isVerified: data.isVerified !== undefined ? Boolean(data.isVerified) : false,
+        verificationCode: data.verificationCode || null,
+        codeExpiresAt: data.codeExpiresAt ? new Date(data.codeExpiresAt) : null,
       },
       create: {
         id,
@@ -695,6 +753,9 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
         role: data.role || "Customer",
         points: data.points || 0,
         status: data.status || "Active",
+        isVerified: data.isVerified !== undefined ? Boolean(data.isVerified) : false,
+        verificationCode: data.verificationCode || null,
+        codeExpiresAt: data.codeExpiresAt ? new Date(data.codeExpiresAt) : null,
       }
     });
   } else if (colName === "coupons") {
@@ -763,6 +824,12 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
         paymentStatus: data.paymentStatus,
         trackingLink: data.trackingLink || null,
         notes: data.notes || null,
+        courierTrackingId: data.courierTrackingId || null,
+        courierConsignmentId: data.courierConsignmentId || null,
+        courierName: data.courierName || null,
+        courierResponse: data.courierResponse || null,
+        transactionId: data.transactionId || null,
+        senderPhone: data.senderPhone || null,
       },
       create: {
         id,
@@ -780,6 +847,13 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
         paymentMethod: data.paymentMethod || "COD",
         orderStatus: data.orderStatus || "Pending",
         notes: data.notes || null,
+        trackingLink: data.trackingLink || null,
+        courierTrackingId: data.courierTrackingId || null,
+        courierConsignmentId: data.courierConsignmentId || null,
+        courierName: data.courierName || null,
+        courierResponse: data.courierResponse || null,
+        transactionId: data.transactionId || null,
+        senderPhone: data.senderPhone || null,
       }
     });
     if (data.orderItems && Array.isArray(data.orderItems)) {
@@ -1130,13 +1204,25 @@ async function mockUpdatePrisma(colName: string, id: string, data: any) {
   } else if (colName === "reviews") {
     await prisma.review.update({ where: { id }, data: flatData });
   } else if (colName === "users") {
-    await prisma.user.update({ where: { id }, data: flatData });
+    try {
+      const allowedUserKeys = ["name", "email", "passwordHash", "phone", "role", "points", "status", "isVerified", "verificationCode", "codeExpiresAt"];
+      const safeUserData: any = {};
+      for (const k of allowedUserKeys) {
+        if (flatData[k] !== undefined) safeUserData[k] = flatData[k];
+      }
+      if (Object.keys(safeUserData).length > 0) {
+        await prisma.user.update({ where: { id }, data: safeUserData });
+      }
+    } catch (uErr) {
+      console.warn("Prisma user update note:", uErr);
+    }
   } else if (colName === "orders") {
     const allowedKeys = [
       "orderNumber", "customerId", "customerName", "customerEmail",
       "customerPhone", "address", "zone", "deliveryCharge", "subTotal",
       "discount", "total", "paymentStatus", "paymentMethod", "orderStatus",
-      "notes", "trackingLink", "salesmanId", "updatedAt"
+      "notes", "trackingLink", "salesmanId", "courierTrackingId", "courierConsignmentId",
+      "courierName", "courierResponse", "transactionId", "senderPhone", "updatedAt"
     ];
     const safeData: any = {};
     for (const key of allowedKeys) {
@@ -1205,6 +1291,12 @@ async function mockDeletePrisma(colName: string, id: string) {
             update: { value: JSON.stringify(list) },
             create: { key: "HERO_BANNERS_DATA", value: JSON.stringify(list) }
           });
+        }
+      } catch (e) {}
+    } else if (colName === "homepage_sections" || colName === "homepageSectionBanners") {
+      try {
+        if ((prisma as any).homepageSectionBanner) {
+          await (prisma as any).homepageSectionBanner.deleteMany({ where: { id } });
         }
       } catch (e) {}
     } else if (colName === "settings") {

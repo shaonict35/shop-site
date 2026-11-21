@@ -4,20 +4,23 @@ import { authenticateJWT, requireRole, AuthenticatedRequest } from "../middlewar
 
 const router = Router();
 
-// Send message (Customer)
+// Send message (Customer or System/Bot)
 router.post("/chat/send", async (req: Request, res: Response) => {
   try {
-    const { chatId, message } = req.body;
+    const { chatId, message, customerName, customerPhone, sender } = req.body;
     if (!chatId || !message) {
        res.status(400).json({ error: "chatId and message are required" });
        return;
     }
 
     const docRef = db.collection("chatMessages").doc();
+    const msgSender = sender || "Customer";
     const newMessage = {
       chatId,
-      sender: "Customer",
+      sender: msgSender,
       message,
+      customerName: customerName || null,
+      customerPhone: customerPhone || null,
       createdAt: new Date().toISOString(),
     };
     await docRef.set(newMessage);
@@ -27,7 +30,15 @@ router.post("/chat/send", async (req: Request, res: Response) => {
       const io = req.app.get("io");
       if (io) {
         io.emit("chat:new_message", { id: docRef.id, ...newMessage });
-        io.emit("chat:threads_updated", { chatId, lastMessage: message, lastSender: "Customer", updatedAt: newMessage.createdAt });
+        io.emit("new_chat_message", { id: docRef.id, ...newMessage });
+        io.emit("chat:threads_updated", {
+          chatId,
+          lastMessage: message,
+          lastSender: msgSender,
+          customerName: customerName || null,
+          customerPhone: customerPhone || null,
+          updatedAt: newMessage.createdAt,
+        });
       }
     } catch (sErr) {}
 
@@ -59,7 +70,7 @@ router.get("/chat/history/:chatId", async (req: Request, res: Response) => {
 });
 
 // Get unique chat threads (Admin only)
-router.get("/chat/admin/threads", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Salesman"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.get("/chat/admin/threads", authenticateJWT as any, requireRole(["SuperAdmin", "Admin", "Manager", "Staff", "Salesman"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const snapshot = await db.collection("chatMessages").get();
     const messages: any[] = [];
@@ -70,7 +81,7 @@ router.get("/chat/admin/threads", authenticateJWT as any, requireRole(["SuperAdm
     // Sort in memory descending to get latest messages first
     messages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    // Group by chatId and keep the last message
+    // Group by chatId and keep the last message and customer info
     const threadsMap = new Map();
     for (const msg of messages) {
       if (!threadsMap.has(msg.chatId)) {
@@ -78,8 +89,14 @@ router.get("/chat/admin/threads", authenticateJWT as any, requireRole(["SuperAdm
           chatId: msg.chatId,
           lastMessage: msg.message,
           lastSender: msg.sender,
+          customerName: msg.customerName || null,
+          customerPhone: msg.customerPhone || null,
           updatedAt: msg.createdAt
         });
+      } else {
+        const curr = threadsMap.get(msg.chatId);
+        if (!curr.customerName && msg.customerName) curr.customerName = msg.customerName;
+        if (!curr.customerPhone && msg.customerPhone) curr.customerPhone = msg.customerPhone;
       }
     }
 
@@ -90,7 +107,7 @@ router.get("/chat/admin/threads", authenticateJWT as any, requireRole(["SuperAdm
 });
 
 // Admin reply to thread
-router.post("/chat/admin/reply", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Salesman"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.post("/chat/admin/reply", authenticateJWT as any, requireRole(["SuperAdmin", "Admin", "Manager", "Staff", "Salesman"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { chatId, message } = req.body;
     if (!chatId || !message) {
@@ -112,6 +129,8 @@ router.post("/chat/admin/reply", authenticateJWT as any, requireRole(["SuperAdmi
       const io = req.app.get("io");
       if (io) {
         io.emit("chat:new_message", { id: docRef.id, ...reply });
+        io.emit("admin_reply", { id: docRef.id, ...reply });
+        io.emit("new_chat_message", { id: docRef.id, ...reply });
         io.emit("chat:threads_updated", { chatId, lastMessage: message, lastSender: "Admin", updatedAt: reply.createdAt });
       }
     } catch (sErr) {}

@@ -1,3 +1,4 @@
+import { emitStorefrontUpdate } from "../utils/socketSync";
 import { Router, Request, Response } from "express";
 import fs from "fs";
 import path from "path";
@@ -26,6 +27,7 @@ export function invalidateHeroBannersCache() {
 
 function notifyRealtimeSync(req: Request, type: string, extra?: any) {
   try {
+    emitStorefrontUpdate(req, type || "hero_banners", extra);
     const io = (req.app as any)?.get("io");
     if (io) {
       io.emit("content_updated", { type, timestamp: Date.now(), ...extra });
@@ -316,7 +318,7 @@ const createHeroBannerHandler = async (req: any, res: Response) => {
     } catch (e) {}
 
     invalidateHeroBannersCache();
-    notifyRealtimeSync(req, "hero_banners", { id, action: "delete" });
+    notifyRealtimeSync(req, "hero_banners", { id: docId, action: "create" });
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     res.status(201).json({
       ...(savedBanner || bannerData),
@@ -430,7 +432,7 @@ const updateHeroBannerHandler = async (req: any, res: Response) => {
     } catch (e) {}
 
     invalidateHeroBannersCache();
-    notifyRealtimeSync(req, "hero_banners", { id, action: "delete" });
+    notifyRealtimeSync(req, "hero_banners", { id, action: "update" });
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     res.json(updated || { id, ...currentBanner, ...updatePayload });
   } catch (error: any) {
@@ -514,6 +516,63 @@ router.delete(
   authenticateJWT as any,
   requireRole(["SuperAdmin", "Manager", "Admin"]) as any,
   deleteHeroBannerHandler
+);
+
+// ─── 5. POST /api/admin/hero-banners/bulk-delete — Bulk Delete Hero Banners ─
+const bulkDeleteHeroBannersHandler = async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, error: "Please provide an array of banner IDs to delete" });
+    }
+
+    let deletedCount = 0;
+    for (const id of ids) {
+      try {
+        let bannerToDelete: any = null;
+        if ((prisma as any).heroBanner) {
+          bannerToDelete = await (prisma as any).heroBanner.findUnique({ where: { id } }).catch(() => null);
+        }
+        if (!bannerToDelete) {
+          const doc = await db.collection("hero_banners").doc(id).get().catch(() => null);
+          if (doc && doc.exists) bannerToDelete = doc.data();
+        }
+
+        if (bannerToDelete?.mediaUrl) {
+          deleteMediaFromDisk(bannerToDelete.mediaUrl);
+        }
+
+        if ((prisma as any).heroBanner) {
+          await (prisma as any).heroBanner.delete({ where: { id } }).catch(() => null);
+        }
+        await db.collection("hero_banners").doc(id).delete().catch(() => null);
+        deletedCount++;
+      } catch (itemErr) {
+        console.warn(`Failed to delete hero banner ${id}:`, itemErr);
+      }
+    }
+
+    invalidateHeroBannersCache();
+    notifyRealtimeSync(req, "hero_banners", { action: "bulk-delete", count: deletedCount });
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.json({ success: true, message: `Successfully deleted ${deletedCount} hero banner(s)`, count: deletedCount });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || "Failed to bulk delete hero banners" });
+  }
+};
+
+router.post(
+  "/hero-banners/bulk-delete",
+  authenticateJWT as any,
+  requireRole(["SuperAdmin", "Manager", "Admin"]) as any,
+  bulkDeleteHeroBannersHandler
+);
+
+router.post(
+  "/admin/hero-banners/bulk-delete",
+  authenticateJWT as any,
+  requireRole(["SuperAdmin", "Manager", "Admin"]) as any,
+  bulkDeleteHeroBannersHandler
 );
 
 export default router;

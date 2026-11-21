@@ -1,3 +1,4 @@
+import { emitStorefrontUpdate } from "../utils/socketSync";
 import { Router, Request, Response } from "express";
 import prisma from "../prisma";
 import { pool, isPlaceholderConfig } from "../config/db";
@@ -28,7 +29,7 @@ export async function recordInventorySale(
           }
         }).catch(() => {});
 
-        await prisma.productVariant.update({
+        await prisma.variant.update({
           where: { id: item.variantId },
           data: { stock: { decrement: qty } }
         }).catch(() => {});
@@ -125,6 +126,7 @@ router.get("/status", async (req: Request, res: Response) => {
           imageUrl: v.imageUrl || primaryImg,
           brand: p.brand?.name,
           category: p.category?.name,
+          note: p.note || "",
           status: v.stock === 0 ? "Out of Stock" : v.stock <= 5 ? "Low Stock" : "In Stock"
         }));
       }
@@ -140,6 +142,7 @@ router.get("/status", async (req: Request, res: Response) => {
         imageUrl: primaryImg,
         brand: p.brand?.name,
         category: p.category?.name,
+        note: p.note || "",
         status: "Out of Stock"
       }];
     });
@@ -206,7 +209,7 @@ router.get("/low-stock", async (req: Request, res: Response) => {
  * GET /api/inventory/logs
  * Inventory adjustment & restock audit history
  */
-router.get("/logs", async (req: Request, res: Response) => {
+router.get(["/logs", "/admin/logs"], async (req: Request, res: Response) => {
   try {
     const limit = parseInt((req.query.limit as string) || "50", 10);
 
@@ -243,7 +246,8 @@ router.get("/logs", async (req: Request, res: Response) => {
       productName: l.variant ? `${l.variant.product.name} (${l.variant.name})` : "Product Item",
       changeType: l.quantity > 0 ? "restock" : l.reason.toLowerCase(),
       quantityChanged: l.quantity,
-      note: l.reason,
+      reason: l.reason,
+      note: l.note || l.reason,
       createdAt: l.createdAt
     }));
 
@@ -281,7 +285,8 @@ router.post("/restock", async (req: Request, res: Response) => {
         data: {
           variantId,
           quantity: qty,
-          reason: restockNote
+          reason: changeType,
+          note: restockNote
         }
       });
     } else if (productId) {
@@ -297,7 +302,8 @@ router.post("/restock", async (req: Request, res: Response) => {
           data: {
             variantId: v.id,
             quantity: qty,
-            reason: restockNote
+            reason: changeType,
+            note: restockNote
           }
         });
       }
@@ -323,6 +329,7 @@ router.post("/restock", async (req: Request, res: Response) => {
 
     // Clear product cache so updated stock reflects immediately
     clearProductsCache();
+    emitStorefrontUpdate(req, "inventory", { action: "restock", productId, variantId, quantity: qty });
 
     res.json({
       success: true,
@@ -335,6 +342,103 @@ router.post("/restock", async (req: Request, res: Response) => {
         timestamp: new Date().toISOString()
       }
     });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/inventory/adjust
+ * Stock adjustment (+ or -) with mandatory/optional note
+ */
+router.post("/adjust", async (req: Request, res: Response) => {
+  try {
+    const { productId, variantId, quantity, note, reason = "Stock Adjustment" } = req.body;
+    const qty = parseInt(quantity, 10);
+    if (isNaN(qty) || qty === 0) {
+      return res.status(400).json({ error: "Please enter a valid non-zero adjustment quantity" });
+    }
+
+    const adjustNote = note || `Manual adjustment (${reason})`;
+    let updatedStock = 0;
+
+    if (variantId) {
+      const v = await prisma.variant.update({
+        where: { id: String(variantId) },
+        data: { stock: { increment: qty } }
+      });
+      updatedStock = v.stock;
+      await prisma.inventoryLog.create({
+        data: {
+          variantId: v.id,
+          quantity: qty,
+          reason,
+          note: adjustNote
+        }
+      });
+    } else if (productId) {
+      const v = await prisma.variant.findFirst({ where: { productId: String(productId) } });
+      if (v) {
+        const updatedV = await prisma.variant.update({
+          where: { id: v.id },
+          data: { stock: { increment: qty } }
+        });
+        updatedStock = updatedV.stock;
+        await prisma.inventoryLog.create({
+          data: {
+            variantId: v.id,
+            quantity: qty,
+            reason,
+            note: adjustNote
+          }
+        });
+      }
+    }
+
+    clearProductsCache();
+    res.json({
+      success: true,
+      message: `Stock adjusted by ${qty > 0 ? '+' : ''}${qty} units.`,
+      updatedStock,
+      note: adjustNote
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * PATCH /api/inventory/log/:id/note
+ * Quick inline edit for log note
+ */
+router.patch("/log/:id/note", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { note } = req.body;
+    const updated = await prisma.inventoryLog.update({
+      where: { id: String(id) },
+      data: { note: String(note || "") }
+    });
+    res.json({ success: true, updated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * PATCH /api/inventory/product/:id/note
+ * Quick inline edit for product internal note
+ */
+router.patch("/product/:id/note", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { note } = req.body;
+    const updated = await prisma.product.update({
+      where: { id: String(id) },
+      data: { note: String(note || "") }
+    });
+    clearProductsCache();
+    res.json({ success: true, updated });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

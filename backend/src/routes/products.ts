@@ -1,11 +1,36 @@
+import { emitStorefrontUpdate } from "../utils/socketSync";
 import { Router, Request, Response } from "express";
 import fs from "fs";
 import path from "path";
 import db, { invalidatePrismaCache } from "../firebase";
 import prisma from "../prisma";
 import { authenticateJWT, requireRole } from "../middleware/auth";
+import { deleteUploadedFile } from "../utils/file-cleanup";
+import { uploadCategoryImage, uploadBrandingImage, uploadProductImage } from "../config/multer";
 
 const router = Router();
+
+// Helper to decode Base64 data URIs and save directly to backend/uploads/<subfolder>
+function saveBase64Image(dataUri: string, subfolder: string, prefix: string): string {
+  if (!dataUri || typeof dataUri !== "string" || !dataUri.startsWith("data:image/")) return dataUri;
+  try {
+    const matches = dataUri.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) return dataUri;
+    const rawExt = matches[1].toLowerCase().replace("jpeg", "jpg").replace("svg+xml", "svg");
+    const ext = rawExt.split("+")[0] || "png";
+    const buffer = Buffer.from(matches[2], "base64");
+    const filename = `${prefix}-${Date.now()}-${Math.round(Math.random() * 1e9)}.${ext}`;
+    const targetDir = path.join(process.cwd(), "uploads", subfolder);
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+    fs.writeFileSync(path.join(targetDir, filename), buffer);
+    return `/uploads/${subfolder}/${filename}`;
+  } catch (err) {
+    console.error(`[saveBase64Image] Failed to decode image for ${subfolder}:`, err);
+    return dataUri;
+  }
+}
 
 // Memory cache for products queries to maximize performance
 export const productsCache = new Map<string, { data: any; expiry: number }>();
@@ -69,6 +94,15 @@ router.get("/categories", async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/categories/upload-image (Admin only)
+const handleCategoryUpload = (req: any, res: any) => {
+  if (!req.file) return res.status(400).json({ error: "No image file provided" });
+  const url = `/uploads/categories/${req.file.filename}`;
+  res.json({ success: true, url, filename: req.file.filename });
+};
+router.post("/categories/upload-image", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, uploadCategoryImage.single("image"), handleCategoryUpload);
+router.post("/admin/categories/upload-image", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, uploadCategoryImage.single("image"), handleCategoryUpload);
+
 // POST /api/categories (Admin only - Create/Update category or subcategory)
 router.post("/categories", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: any, res: any) => {
   try {
@@ -78,16 +112,37 @@ router.post("/categories", authenticateJWT as any, requireRole(["SuperAdmin", "M
     }
     const docId = id || db.collection("categories").doc().id;
     const docRef = db.collection("categories").doc(docId);
+    const existingSnap = await docRef.get();
+    const existing = existingSnap.exists ? existingSnap.data() : {};
+
     const cleanSlug = generateSlug(name);
+    // Convert base64 to file on disk if needed
+    let finalImageUrl = imageUrl ? saveBase64Image(imageUrl, "categories", "cat") : (existing.imageUrl || "");
+    if (existing.imageUrl && finalImageUrl && existing.imageUrl !== finalImageUrl) {
+      deleteUploadedFile(existing.imageUrl);
+    }
+
     const data = {
       id: docId,
       name,
       slug: cleanSlug,
       parentId: parentId || null,
-      imageUrl: imageUrl || "",
+      imageUrl: finalImageUrl,
       updatedAt: new Date().toISOString()
     };
     await docRef.set(data, { merge: true });
+
+    // Sync permanently with Prisma
+    try {
+      await prisma.category.upsert({
+        where: { id: docId },
+        create: { id: docId, name, imageUrl: finalImageUrl || null, parentId: data.parentId },
+        update: { name, imageUrl: finalImageUrl || null, parentId: data.parentId }
+      }).catch(async () => {
+        await prisma.category.update({ where: { name }, data: { imageUrl: finalImageUrl || null, parentId: data.parentId } }).catch(() => null);
+      });
+    } catch (_) {}
+
     categoriesCache.data = null;
     try {
       const io = (req.app as any)?.get("io");
@@ -96,6 +151,7 @@ router.post("/categories", authenticateJWT as any, requireRole(["SuperAdmin", "M
         io.emit("data_sync", { type: "categories", id: docId });
       }
     } catch (_) {}
+    emitStorefrontUpdate(req, "categories", { action: "create", id: docId });
     res.json({ message: "Category saved successfully", category: data });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -111,16 +167,34 @@ router.put("/categories/:id", authenticateJWT as any, requireRole(["SuperAdmin",
     const existingSnap = await docRef.get();
     const existing = existingSnap.exists ? existingSnap.data() : {};
     const cleanName = name || existing.name;
+
+    let finalImageUrl = imageUrl !== undefined ? (imageUrl ? saveBase64Image(imageUrl, "categories", "cat") : "") : (existing.imageUrl || "");
+    if (existing.imageUrl && finalImageUrl && existing.imageUrl !== finalImageUrl) {
+      deleteUploadedFile(existing.imageUrl);
+    }
+
     const data = {
       ...existing,
       id: docId,
       name: cleanName,
       slug: cleanName ? generateSlug(cleanName) : existing.slug,
       parentId: parentId !== undefined ? parentId : (existing.parentId || null),
-      imageUrl: imageUrl !== undefined ? imageUrl : (existing.imageUrl || ""),
+      imageUrl: finalImageUrl,
       updatedAt: new Date().toISOString()
     };
     await docRef.set(data, { merge: true });
+
+    // Sync permanently with Prisma
+    try {
+      await prisma.category.upsert({
+        where: { id: docId },
+        create: { id: docId, name: cleanName, imageUrl: finalImageUrl || null, parentId: data.parentId },
+        update: { name: cleanName, imageUrl: finalImageUrl || null, parentId: data.parentId }
+      }).catch(async () => {
+        await prisma.category.update({ where: { name: cleanName }, data: { imageUrl: finalImageUrl || null, parentId: data.parentId } }).catch(() => null);
+      });
+    } catch (_) {}
+
     categoriesCache.data = null;
     try {
       const io = (req.app as any)?.get("io");
@@ -129,6 +203,7 @@ router.put("/categories/:id", authenticateJWT as any, requireRole(["SuperAdmin",
         io.emit("data_sync", { type: "categories", id: docId });
       }
     } catch (_) {}
+    emitStorefrontUpdate(req, "categories", { action: "update", id: docId });
     res.json({ message: "Category updated successfully", category: data });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -139,7 +214,14 @@ router.put("/categories/:id", authenticateJWT as any, requireRole(["SuperAdmin",
 router.delete("/categories/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: any, res: any) => {
   try {
     const { id } = req.params;
+    const snap = await db.collection("categories").doc(id).get().catch(() => null);
+    if (snap && snap.exists) {
+      deleteUploadedFile(snap.data()?.imageUrl);
+    }
     await db.collection("categories").doc(id).delete();
+    try {
+      await prisma.category.delete({ where: { id } }).catch(() => null);
+    } catch (_) {}
     categoriesCache.data = null;
     try {
       const io = (req.app as any)?.get("io");
@@ -148,22 +230,70 @@ router.delete("/categories/:id", authenticateJWT as any, requireRole(["SuperAdmi
         io.emit("data_sync", { type: "categories", id });
       }
     } catch (_) {}
+    emitStorefrontUpdate(req, "categories", { action: "delete", id });
     res.json({ message: "Category deleted successfully" });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
 
+// POST /api/categories/bulk-delete (Admin only)
+const bulkDeleteCategoriesHandler = async (req: any, res: any) => {
+  try {
+    const { ids } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, error: "Please provide an array of category IDs to delete" });
+    }
+
+    let count = 0;
+    for (const id of ids) {
+      try {
+        const snap = await db.collection("categories").doc(id).get().catch(() => null);
+        if (snap && snap.exists) {
+          deleteUploadedFile(snap.data()?.imageUrl);
+        }
+        await db.collection("categories").doc(id).delete().catch(() => null);
+        try {
+          await prisma.category.delete({ where: { id } }).catch(() => null);
+        } catch (_) {}
+        count++;
+      } catch (e) {
+        console.warn(`Failed to delete category ${id}:`, e);
+      }
+    }
+
+    categoriesCache.data = null;
+    try {
+      const io = (req.app as any)?.get("io");
+      if (io) {
+        io.emit("content_updated", { type: "categories", action: "bulk-delete", count });
+        io.emit("data_sync", { type: "categories", action: "bulk-delete", count });
+      }
+    } catch (_) {}
+
+    res.json({ success: true, message: `Successfully deleted ${count} category(ies)`, count });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+router.post("/categories/bulk-delete", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, bulkDeleteCategoriesHandler);
+router.post("/admin/categories/bulk-delete", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, bulkDeleteCategoriesHandler);
+
 // GET /api/brands
 router.get("/brands", async (req: Request, res: Response) => {
   try {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+
     const isBypass = req.query.bypass === "true" || req.query.t;
     if (!isBypass && brandsCache.data && brandsCache.expiry > Date.now()) {
       return res.json(brandsCache.data);
     }
 
     const snapshot = await db.collection("brands").get();
-    const brandsList: any[] = [];
+    let brandsList: any[] = [];
     snapshot.forEach(doc => {
       const bData = doc.data() as any;
       brandsList.push({ 
@@ -172,6 +302,21 @@ router.get("/brands", async (req: Request, res: Response) => {
         slug: bData?.slug || generateSlug(bData?.name || doc.id)
       });
     });
+
+    // Fallback to SQLite Prisma brands if Firestore mock is empty
+    if (brandsList.length === 0) {
+      try {
+        const prismaBrands = await prisma.brand.findMany({ orderBy: { name: "asc" } });
+        brandsList = prismaBrands.map(b => ({
+          id: b.id,
+          name: b.name,
+          slug: generateSlug(b.name),
+          logoUrl: b.logoUrl || "/placeholder-product.svg",
+          originCountry: "International",
+          isTopBrand: b.isTopBrand
+        }));
+      } catch (_) {}
+    }
 
     if (!isBypass) {
       brandsCache.data = brandsList;
@@ -183,6 +328,15 @@ router.get("/brands", async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/brands/upload-image (Admin only)
+const handleBrandUpload = (req: any, res: any) => {
+  if (!req.file) return res.status(400).json({ error: "No image file provided" });
+  const url = `/uploads/branding/${req.file.filename}`;
+  res.json({ success: true, url, filename: req.file.filename });
+};
+router.post("/brands/upload-image", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, uploadBrandingImage.single("image"), handleBrandUpload);
+router.post("/admin/brands/upload-image", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, uploadBrandingImage.single("image"), handleBrandUpload);
+
 // POST /api/brands (Admin only - Add/Update Brand)
 router.post("/brands", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: any, res: any) => {
   try {
@@ -193,6 +347,11 @@ router.post("/brands", authenticateJWT as any, requireRole(["SuperAdmin", "Manag
     const docRef = db.collection("brands").doc(docId);
     const existingDoc = await docRef.get();
     const existingData = existingDoc.exists ? existingDoc.data() : {};
+
+    let finalLogoUrl = logoUrl ? saveBase64Image(logoUrl, "branding", "brand") : (existingData?.logoUrl || "/placeholder-product.svg");
+    if (existingData?.logoUrl && finalLogoUrl && existingData.logoUrl !== finalLogoUrl && !existingData.logoUrl.includes("placeholder")) {
+      deleteUploadedFile(existingData.logoUrl);
+    }
     
     const data = {
       ...existingData,
@@ -200,12 +359,25 @@ router.post("/brands", authenticateJWT as any, requireRole(["SuperAdmin", "Manag
       name,
       slug: cleanSlug,
       originCountry: originCountry !== undefined ? originCountry : (existingData?.originCountry || "International"),
-      logoUrl: logoUrl || existingData?.logoUrl || "/placeholder-product.svg",
+      logoUrl: finalLogoUrl,
       updatedAt: new Date().toISOString()
     };
     await docRef.set(data, { merge: true });
+
+    // Sync permanently with Prisma
+    try {
+      await prisma.brand.upsert({
+        where: { id: docId },
+        create: { id: docId, name, slug: cleanSlug, logoUrl: finalLogoUrl, originCountry: data.originCountry },
+        update: { name, slug: cleanSlug, logoUrl: finalLogoUrl, originCountry: data.originCountry }
+      }).catch(async () => {
+        await prisma.brand.update({ where: { name }, data: { logoUrl: finalLogoUrl, originCountry: data.originCountry } }).catch(() => null);
+      });
+    } catch (_) {}
+
     brandsCache.data = null;
     invalidatePrismaCache("brands");
+    emitStorefrontUpdate(req, "brands", { id: docId });
     res.json({ message: "Brand saved successfully", brand: data });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -216,14 +388,67 @@ router.post("/brands", authenticateJWT as any, requireRole(["SuperAdmin", "Manag
 router.delete("/brands/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: any, res: any) => {
   try {
     const { id } = req.params;
+    const snap = await db.collection("brands").doc(id).get().catch(() => null);
+    if (snap && snap.exists) {
+      deleteUploadedFile(snap.data()?.logoUrl);
+    }
     await db.collection("brands").doc(id).delete();
+    try {
+      await prisma.brand.delete({ where: { id } }).catch(() => null);
+    } catch (_) {}
     brandsCache.data = null;
     invalidatePrismaCache("brands");
+    emitStorefrontUpdate(req, "brands", { action: "delete", id });
     res.json({ message: "Brand deleted successfully" });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
+
+// POST /api/brands/bulk-delete (Admin only)
+const bulkDeleteBrandsHandler = async (req: any, res: any) => {
+  try {
+    const { ids } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, error: "Please provide an array of brand IDs to delete" });
+    }
+
+    let count = 0;
+    for (const id of ids) {
+      try {
+        const snap = await db.collection("brands").doc(id).get().catch(() => null);
+        if (snap && snap.exists) {
+          deleteUploadedFile(snap.data()?.logoUrl);
+        }
+        await db.collection("brands").doc(id).delete().catch(() => null);
+        try {
+          await prisma.brand.delete({ where: { id } }).catch(() => null);
+        } catch (_) {}
+        count++;
+      } catch (e) {
+        console.warn(`Failed to delete brand ${id}:`, e);
+      }
+    }
+
+    brandsCache.data = null;
+    invalidatePrismaCache("brands");
+
+    try {
+      const io = (req.app as any)?.get("io");
+      if (io) {
+        io.emit("content_updated", { type: "brands", action: "bulk-delete", count });
+        io.emit("data_sync", { type: "brands", action: "bulk-delete", count });
+      }
+    } catch (_) {}
+
+    res.json({ success: true, message: `Successfully deleted ${count} brand(s)`, count });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+router.post("/brands/bulk-delete", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, bulkDeleteBrandsHandler);
+router.post("/admin/brands/bulk-delete", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, bulkDeleteBrandsHandler);
 
 function resolveFullUrl(req: Request, url?: string | null): string {
   if (!url || typeof url !== "string") return "/placeholder-product.svg";
@@ -285,6 +510,50 @@ const getProductsHandler = async (req: Request, res: Response) => {
         });
       }
     });
+
+    // Merge active Combos from Prisma so they appear on /shop and categories
+    try {
+      const combos = await prisma.combo.findMany({
+        where: showAll ? {} : { isActive: true },
+        include: {
+          items: true
+        }
+      });
+
+      combos.forEach(c => {
+        const mainImg = c.bannerImage || "/placeholder-product.svg";
+        const resolvedImg = resolveFullUrl(req, mainImg);
+        productsList.push({
+          id: c.id,
+          name: c.title,
+          slug: c.slug,
+          description: c.description || "",
+          isCombo: true,
+          comboItems: c.items,
+          price: c.regularPrice || c.comboPrice,
+          discountPrice: c.comboPrice < c.regularPrice ? c.comboPrice : null,
+          stock: 50,
+          inStock: true,
+          status: "Active",
+          isActive: c.isActive,
+          imageUrl: resolvedImg,
+          images: [{ id: `combo-${c.id}`, url: resolvedImg, isPrimary: true }],
+          variants: [{
+            id: `var-combo-${c.id}`,
+            name: "Combo Set",
+            price: c.regularPrice || c.comboPrice,
+            discountPrice: c.comboPrice < c.regularPrice ? c.comboPrice : null,
+            stock: 50
+          }],
+          brand: { name: "GlowGoodly Combos", slug: "glowgoodly-combos" },
+          categoryId: c.categoryId || "cat-combo",
+          subcategoryId: c.subcategoryId,
+          category: { id: c.categoryId || "cat-combo", name: "Combo Deals" }
+        });
+      });
+    } catch (e) {
+      console.warn("Failed to merge combos in getProductsHandler:", e);
+    }
 
     // Support fast query by ID list (e.g. for Wishlist)
     if (ids) {
@@ -403,19 +672,20 @@ router.get("/admin/products", getProductsHandler);
 router.get("/products/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    if (!id || id === "default" || id === "undefined") {
+    const prodId = String(id);
+    if (!prodId || prodId === "default" || prodId === "undefined") {
       return res.status(400).json({ error: "Invalid product id" });
     }
 
     const isBypass = req.query.bypass === "true" || req.query.t || req.headers["cache-control"] === "no-cache";
     if (!isBypass) {
-      const cached = productDetailsCache.get(id);
+      const cached = productDetailsCache.get(prodId);
       if (cached && cached.expiry > Date.now()) {
         return res.json(cached.data);
       }
     }
 
-    let doc = await db.collection("products").doc(id as string).get();
+    let doc = await db.collection("products").doc(prodId).get();
     let productData: any = null;
 
     if (doc.exists) {
@@ -435,11 +705,11 @@ router.get("/products/:id", async (req: Request, res: Response) => {
         });
       }
 
-      const cleanTarget = decodeURIComponent(id).toLowerCase().trim();
+      const cleanTarget = decodeURIComponent(prodId).toLowerCase().trim();
       const targetSlug = generateSlug(cleanTarget);
 
       const found = allList.find(p => 
-        p.id === id || 
+        p.id === prodId || 
         (p.slug && p.slug.toLowerCase() === cleanTarget) ||
         (p.slug && p.slug.toLowerCase() === targetSlug) ||
         (p.name && generateSlug(p.name) === targetSlug)
@@ -499,7 +769,7 @@ router.get("/products/:id", async (req: Request, res: Response) => {
 
     if (!isBypass) {
       const expiry = Date.now() + CACHE_DURATION_MS;
-      productDetailsCache.set(id, { data: payload, expiry });
+      productDetailsCache.set(prodId, { data: payload, expiry });
       if (productData.id) {
         productDetailsCache.set(productData.id, { data: payload, expiry });
       }
@@ -519,21 +789,22 @@ router.get("/products/:id", async (req: Request, res: Response) => {
 router.post("/products/:id/reviews", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const prodId = String(id);
     const { customerName, rating, comment } = req.body;
 
     if (!customerName || !rating || !comment) {
       return res.status(400).json({ error: "Customer name, rating, and comment are required" });
     }
 
-    let targetProductId = id;
-    const productDoc = await db.collection("products").doc(id as string).get();
+    let targetProductId = prodId;
+    const productDoc = await db.collection("products").doc(prodId).get();
     if (!productDoc.exists) {
       const snap = await db.collection("products").get();
       let found = false;
       snap.forEach(d => {
         const dData = d.data() as any;
         const dSlug = dData?.slug || generateSlug(dData?.name || d.id);
-        if (d.id === id || dData?.id === id || dSlug === id || generateSlug(d.id) === id) {
+        if (d.id === prodId || dData?.id === prodId || dSlug === prodId || generateSlug(d.id) === prodId) {
           targetProductId = d.id;
           found = true;
         }
@@ -555,7 +826,7 @@ router.post("/products/:id/reviews", async (req: Request, res: Response) => {
 
     await reviewRef.set(review);
     productDetailsCache.delete(targetProductId);
-    productDetailsCache.delete(id);
+    productDetailsCache.delete(prodId);
 
     res.status(201).json({
       message: "Review submitted successfully and is pending approval.",
@@ -682,6 +953,7 @@ router.post("/products", authenticateJWT as any, requireRole(["SuperAdmin", "Man
     clearProductsCache();
     invalidatePrismaCache("products");
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    emitStorefrontUpdate(req, "products", { action: "create", id: docRef.id });
     res.status(201).json({ id: docRef.id, ...product });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -798,6 +1070,7 @@ const updateProductHandler = async (req: Request, res: Response) => {
     clearProductsCache();
     invalidatePrismaCache("products");
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    emitStorefrontUpdate(req, "products", { action: "update", id });
     res.json({ id, ...updatedProduct });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -878,6 +1151,7 @@ const deleteProductHandler = async (req: Request, res: Response) => {
     clearProductsCache();
     invalidatePrismaCache("products");
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    emitStorefrontUpdate(req, "products", { action: "delete", id });
     res.json({ message: "Product deleted successfully" });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -886,5 +1160,84 @@ const deleteProductHandler = async (req: Request, res: Response) => {
 
 router.delete("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, deleteProductHandler);
 router.delete("/admin/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, deleteProductHandler);
+
+// POST /api/products/bulk-delete (Admin only)
+const bulkDeleteProductsHandler = async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, error: "Please provide an array of product IDs to delete" });
+    }
+
+    let count = 0;
+    for (const rawId of ids) {
+      const id = String(rawId);
+      try {
+        const docRef = db.collection("products").doc(id);
+        const doc = await docRef.get().catch(() => null);
+        let prodData: any = doc && doc.exists ? doc.data() : null;
+
+        if (!prodData) {
+          try {
+            const p = await prisma.product.findUnique({
+              where: { id },
+              include: { images: true, variants: true }
+            });
+            if (p) prodData = p;
+          } catch (_) {}
+        }
+
+        if (prodData) {
+          // Cleanup disk images
+          const imagesToClean: string[] = [];
+          if (prodData.imageUrl) imagesToClean.push(prodData.imageUrl);
+          if (prodData.image) imagesToClean.push(prodData.image);
+          if (Array.isArray(prodData.images)) {
+            prodData.images.forEach((img: any) => {
+              if (typeof img === "string") imagesToClean.push(img);
+              else if (img?.url) imagesToClean.push(img.url);
+            });
+          }
+          if (Array.isArray(prodData.variants)) {
+            prodData.variants.forEach((v: any) => {
+              if (v.imageUrl) imagesToClean.push(v.imageUrl);
+            });
+          }
+          imagesToClean.forEach((imgUrl) => deleteUploadedFile(imgUrl));
+        }
+
+        // Delete Prisma cascades
+        await prisma.review.deleteMany({ where: { productId: id } }).catch(() => null);
+        await prisma.variant.deleteMany({ where: { productId: id } }).catch(() => null);
+        await prisma.productImage.deleteMany({ where: { productId: id } }).catch(() => null);
+        await prisma.product.deleteMany({ where: { id } }).catch(() => null);
+        await docRef.delete().catch(() => null);
+
+        count++;
+      } catch (errItem) {
+        console.warn(`Failed to delete product ${id}:`, errItem);
+      }
+    }
+
+    clearProductsCache();
+    invalidatePrismaCache("products");
+
+    try {
+      const io = (req.app as any)?.get("io");
+      if (io) {
+        io.emit("content_updated", { type: "products", action: "bulk-delete", count });
+        io.emit("data_sync", { type: "products", action: "bulk-delete", count });
+      }
+    } catch (_) {}
+
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.json({ success: true, message: `Successfully deleted ${count} product(s)`, count });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || "Failed to bulk delete products" });
+  }
+};
+
+router.post("/products/bulk-delete", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, bulkDeleteProductsHandler);
+router.post("/admin/products/bulk-delete", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, bulkDeleteProductsHandler);
 
 export default router;

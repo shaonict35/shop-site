@@ -22,6 +22,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
+  // OTP Verification State
+  const [showOtpView, setShowOtpView] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [otpEmail, setOtpEmail] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
+
   // Cloudflare Turnstile Verification Token
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
@@ -29,6 +35,15 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+
+  // Countdown timer for Resend OTP
+  React.useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   // ─── 1. LOGIN CUSTOMER (PHONE NUMBER / EMAIL + PASSWORD) ───────────────────
   const handleCustomerLogin = async (e: React.FormEvent) => {
@@ -67,6 +82,10 @@ export default function LoginPage() {
         setTimeout(() => {
           window.location.href = "/account";
         }, 600);
+      } else if (data.requireOtp) {
+        setShowOtpView(true);
+        setOtpEmail(data.email || identifier);
+        setErrorMsg(data.error || "অনুগ্রহ করে আপনার ইমেইলে পাঠানো ৬-সংখ্যার কোডটি দিয়ে অ্যাকাউন্ট ভেরিফাই করুন।");
       } else {
         setErrorMsg(data.error || "লগইন ব্যর্থ হয়েছে। আপনার ক্রেডেনশিয়াল সঠিক কিনা যাচাই করুন।");
       }
@@ -105,7 +124,11 @@ export default function LoginPage() {
       });
 
       const data = await res.json();
-      if (res.ok || res.status === 201) {
+      if (data.requireOtp) {
+        setShowOtpView(true);
+        setOtpEmail(data.email || email.trim() || phone.trim());
+        setSuccessMsg(data.message || "রেজিস্ট্রেশন সফল! আপনার ইমেইলে ৬-ডিজিট ভেরিফিকেশন কোড পাঠানো হয়েছে।");
+      } else if (res.ok || res.status === 201) {
         login(data.user, data.token);
         setSuccessMsg("অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে! ড্যাশবোর্ডে নিয়ে যাওয়া হচ্ছে...");
         setTimeout(() => {
@@ -118,6 +141,68 @@ export default function LoginPage() {
       setErrorMsg("রেজিস্ট্রেশন করার সময় একটি সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ─── 3. VERIFY OTP CODE (6-DIGIT EMAIL CODE) ──────────────────────────────
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    if (!otpCode.trim() || otpCode.trim().length < 6) {
+      setErrorMsg("অনুগ্রহ করে ৬-সংখ্যার ভেরিফিকেশন কোড লিখুন।");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/auth/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          emailOrPhone: otpEmail,
+          otpCode: otpCode.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.token) {
+        login(data.user, data.token);
+        setSuccessMsg(data.message || "অ্যাকাউন্ট সফলভাবে ভেরিফাই হয়েছে! লগইন করা হচ্ছে...");
+        setTimeout(() => {
+          window.location.href = "/account";
+        }, 600);
+      } else {
+        setErrorMsg(data.error || "ভেরিফিকেশন কোড ভুল হয়েছে। আবার চেষ্টা করুন।");
+      }
+    } catch (e) {
+      setErrorMsg("ভেরিফাই করতে সমস্যা হয়েছে। অনুগ্রহ করে পুনরায় চেষ্টা করুন।");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ─── 4. RESEND OTP CODE ───────────────────────────────────────────────────
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0) return;
+    setErrorMsg("");
+    setSuccessMsg("");
+    try {
+      const res = await fetch(`${API_BASE}/auth/resend-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emailOrPhone: otpEmail }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccessMsg(data.message || "নতুন ভেরিফিকেশন কোড পাঠানো হয়েছে।");
+        setResendCooldown(60);
+      } else {
+        setErrorMsg(data.error || "কোড পাঠানো সম্ভব হয়নি।");
+      }
+    } catch (e) {
+      setErrorMsg("কোড পাঠাতে সমস্যা হয়েছে।");
     }
   };
 
@@ -191,11 +276,13 @@ export default function LoginPage() {
             </span>
 
             <h1 style={{ fontSize: "24px", fontWeight: "900", color: "#0f172a", margin: "10px 0 4px 0" }}>
-              {modeTab === "login" ? "লগইন করুন" : "রেজিস্ট্রেশন করুন"}
+              {showOtpView ? "ইমেইল ভেরিফিকেশন" : (modeTab === "login" ? "লগইন করুন" : "রেজিস্ট্রেশন করুন")}
             </h1>
 
             <p style={{ fontSize: "13px", color: "#64748b", fontWeight: "500", margin: 0 }}>
-              {modeTab === "login" ? "আপনার অ্যাকাউন্টে লগইন করে প্ল্যাটফর্মে কাজ শুরু করুন" : "একটি নতুন অ্যাকাউন্ট তৈরি করে সেবা গ্রহণ করুন"}
+              {showOtpView
+                ? `আমরা ${otpEmail} ঠিকানায় একটি ৬-সংখ্যার কোড পাঠিয়েছি`
+                : (modeTab === "login" ? "আপনার অ্যাকাউন্টে লগইন করে প্ল্যাটফর্মে কাজ শুরু করুন" : "একটি নতুন অ্যাকাউন্ট তৈরি করে সেবা গ্রহণ করুন")}
             </p>
           </div>
 
@@ -211,8 +298,90 @@ export default function LoginPage() {
             </div>
           )}
 
+          {/* ─── OTP VERIFICATION FORM (WHEN REQUIRED) ─── */}
+          {showOtpView && (
+            <form onSubmit={handleVerifyOtp} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+              <div style={{ textAlign: "center", padding: "4px 0" }}>
+                <span style={{ fontSize: "12.5px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "8px", letterSpacing: "1px" }}>
+                  ENTER 6-DIGIT VERIFICATION CODE
+                </span>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ""))}
+                  placeholder="------"
+                  autoFocus
+                  required
+                  style={{
+                    width: "100%",
+                    padding: "12px",
+                    textAlign: "center",
+                    fontSize: "28px",
+                    fontWeight: "900",
+                    letterSpacing: "12px",
+                    borderRadius: "12px",
+                    border: "2px solid #e63b7a",
+                    backgroundColor: "#fff0f5",
+                    outline: "none",
+                    fontFamily: "monospace"
+                  }}
+                />
+                <span style={{ fontSize: "11.5px", color: "#64748b", marginTop: "6px", display: "block" }}>
+                  Code expires in 10 minutes (কোডটির মেয়াদ ১০ মিনিট)
+                </span>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  backgroundColor: "#e63b7a",
+                  color: "#ffffff",
+                  border: "none",
+                  padding: "14px",
+                  borderRadius: "10px",
+                  fontWeight: "800",
+                  fontSize: "15px",
+                  cursor: loading ? "wait" : "pointer",
+                  boxShadow: "0 4px 14px rgba(230,59,122,0.35)",
+                  transition: "all 0.2s"
+                }}
+              >
+                {loading ? "ভেরিফাই হচ্ছে..." : "VERIFY CODE & LOGIN →"}
+              </button>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: "14px", marginTop: "4px" }}>
+                <button
+                  type="button"
+                  disabled={resendCooldown > 0}
+                  onClick={handleResendOtp}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    fontSize: "12.5px",
+                    color: resendCooldown > 0 ? "#94a3b8" : "#e63b7a",
+                    fontWeight: "800",
+                    cursor: resendCooldown > 0 ? "not-allowed" : "pointer",
+                    padding: 0
+                  }}
+                >
+                  {resendCooldown > 0 ? `Resend Code in ${resendCooldown}s` : "🔄 Resend Code (পুনরায় পাঠান)"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setShowOtpView(false); setErrorMsg(""); setSuccessMsg(""); }}
+                  style={{ background: "none", border: "none", fontSize: "12.5px", color: "#64748b", fontWeight: "700", cursor: "pointer", padding: 0 }}
+                >
+                  ← Cancel
+                </button>
+              </div>
+            </form>
+          )}
+
           {/* ─── TAB 1: LOGIN FORM ─── */}
-          {modeTab === "login" && (
+          {!showOtpView && modeTab === "login" && (
             <form onSubmit={handleCustomerLogin} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               {/* Email / Mobile Field */}
               <div>
@@ -371,7 +540,7 @@ export default function LoginPage() {
           )}
 
           {/* ─── TAB 2: SIGN UP FORM ─── */}
-          {modeTab === "signup" && (
+          {!showOtpView && modeTab === "signup" && (
             <form onSubmit={handleCustomerSignup} style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
               {/* Full Name */}
               <div>

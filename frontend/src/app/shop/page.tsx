@@ -351,12 +351,43 @@ function ShopPageContent() {
   useEffect(() => {
     const fetchInitialData = async (bypass: boolean = true) => {
       try {
-        const [prodData, brandData] = await Promise.all([
+        const [prodData, brandData, comboData] = await Promise.all([
           fetchWithCache(`${API_BASE}/products?includeAll=true&t=${Date.now()}`, true),
           fetchWithCache(`${API_BASE}/brands?t=${Date.now()}`, true),
+          fetchWithCache(`${API_BASE}/combos?t=${Date.now()}`, true).catch(() => []),
         ]);
 
-        const validProds = Array.isArray(prodData) ? prodData : [];
+        const formattedCombos = (Array.isArray(comboData) ? comboData : []).filter((c: any) => c.isActive !== false).map((c: any) => {
+          const hasFreeGift = Array.isArray(c.items) && c.items.some((it: any) => it.isFreeGift);
+          const freeGiftItem = hasFreeGift ? c.items.find((it: any) => it.isFreeGift) : null;
+          return {
+            id: c.id,
+            name: c.title,
+            slug: c.slug,
+            description: c.description || "",
+            price: c.regularPrice || c.comboPrice,
+            discountPrice: c.comboPrice,
+            images: [c.bannerImage || "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&auto=format&fit=crop&q=80"],
+            category: c.category || { id: c.categoryId, name: "Perfect Match COMBO", slug: "combo" },
+            campaignName: "COMBO",
+            isCombo: true,
+            hasFreeGift,
+            freeGiftTitle: freeGiftItem ? (freeGiftItem.product?.name || "Free Gift Included") : undefined,
+            items: c.items || [],
+            variants: [
+              {
+                id: c.id,
+                name: "Combo Bundle",
+                price: c.regularPrice || c.comboPrice,
+                discountPrice: c.comboPrice,
+                stock: 50,
+                sku: `COMBO-${c.id.substring(0, 6)}`
+              }
+            ]
+          };
+        });
+
+        const validProds = [...(Array.isArray(prodData) ? prodData : []), ...formattedCombos];
         const validBrands = Array.isArray(brandData) ? brandData : [];
 
         setProducts(validProds);
@@ -886,6 +917,13 @@ function ShopPageContent() {
                       {isDiscounted && (
                         <span style={{ position: "absolute", top: "10px", left: "0", backgroundColor: "#e2136e", color: "#ffffff", padding: "4px 10px", borderRadius: "0 12px 12px 0", fontSize: "11px", fontWeight: "900", zIndex: 5, boxShadow: "0 2px 6px rgba(226,19,110,0.3)" }}>
                           {discountPercent}% OFF
+                        </span>
+                      )}
+
+                      {/* Combo / Free Gift Badge */}
+                      {(p as any).isCombo && (
+                        <span style={{ position: "absolute", top: isDiscounted ? "36px" : "10px", left: "0", backgroundColor: "#047857", color: "#ffffff", padding: "3px 8px", borderRadius: "0 10px 10px 0", fontSize: "10px", fontWeight: "900", zIndex: 5 }}>
+                          {(p as any).hasFreeGift ? "🎁 COMBO + FREE GIFT" : "✨ COMBO SET"}
                         </span>
                       )}
 

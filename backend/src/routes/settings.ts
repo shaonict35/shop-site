@@ -1,3 +1,4 @@
+import { emitStorefrontUpdate } from "../utils/socketSync";
 
 import { Router, Response } from "express";
 import prisma from "../prisma";
@@ -156,6 +157,7 @@ router.post("/seasonal-offer", async (req, res) => {
       create: { key: "SEASONAL_OFFER_DATA", value: JSON.stringify(payload) }
     });
 
+    emitStorefrontUpdate(req, "seasonal-offer", payload);
     res.json({ message: "Seasonal offer updated successfully", data: payload });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -205,13 +207,37 @@ router.post("/pages-config", async (req, res) => {
 });
 
 // GET /api/settings (Admin only)
-router.get("/", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.get("/", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const settings = await prisma.setting.findMany();
     const settingsObj = settings.reduce((acc: any, s) => {
       acc[s.key] = s.value;
       return acc;
     }, {});
+
+    const siteSettings = await prisma.siteSettings.findFirst().catch(() => null);
+
+    // Provide default fallbacks for Pathao
+    if (!settingsObj.PATHAO_MODE) settingsObj.PATHAO_MODE = siteSettings?.pathaoMode || process.env.PATHAO_MODE || "sandbox";
+    if (!settingsObj.PATHAO_BASE_URL) settingsObj.PATHAO_BASE_URL = siteSettings?.pathaoBaseUrl || process.env.PATHAO_BASE_URL || (settingsObj.PATHAO_MODE === "live" ? "https://api-hermes.pathao.com" : "https://courier-api-sandbox.pathao.com");
+    if (!settingsObj.PATHAO_CLIENT_ID) settingsObj.PATHAO_CLIENT_ID = siteSettings?.pathaoClientId || process.env.PATHAO_CLIENT_ID || "7N1aMJQbWm";
+    if (!settingsObj.PATHAO_CLIENT_SECRET) settingsObj.PATHAO_CLIENT_SECRET = siteSettings?.pathaoClientSecret || process.env.PATHAO_CLIENT_SECRET || "wRcaibZkUdSNz2EI9ZyuXLlNrnAv0TdPUPXMnD39";
+    if (!settingsObj.PATHAO_USERNAME) settingsObj.PATHAO_USERNAME = siteSettings?.pathaoUsername || process.env.PATHAO_USERNAME || "test@pathao.com";
+    if (!settingsObj.PATHAO_PASSWORD) settingsObj.PATHAO_PASSWORD = siteSettings?.pathaoPassword || process.env.PATHAO_PASSWORD || "lovePathao";
+    if (!settingsObj.PATHAO_STORE_ID) settingsObj.PATHAO_STORE_ID = siteSettings?.pathaoStoreId ? String(siteSettings.pathaoStoreId) : (process.env.PATHAO_STORE_ID || "");
+
+    // Provide default fallbacks for bKash
+    if (!settingsObj.BKASH_MODE) settingsObj.BKASH_MODE = siteSettings?.bkashMode || process.env.BKASH_MODE || "sandbox";
+    if (!settingsObj.BKASH_BASE_URL) settingsObj.BKASH_BASE_URL = siteSettings?.bkashBaseUrl || process.env.BKASH_BASE_URL || (settingsObj.BKASH_MODE === "live" ? "https://tokenized.pay.bka.sh" : "https://tokenized.sandbox.bka.sh");
+    if (!settingsObj.BKASH_APP_KEY) settingsObj.BKASH_APP_KEY = siteSettings?.bkashAppKey || process.env.BKASH_APP_KEY || "sandbox_bkash_app_key";
+    if (!settingsObj.BKASH_APP_SECRET) settingsObj.BKASH_APP_SECRET = siteSettings?.bkashAppSecret || process.env.BKASH_APP_SECRET || "sandbox_bkash_app_secret";
+    if (!settingsObj.BKASH_USERNAME) settingsObj.BKASH_USERNAME = siteSettings?.bkashUsername || process.env.BKASH_USERNAME || "sandbox_bkash_username";
+    if (!settingsObj.BKASH_PASSWORD) settingsObj.BKASH_PASSWORD = siteSettings?.bkashPassword || process.env.BKASH_PASSWORD || "sandbox_bkash_password";
+    if (!settingsObj.BKASH_MERCHANT_NO && !settingsObj.BKASH_MERCHANT_NUMBER) {
+      settingsObj.BKASH_MERCHANT_NO = siteSettings?.bkashMerchantNumber || process.env.BKASH_MERCHANT_NUMBER || "01700000000";
+      settingsObj.BKASH_MERCHANT_NUMBER = settingsObj.BKASH_MERCHANT_NO;
+    }
+
     res.json(settingsObj);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -237,8 +263,42 @@ router.post("/bulk", authenticateJWT as any, requireRole(["SuperAdmin", "Admin",
     });
 
     await Promise.all(updatePromises);
+
+    // Sync to Prisma SiteSettings model as well
+    try {
+      const siteSettingsUpdate: any = {};
+      if (settings.PATHAO_MODE) siteSettingsUpdate.pathaoMode = settings.PATHAO_MODE;
+      if (settings.PATHAO_BASE_URL) siteSettingsUpdate.pathaoBaseUrl = settings.PATHAO_BASE_URL;
+      if (settings.PATHAO_CLIENT_ID) siteSettingsUpdate.pathaoClientId = settings.PATHAO_CLIENT_ID;
+      if (settings.PATHAO_CLIENT_SECRET) siteSettingsUpdate.pathaoClientSecret = settings.PATHAO_CLIENT_SECRET;
+      if (settings.PATHAO_USERNAME) siteSettingsUpdate.pathaoUsername = settings.PATHAO_USERNAME;
+      if (settings.PATHAO_PASSWORD) siteSettingsUpdate.pathaoPassword = settings.PATHAO_PASSWORD;
+      if (settings.PATHAO_STORE_ID !== undefined) siteSettingsUpdate.pathaoStoreId = settings.PATHAO_STORE_ID ? parseInt(String(settings.PATHAO_STORE_ID), 10) : null;
+
+      if (settings.BKASH_MODE) siteSettingsUpdate.bkashMode = settings.BKASH_MODE;
+      if (settings.BKASH_BASE_URL) siteSettingsUpdate.bkashBaseUrl = settings.BKASH_BASE_URL;
+      if (settings.BKASH_APP_KEY) siteSettingsUpdate.bkashAppKey = settings.BKASH_APP_KEY;
+      if (settings.BKASH_APP_SECRET) siteSettingsUpdate.bkashAppSecret = settings.BKASH_APP_SECRET;
+      if (settings.BKASH_USERNAME) siteSettingsUpdate.bkashUsername = settings.BKASH_USERNAME;
+      if (settings.BKASH_PASSWORD) siteSettingsUpdate.bkashPassword = settings.BKASH_PASSWORD;
+      if (settings.BKASH_MERCHANT_NO || settings.BKASH_MERCHANT_NUMBER) {
+        siteSettingsUpdate.bkashMerchantNumber = settings.BKASH_MERCHANT_NO || settings.BKASH_MERCHANT_NUMBER;
+      }
+
+      if (Object.keys(siteSettingsUpdate).length > 0) {
+        await prisma.siteSettings.upsert({
+          where: { id: "default" },
+          update: siteSettingsUpdate,
+          create: { id: "default", ...siteSettingsUpdate }
+        });
+      }
+    } catch (siteErr) {
+      console.warn("Failed to sync SiteSettings model:", siteErr);
+    }
+
     invalidatePrismaCache("settings");
 
+    emitStorefrontUpdate(req, "settings", settings);
     res.json({ message: "Settings updated successfully" });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

@@ -364,3 +364,82 @@ Warehouse: 1162, East Monipur, Mirpur-2, Dhaka-1216, Bangladesh
     console.error(`[Order Mailer Error] Failed to send order receipt for #${order.orderNumber}:`, err);
   }
 }
+
+/**
+ * 3. Send 6-Digit Email Verification OTP to Customer on Signup
+ */
+export async function sendVerificationOtpEmail(toEmail: string, name: string, otpCode: string) {
+  try {
+    const config = await getActiveSmtpConfig();
+    const transporter = getTransporter(config);
+    const senderEmail = config.user || "support@glowgoodly.com";
+    const fromAddress = config.fromAddress || `"GlowGoodly Official" <${senderEmail}>`;
+
+    const plainText = `
+Hello ${name || "Customer"},
+
+Your GlowGoodly account verification code is: ${otpCode}
+
+This code will expire in 10 minutes. Please enter this code on the verification screen to activate your account.
+
+If you did not request this verification code, please ignore this email.
+
+Warm regards,
+GlowGoodly Team
+https://glowgoodly.com
+    `.trim();
+
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 580px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
+        <div style="background: linear-gradient(135deg, #e63b7a 0%, #be185d 100%); padding: 24px; text-align: center; color: #ffffff;">
+          <h1 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 1px;">GLOWGOODLY</h1>
+          <p style="margin-top: 6px; font-size: 14px; opacity: 0.95;">Account Security & Email Verification</p>
+        </div>
+        <div style="padding: 28px 24px; color: #334155;">
+          <h2 style="font-size: 18px; color: #0f172a; margin-top: 0;">Hello ${name || "Valued Customer"},</h2>
+          <p style="font-size: 14px; line-height: 1.6; color: #475569;">
+            Thank you for registering at <strong>GlowGoodly</strong>. To complete your signup and verify your email address, please use the 6-digit verification code below:
+          </p>
+          
+          <div style="text-align: center; margin: 26px 0;">
+            <div style="display: inline-block; background-color: #fdf2f8; border: 2px dashed #e63b7a; border-radius: 12px; padding: 16px 36px;">
+              <span style="font-size: 32px; font-weight: 900; letter-spacing: 8px; color: #e63b7a; font-family: monospace;">${otpCode}</span>
+            </div>
+            <p style="margin: 8px 0 0 0; font-size: 12.5px; color: #64748b;">This code expires in <strong>10 minutes</strong>.</p>
+          </div>
+
+          <p style="font-size: 13px; color: #64748b; line-height: 1.5;">
+            If you did not create an account on GlowGoodly, please ignore this email. Your email address remains secure.
+          </p>
+        </div>
+        <div style="background-color: #f8fafc; padding: 16px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0;">
+          &copy; 2026 GlowGoodly Bangladesh • 100% Authentic Cosmetics & Skincare<br/>
+          Support Hotline: +8801609013011 | Email: support@glowgoodly.com
+        </div>
+      </div>
+    `;
+
+    console.log(`[OTP Mailer] Sending verification OTP ${otpCode} to ${toEmail}...`);
+    const info = await transporter.sendMail({
+      from: fromAddress,
+      to: toEmail,
+      subject: `🔑 ${otpCode} is your GlowGoodly verification code`,
+      text: plainText,
+      html: htmlContent,
+      replyTo: "support@glowgoodly.com",
+      headers: {
+        "X-Mailer": "GlowGoodly Auth OTP Engine",
+        "X-Priority": "1 (Highest)"
+      }
+    });
+
+    console.log(`[OTP Mailer] Verification OTP sent successfully! Message ID: ${info.messageId}`);
+    return info;
+  } catch (err) {
+    console.warn(`[OTP Mailer Warning] Could not send OTP email via SMTP (${err}). Using console log fallback:`);
+    console.log(`====================================================`);
+    console.log(`[DEV OTP FALLBACK] Verification code for ${toEmail}: ${otpCode}`);
+    console.log(`====================================================`);
+  }
+}
+

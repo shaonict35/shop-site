@@ -1,3 +1,4 @@
+import { emitStorefrontUpdate } from "../utils/socketSync";
 import { Router, Request, Response } from "express";
 import db from "../firebase";
 
@@ -138,6 +139,7 @@ router.post("/admin/menus", async (req: Request, res: Response) => {
     };
 
     await docRef.set(newItem);
+    emitStorefrontUpdate(req, "menus", { action: "create", id: docRef.id });
     res.status(201).json(newItem);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -161,6 +163,7 @@ router.put("/admin/menus/:id", async (req: Request, res: Response) => {
     };
 
     await docRef.update(updateData);
+    emitStorefrontUpdate(req, "menus", { action: "update", id });
     res.json({ id, ...updateData });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -173,6 +176,7 @@ router.delete("/admin/menus/:id", async (req: Request, res: Response) => {
     const { id } = req.params;
     const docRef = db.collection("menu_items").doc(id as string);
     await docRef.delete();
+    emitStorefrontUpdate(req, "menus", { action: "delete", id });
     res.json({ success: true, message: "Menu item deleted successfully" });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

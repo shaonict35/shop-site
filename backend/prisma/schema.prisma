@@ -19,6 +19,9 @@ model User {
   role         String    @default("Customer") // SuperAdmin, Manager, Salesman, Rider, Customer
   points       Int       @default(0) // Loyalty Points / GlowGoodly Balance
   status       String    @default("Active") // Active, Suspicious, Fraud
+  isVerified   Boolean   @default(false)
+  verificationCode String?
+  codeExpiresAt DateTime?
   addresses    Address[]
   orders       Order[]
   createdAt    DateTime  @default(now())
@@ -74,6 +77,7 @@ model Product {
   metaDescription String?       
   metaKeywords    String?       
   campaignName    String?        // e.g. BOGO, COMBO, CLEARANCE, EXCLUSIVE
+  note            String?        // Internal admin inventory/product note
   images          ProductImage[]
   variants        Variant[]
   reviews         Review[]
@@ -138,6 +142,15 @@ model Order {
   notes          String?    
   trackingLink   String?    
   salesmanId     String?     // Track which salesperson handled it
+  courierTrackingId    String?
+  courierConsignmentId String?
+  consignmentId        String?
+  courierName          String?
+  courierResponse      String?
+  transactionId        String?
+  trxId                String?
+  paymentId            String?
+  senderPhone          String?
   orderItems     OrderItem[]
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
@@ -154,6 +167,7 @@ model OrderItem {
   quantity    Int
   price       Float
   total       Float
+  note        String?  // Item/shade specific note
 }
 
 model Coupon {
@@ -220,6 +234,23 @@ model HeroBanner {
   @@index([order])
 }
 
+model HomepageSectionBanner {
+  id         String   @id @default(uuid())
+  sectionKey String   // 'DEALS_YOU_CANNOT_MISS' | 'TOP_BRANDS_OFFERS' | 'LIMITED_TIME_OFFERS' | 'SHOP_BY_CATEGORY' | 'SHOP_BY_CONCERN'
+  title      String?
+  subtitle   String?
+  imageUrl   String
+  linkUrl    String?
+  order      Int      @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([sectionKey])
+  @@index([isActive])
+  @@index([order])
+}
+
 model Vendor {
   id          String   @id @default(uuid())
   name        String
@@ -250,6 +281,7 @@ model InventoryLog {
   variant   Variant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
   quantity  Int      // Positive for stock in, Negative for stock out
   reason    String   // e.g. "Restock", "Sale", "Damage", "Return"
+  note      String?  // Restocking or adjustment explanation note
   userId    String?  // Staff who made the change
   createdAt DateTime @default(now())
 }
@@ -263,12 +295,33 @@ model Visitor {
   createdAt DateTime @default(now())
 }
 
+model ChatSession {
+  id            String        @id @default(uuid())
+  customerName  String?
+  customerPhone String?
+  customerEmail String?
+  unreadCount   Int           @default(0)
+  lastMessage   String?
+  lastSender    String?       // "CUSTOMER" or "ADMIN"
+  messages      ChatMessage[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([customerPhone])
+  @@index([updatedAt])
+}
+
 model ChatMessage {
-  id        String   @id @default(uuid())
-  chatId    String   // Session ID or User ID to group the conversation
-  sender    String   // "Customer" or "Admin"
+  id        String       @id @default(uuid())
+  chatId    String?      // Session ID or User ID to group the conversation
+  sessionId String?
+  session   ChatSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sender    String       // "Customer" or "Admin"
   message   String  
-  createdAt DateTime @default(now())
+  createdAt DateTime     @default(now())
+
+  @@index([chatId])
+  @@index([sessionId])
 }
 
 model Notification {
@@ -312,4 +365,87 @@ model CmsPage {
   metaDescription String? 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+model SiteSettings {
+  id                    String    @id @default("default")
+  // Pathao Courier API
+  pathaoMode            String    @default("sandbox") // "sandbox" | "live"
+  pathaoBaseUrl         String    @default("https://courier-api-sandbox.pathao.com")
+  pathaoClientId        String?   @default("7N1aMJQbWm")
+  pathaoClientSecret    String?   @default("wRcaibZkUdSNz2EI9ZyuXLlNrnAv0TdPUPXMnD39")
+  pathaoUsername        String?   @default("test@pathao.com")
+  pathaoPassword        String?   @default("lovePathao")
+  pathaoStoreId         Int?
+  pathaoAccessToken     String?
+  pathaoRefreshToken    String?
+  pathaoTokenExpiresAt  DateTime?
+
+  // bKash Tokenized Checkout API
+  bkashMode             String    @default("sandbox") // "sandbox" | "live" | "manual"
+  bkashBaseUrl          String    @default("https://tokenized.sandbox.bka.sh")
+  bkashAppKey           String?   @default("sandbox_bkash_app_key")
+  bkashAppSecret        String?   @default("sandbox_bkash_app_secret")
+  bkashUsername         String?   @default("sandbox_bkash_username")
+  bkashPassword         String?   @default("sandbox_bkash_password")
+  bkashMerchantNumber   String?   @default("01700000000")
+  bkashIdToken          String?
+  bkashRefreshToken     String?
+  bkashTokenExpiresAt   DateTime?
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model Career {
+  id           String    @id @default(uuid())
+  title        String
+  department   String?   @default("General")
+  location     String?   @default("Dhaka, Bangladesh")
+  jobType      String?   @default("Full-time")
+  salaryRange  String?
+  description  String
+  requirements String?
+  deadline     DateTime?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([isActive])
+}
+
+model Combo {
+  id             String      @id @default(uuid())
+  categoryId     String?
+  subcategoryId  String?
+  title          String
+  slug           String      @unique
+  description    String?
+  bannerImage    String?
+  regularPrice   Float       @default(0)
+  comboPrice     Float       @default(0)
+  isActive       Boolean     @default(true)
+  items          ComboItem[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([categoryId])
+  @@index([subcategoryId])
+  @@index([isActive])
+}
+
+model ComboItem {
+  id         String   @id @default(uuid())
+  comboId    String
+  combo      Combo    @relation(fields: [comboId], references: [id], onDelete: Cascade)
+  productId  String
+  variantId  String?
+  shadeName  String?
+  quantity   Int      @default(1)
+  isFreeGift Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([comboId])
+  @@index([productId])
 }

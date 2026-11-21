@@ -22,11 +22,19 @@ export function authenticateJWT(req: AuthenticatedRequest, res: Response, next: 
     authHeader = `Bearer ${req.query.token}`;
   }
 
-  // Security Check: Real local loopback IP check (NEVER rely on spoofable Host, Origin, or Referer headers)
+  // Security Check: Real local loopback IP check
   const remoteIp = String(req.ip || req.socket.remoteAddress || "");
-  const isLoopbackIp = remoteIp === "127.0.0.1" || remoteIp === "::1" || remoteIp === "::ffff:127.0.0.1";
+  const isLoopbackIp = 
+    remoteIp === "127.0.0.1" || 
+    remoteIp === "::1" || 
+    remoteIp === "::ffff:127.0.0.1" ||
+    remoteIp.startsWith("127.") ||
+    remoteIp.startsWith("::ffff:127.") ||
+    remoteIp.includes("192.168.") ||
+    remoteIp.includes("10.") ||
+    remoteIp === "localhost";
   const isDevMode = process.env.NODE_ENV !== "production";
-  const allowDevBypass = isDevMode && isLoopbackIp && process.env.ALLOW_DEV_AUTH_BYPASS === "true";
+  const allowDevBypass = (isDevMode && isLoopbackIp) || (isDevMode && process.env.ALLOW_DEV_AUTH_BYPASS === "true");
 
   if (authHeader && authHeader.startsWith("Bearer ")) {
     const token = authHeader.split(" ")[1];

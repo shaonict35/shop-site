@@ -26,7 +26,17 @@ export default function CheckoutPage() {
   } = useApp();
 
   const [email, setEmail] = useState(user?.email || "");
-  const [paymentMethod, setPaymentMethod] = useState("COD");
+  const [paymentMethod, setPaymentMethod] = useState<"COD" | "bKash">("COD");
+  const [bkashSenderNumber, setBkashSenderNumber] = useState("");
+  const [bkashTrxId, setBkashTrxId] = useState("");
+  const [copiedMerchant, setCopiedMerchant] = useState(false);
+  const BKASH_MERCHANT_NUMBER = "01609013011";
+
+  // Dynamic bKash Configuration (Mode: 'sandbox' | 'live' | 'manual')
+  const [bkashConfig, setBkashConfig] = useState<{ mode: string; merchantNumber: string }>({
+    mode: "sandbox",
+    merchantNumber: "01609013011"
+  });
 
   // Delivery Zone Selection State ("auto", "inside", "sub", "outside")
   const [manualZone, setManualZone] = useState<"auto" | "inside" | "sub" | "outside">("auto");
@@ -50,6 +60,27 @@ export default function CheckoutPage() {
         }
       })
       .catch(() => {});
+
+    // Fetch bKash gateway configuration
+    fetch(`${API_BASE}/payments/bkash/config`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.mode) {
+          setBkashConfig({
+            mode: data.mode,
+            merchantNumber: data.merchantNumber || "01609013011"
+          });
+        }
+      })
+      .catch(() => {});
+
+    // Check URL parameters for payment notifications
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("payment") === "failed") {
+        setErrorMsg("bKash payment was cancelled or could not be completed. Please try again or select Cash on Delivery.");
+      }
+    }
   }, []);
 
   const [couponCode, setCouponCode] = useState("");
@@ -167,6 +198,19 @@ export default function CheckoutPage() {
       return;
     }
 
+    const isBkashApi = paymentMethod === "bKash" && bkashConfig.mode !== "manual";
+
+    if (paymentMethod === "bKash" && !isBkashApi) {
+      if (!bkashSenderNumber.trim()) {
+        setErrorMsg("Please enter your bKash sender number (যে নম্বর থেকে টাকা পাঠিয়েছেন)");
+        return;
+      }
+      if (!bkashTrxId.trim()) {
+        setErrorMsg("Please enter your bKash Transaction ID (TrxID)");
+        return;
+      }
+    }
+
     setLoading(true);
     setErrorMsg("");
 
@@ -179,9 +223,14 @@ export default function CheckoutPage() {
         customerPhone: checkoutPhone,
         address: checkoutAddress,
         zone,
-        paymentMethod: "Cash on Delivery (COD)",
-        paymentPhone: checkoutPhone,
-        paymentStatus: "Pending COD",
+        paymentMethod: paymentMethod === "bKash" 
+          ? (isBkashApi ? "bKash Tokenized" : "bKash Merchant (Manual)")
+          : "Cash on Delivery (COD)",
+        paymentPhone: paymentMethod === "bKash" ? (bkashSenderNumber.trim() || checkoutPhone) : checkoutPhone,
+        senderPhone: paymentMethod === "bKash" ? (bkashSenderNumber.trim() || null) : null,
+        trxId: paymentMethod === "bKash" && !isBkashApi ? bkashTrxId.trim().toUpperCase() : null,
+        transactionId: paymentMethod === "bKash" && !isBkashApi ? bkashTrxId.trim().toUpperCase() : null,
+        paymentStatus: isBkashApi ? "PENDING_PAYMENT" : (paymentMethod === "bKash" ? "PAID" : "Pending COD"),
         items: cart.map((i) => ({ variantId: i.id, quantity: i.quantity })),
         couponCode: effectiveDiscount > 0 ? (couponCode || `AUTO_${autoDiscount}OFF`) : null,
       };
@@ -199,11 +248,35 @@ export default function CheckoutPage() {
         return;
       }
 
-      const createdOrderNumber = data.order.orderNumber;
+      const createdOrder = data.order;
+      const createdOrderNumber = createdOrder.orderNumber;
 
-      // Cash on Delivery (COD) -> Order complete!
+      // If official bKash Tokenized API mode is enabled, initiate gateway payment:
+      if (isBkashApi) {
+        const bkashRes = await fetch(`${API_BASE}/payments/bkash/create`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderId: createdOrder.id,
+            amount: total,
+            customerPhone: checkoutPhone,
+            customerName: checkoutName
+          })
+        });
+        const bkashData = await bkashRes.json();
+        if (bkashRes.ok && bkashData.bkashURL) {
+          clearCart();
+          window.location.href = bkashData.bkashURL;
+          return;
+        } else {
+          setErrorMsg(bkashData.error || "Failed to initialize bKash gateway. Please select Cash on Delivery or contact support.");
+          setLoading(false);
+          return;
+        }
+      }
+
       clearCart();
-      router.push(`/thank-you?orderNumber=${createdOrderNumber}&total=${total}&paymentMethod=COD`);
+      router.push(`/thank-you?orderNumber=${createdOrderNumber}&total=${total}&paymentMethod=${paymentMethod}`);
     } catch (err: any) {
       setErrorMsg("Network error. Please try placing your order again.");
     } finally {
@@ -378,27 +451,193 @@ export default function CheckoutPage() {
                 </h2>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                  {/* Cash on Delivery Option */}
+                  {/* Option 1: Cash on Delivery */}
                   <div
+                    onClick={() => setPaymentMethod("COD")}
                     style={{
                       padding: "16px",
                       borderRadius: "12px",
-                      border: "2.5px solid #e63b7a",
-                      backgroundColor: "#fff0f5",
+                      border: paymentMethod === "COD" ? "2.5px solid #e63b7a" : "1.5px solid #cbd5e1",
+                      backgroundColor: paymentMethod === "COD" ? "#fff0f5" : "#ffffff",
+                      cursor: "pointer",
                       display: "flex",
                       flexDirection: "column",
-                      gap: "6px"
+                      gap: "6px",
+                      transition: "all 0.2s ease"
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <span style={{ fontSize: "15px", fontWeight: "900", color: "#0f172a", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span style={{ fontSize: "15px", fontWeight: "900", color: "#0f172a", display: "flex", alignItems: "center", gap: "8px" }}>
+                        <input
+                          type="radio"
+                          name="paymentOption"
+                          checked={paymentMethod === "COD"}
+                          onChange={() => setPaymentMethod("COD")}
+                          style={{ accentColor: "#e63b7a", cursor: "pointer", width: "16px", height: "16px" }}
+                        />
                         💵 Cash on Delivery (COD)
                       </span>
-                      <span style={{ fontSize: "11px", backgroundColor: "#e63b7a", color: "#ffffff", padding: "2px 8px", borderRadius: "10px", fontWeight: "800" }}>ACTIVE</span>
+                      {paymentMethod === "COD" && (
+                        <span style={{ fontSize: "11px", backgroundColor: "#e63b7a", color: "#ffffff", padding: "2px 8px", borderRadius: "10px", fontWeight: "800" }}>SELECTED</span>
+                      )}
                     </div>
-                    <span style={{ fontSize: "12.5px", color: "#475569", fontWeight: "600" }}>
+                    <span style={{ fontSize: "12.5px", color: "#475569", fontWeight: "600", paddingLeft: "24px" }}>
                       পণ্য হাতে পেয়ে নগদ মূল্য পরিশোধ করুন (Pay cash when your order arrives)
                     </span>
+                  </div>
+
+                  {/* Option 2: bKash Merchant Payment */}
+                  <div
+                    onClick={() => setPaymentMethod("bKash")}
+                    style={{
+                      padding: "16px",
+                      borderRadius: "12px",
+                      border: paymentMethod === "bKash" ? "2.5px solid #e2136e" : "1.5px solid #cbd5e1",
+                      backgroundColor: paymentMethod === "bKash" ? "#fdf2f8" : "#ffffff",
+                      cursor: "pointer",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "10px",
+                      transition: "all 0.2s ease"
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: "15px", fontWeight: "900", color: "#0f172a", display: "flex", alignItems: "center", gap: "8px" }}>
+                        <input
+                          type="radio"
+                          name="paymentOption"
+                          checked={paymentMethod === "bKash"}
+                          onChange={() => setPaymentMethod("bKash")}
+                          style={{ accentColor: "#e2136e", cursor: "pointer", width: "16px", height: "16px" }}
+                        />
+                        <span style={{ color: "#e2136e", fontWeight: "900" }}>bKash Merchant Payment</span> (বিকাশ পেমেন্ট)
+                      </span>
+                      <span style={{ fontSize: "11px", backgroundColor: "#e2136e", color: "#ffffff", padding: "2px 8px", borderRadius: "10px", fontWeight: "800" }}>
+                        {paymentMethod === "bKash" ? "SELECTED" : "DIRECT"}
+                      </span>
+                    </div>
+
+                    {paymentMethod === "bKash" && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          backgroundColor: "#ffffff",
+                          border: "1.5px solid #fbcfe8",
+                          borderRadius: "10px",
+                          padding: "16px",
+                          marginTop: "4px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "12px"
+                        }}
+                      >
+                        {bkashConfig.mode !== "manual" ? (
+                          <div style={{ backgroundColor: "#fdf2f8", border: "1.5px dashed #e2136e", padding: "16px", borderRadius: "8px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
+                              <span style={{ fontSize: "24px" }}>💳</span>
+                              <div>
+                                <strong style={{ color: "#e2136e", fontSize: "14px", display: "block" }}>
+                                  Official bKash Payment Gateway ({bkashConfig.mode === "live" ? "Live" : "Sandbox"})
+                                </strong>
+                                <span style={{ fontSize: "12px", color: "#64748b" }}>
+                                  Instant verification • 100% Secure • Automated Order Confirmation
+                                </span>
+                              </div>
+                            </div>
+                            <p style={{ margin: "6px 0 0 0", fontSize: "12.5px", color: "#475569", lineHeight: "1.5" }}>
+                              অর্ডারটি প্লেস করার পর আপনাকে সরাসরি <strong>bKash সিকিউর পেমেন্ট উইন্ডোতে</strong> নিয়ে যাওয়া হবে, যেখানে আপনার বিকাশ পিন ও ওটিপি দিয়ে মাত্র কয়েক সেকেন্ডে পেমেন্ট সম্পন্ন করতে পারবেন।
+                            </p>
+                          </div>
+                        ) : (
+                          <>
+                            {/* Merchant Number with Copy */}
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: "#fdf2f8", padding: "10px 14px", borderRadius: "8px", border: "1px dashed #e2136e" }}>
+                              <div>
+                                <span style={{ fontSize: "11px", fontWeight: "800", color: "#64748b", textTransform: "uppercase" }}>bKash Merchant Number</span>
+                                <p style={{ margin: "2px 0 0 0", fontSize: "18px", fontWeight: "900", color: "#e2136e", letterSpacing: "1px" }}>
+                                  {bkashConfig.merchantNumber || BKASH_MERCHANT_NUMBER}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(bkashConfig.merchantNumber || BKASH_MERCHANT_NUMBER);
+                                  setCopiedMerchant(true);
+                                  setTimeout(() => setCopiedMerchant(false), 2000);
+                                }}
+                                style={{
+                                  backgroundColor: copiedMerchant ? "#059669" : "#e2136e",
+                                  color: "#ffffff",
+                                  border: "none",
+                                  padding: "6px 14px",
+                                  borderRadius: "6px",
+                                  fontSize: "12px",
+                                  fontWeight: "800",
+                                  cursor: "pointer"
+                                }}
+                              >
+                                {copiedMerchant ? "✓ COPIED" : "COPY NUMBER"}
+                              </button>
+                            </div>
+
+                            {/* Step by step instructions */}
+                            <div style={{ fontSize: "12px", color: "#475569", lineHeight: "1.6", backgroundColor: "#f8fafc", padding: "10px 12px", borderRadius: "6px" }}>
+                              <p style={{ margin: "0 0 4px 0", fontWeight: "800", color: "#0f172a" }}>বিকাশ করার নিয়ম (How to Pay):</p>
+                              <ol style={{ margin: "0", paddingLeft: "18px" }}>
+                                <li>বিকাশ অ্যাপ ওপেন করে <strong>"Make Payment"</strong> অপশনে ক্লিক করুন</li>
+                                <li>মার্চেন্ট নম্বর হিসেবে <strong>{bkashConfig.merchantNumber || BKASH_MERCHANT_NUMBER}</strong> দিন</li>
+                                <li>টাকার পরিমাণ লিখুন: <strong>৳{total}</strong></li>
+                                <li>পেমেন্ট কনফার্ম করার পর ফিরতি এসএমএস থেকে <strong>TrxID</strong> নিচে লিখুন:</li>
+                              </ol>
+                            </div>
+
+                            {/* Input Fields */}
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                              <div>
+                                <label style={{ display: "block", fontSize: "11px", fontWeight: "800", color: "#334155", marginBottom: "4px" }}>
+                                  SENDER BKASH NUMBER *
+                                </label>
+                                <input
+                                  type="tel"
+                                  value={bkashSenderNumber}
+                                  onChange={(e) => setBkashSenderNumber(e.target.value)}
+                                  placeholder="01XXXXXXXXX"
+                                  style={{
+                                    width: "100%",
+                                    padding: "9px 12px",
+                                    borderRadius: "6px",
+                                    border: "1.5px solid #cbd5e1",
+                                    fontSize: "13px",
+                                    outline: "none"
+                                  }}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ display: "block", fontSize: "11px", fontWeight: "800", color: "#334155", marginBottom: "4px" }}>
+                                  TRANSACTION ID (TrxID) *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={bkashTrxId}
+                                  onChange={(e) => setBkashTrxId(e.target.value.toUpperCase())}
+                                  placeholder="e.g. 8N7A6B5C4D"
+                                  style={{
+                                    width: "100%",
+                                    padding: "9px 12px",
+                                    borderRadius: "6px",
+                                    border: "1.5px solid #cbd5e1",
+                                    fontSize: "13px",
+                                    textTransform: "uppercase",
+                                    outline: "none",
+                                    fontFamily: "monospace"
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -440,7 +679,7 @@ export default function CheckoutPage() {
                     </span>
                   ) : paymentMethod === "bKash" ? (
                     <>
-                      <span>PROCEED TO bKASH PAYMENT (BDT {total})</span>
+                      <span>CONFIRM bKASH PAYMENT (BDT {total})</span>
                       <ArrowRight size={20} />
                     </>
                   ) : (

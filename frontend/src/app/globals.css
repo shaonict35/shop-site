@@ -2698,6 +2698,15 @@ button, input, select, textarea {
   gap: 12px;
 }
 
+.shajgoj-cat-circle:hover div {
+  transform: scale(1.08);
+  box-shadow: 0 8px 24px rgba(230, 59, 122, 0.22);
+  border-color: #e63b7a !important;
+}
+.shajgoj-cat-circle:hover span {
+  color: #e63b7a !important;
+}
+
 @media (min-width: 768px) {
   .categories-grid {
     grid-template-columns: repeat(4, 1fr);

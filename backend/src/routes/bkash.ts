@@ -1,185 +1,222 @@
 import { Router, Request, Response } from "express";
 import db from "../firebase";
+import prisma from "../prisma";
+import bkashService from "../services/bkashService";
+import { authenticateJWT, requireRole, AuthenticatedRequest } from "../middleware/auth";
+import { sendOrderReceiptEmail } from "../mailer";
 
 const router = Router();
 
-// bKash Merchant Configuration (https://developer.bka.sh)
-const BKASH_MERCHANT_NUMBER = process.env.BKASH_MERCHANT_NUMBER || "01609013011";
-const BKASH_MERCHANT_NAME = "GlowGoodly Official";
-const BKASH_BASE_URL = process.env.BKASH_BASE_URL || "https://tokenized.sandbox.bkam.com.bd/v1.2.0-beta";
-const BKASH_APP_KEY = process.env.BKASH_APP_KEY || "sandbox_app_key_glowgoodly";
-const BKASH_APP_SECRET = process.env.BKASH_APP_SECRET || "sandbox_app_secret_glowgoodly";
-const BKASH_USERNAME = process.env.BKASH_USERNAME || "sandbox_username";
-const BKASH_PASSWORD = process.env.BKASH_PASSWORD || "sandbox_password";
-
-// Helper: Grant Token from bKash API (Developer API)
-async function getBkashToken(): Promise<string> {
+// ─── GET /api/payments/bkash/config or /api/bkash/config ───
+router.get(["/config", "/bkash/config"], async (req: Request, res: Response) => {
   try {
-    if (process.env.BKASH_APP_KEY && process.env.BKASH_APP_SECRET) {
-      const response = await fetch(`${BKASH_BASE_URL}/tokenized/checkout/token/grant`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          username: BKASH_USERNAME,
-          password: BKASH_PASSWORD
-        },
-        body: JSON.stringify({
-          app_key: BKASH_APP_KEY,
-          app_secret: BKASH_APP_SECRET
-        })
-      });
-      const data = await response.json();
-      if (data.id_token) {
-        return data.id_token;
-      }
-    }
-  } catch (err) {
-    console.log("Using fallback bKash sandbox token session");
+    const config = await bkashService.getConfig();
+    res.json({
+      success: true,
+      mode: config.mode,
+      isSandbox: config.mode === "sandbox",
+      isLive: config.mode === "live",
+      isManual: config.mode === "manual",
+      merchantNumber: config.merchantNumber,
+      currency: "BDT"
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to load bKash config" });
   }
-  return `mock_token_${Date.now()}`;
-}
-
-// ─── GET /api/bkash/config — Get public bKash Merchant info ───
-router.get("/config", (req: Request, res: Response) => {
-  res.json({
-    merchantNumber: BKASH_MERCHANT_NUMBER,
-    merchantName: BKASH_MERCHANT_NAME,
-    currency: "BDT",
-    isSandbox: !process.env.BKASH_APP_KEY
-  });
 });
 
-// ─── POST /api/bkash/create-payment — Initiate bKash Payment Session ───
-router.post("/create-payment", async (req: Request, res: Response) => {
+// ─── POST /api/payments/bkash/test (Test connection & token generation) ───
+router.post(["/test", "/bkash/test", "/admin/payments/bkash/test"], authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { amount, orderId, customerPhone, customerName, items } = req.body;
+    const config = await bkashService.getConfig();
+    if (config.mode === "manual") {
+      return res.json({
+        success: true,
+        message: `bKash is currently configured in Manual Mode (Merchant Number: ${config.merchantNumber || "Not configured"}).`,
+        mode: "manual"
+      });
+    }
+    const tokenData = await bkashService.getValidIdToken();
+    res.json({
+      success: true,
+      message: `⚡ bKash Tokenized Checkout API Connected Successfully in ${config.mode.toUpperCase()} mode!`,
+      mode: config.mode,
+      baseUrl: config.baseUrl,
+      tokenPreview: tokenData.idToken.slice(0, 10) + "..."
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to authenticate with bKash API" });
+  }
+});
 
+// ─── POST /api/payments/bkash/create or /api/bkash/create ───
+router.post(["/create", "/bkash/create", "/create-payment"], async (req: Request, res: Response) => {
+  try {
+    const { amount, orderId, customerPhone, customerName } = req.body;
     if (!amount || Number(amount) <= 0) {
       return res.status(400).json({ error: "Valid order amount is required for bKash payment" });
     }
-
-    const paymentID = `BKASH-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const idToken = await getBkashToken();
-
-    // If live bKash Developer credentials present, call official endpoint
-    if (process.env.BKASH_APP_KEY && process.env.BKASH_APP_SECRET) {
-      try {
-        const createRes = await fetch(`${BKASH_BASE_URL}/tokenized/checkout/create`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: idToken,
-            "X-APP-Key": BKASH_APP_KEY
-          },
-          body: JSON.stringify({
-            mode: "0011",
-            payerReference: customerPhone || "Customer",
-            callbackURL: `${process.env.FRONTEND_URL || "https://shop.glowgoodly.com"}/checkout?bkash_callback=true`,
-            amount: String(amount),
-            currency: "BDT",
-            intent: "sale",
-            merchantInvoiceNumber: orderId || `INV-${Date.now()}`
-          })
-        });
-        const createData = await createRes.json();
-        if (createData.bkashURL) {
-          return res.json({
-            success: true,
-            paymentID: createData.paymentID,
-            bkashURL: createData.bkashURL,
-            merchantNumber: BKASH_MERCHANT_NUMBER,
-            amount
-          });
-        }
-      } catch (e) {
-        console.error("Official bKash create payment error, using interactive portal", e);
-      }
+    if (!orderId) {
+      return res.status(400).json({ error: "Order ID (invoice number) is required" });
     }
 
-    // Interactive bKash Portal Session Fallback (Matches developer.bka.sh user experience)
-    const bkashURL = `${process.env.FRONTEND_URL || "https://shop.glowgoodly.com"}/bkash-portal?paymentID=${paymentID}&amount=${amount}&orderId=${orderId || ""}&phone=${encodeURIComponent(customerPhone || "")}&name=${encodeURIComponent(customerName || "")}`;
+    const config = await bkashService.getConfig();
+
+    // If Manual mode, return instructions immediately
+    if (config.mode === "manual") {
+      return res.json({
+        success: true,
+        mode: "manual",
+        merchantNumber: config.merchantNumber,
+        amount,
+        orderId,
+        message: `Please send BDT ${amount} to bKash Merchant Number ${config.merchantNumber} and provide your TrxID.`
+      });
+    }
+
+    const frontendBase = (process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/$/, "");
+    const backendBase = `http://localhost:${process.env.PORT || 5000}`;
+    const callbackUrl = `${backendBase}/api/payments/bkash/callback`;
+
+    const payment = await bkashService.createPayment({
+      amount,
+      orderId,
+      payerReference: customerPhone || "Customer",
+      callbackUrl
+    });
 
     res.json({
       success: true,
-      paymentID,
-      bkashURL,
-      merchantNumber: BKASH_MERCHANT_NUMBER,
-      merchantName: BKASH_MERCHANT_NAME,
-      amount,
-      message: `bKash Payment initialized for Merchant ${BKASH_MERCHANT_NUMBER}`
+      mode: config.mode,
+      paymentID: payment.paymentID,
+      bkashURL: payment.bkashURL,
+      merchantNumber: config.merchantNumber,
+      amount
     });
   } catch (err: any) {
-    console.error("bKash payment initiation error:", err);
-    res.status(500).json({ error: "bKash Payment initialization failed" });
+    console.error("[bKash Create Error]:", err);
+    res.status(500).json({ error: err.message || "Failed to initiate bKash payment" });
   }
 });
 
-// ─── POST /api/bkash/execute-payment — Verify & Execute Payment (Deduct bill amount to merchant 01609013011) ───
-router.post("/execute-payment", async (req: Request, res: Response) => {
+// ─── GET /api/payments/bkash/callback or /api/bkash/callback ───
+router.get(["/callback", "/bkash/callback"], async (req: Request, res: Response) => {
   try {
-    const { paymentID, orderId, customerPhone, amount, trxID } = req.body;
+    const paymentID = String(req.query.paymentID || "");
+    const status = String(req.query.status || "");
+    const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/$/, "");
 
-    if (!paymentID) {
-      return res.status(400).json({ error: "Payment ID is required" });
+    if (status === "cancel" || status === "failure") {
+      return res.redirect(`${frontendUrl}/checkout?payment=failed&status=${status}`);
     }
 
-    const generatedTrxId = trxID || `8N7A${Math.floor(100000 + Math.random() * 900000)}`;
+    if (status === "success" && paymentID) {
+      const executeResult = await bkashService.executePayment(paymentID);
 
-    // Try executing via official bKash Developer API if token present
-    if (process.env.BKASH_APP_KEY && process.env.BKASH_APP_SECRET) {
-      try {
-        const idToken = await getBkashToken();
-        const execRes = await fetch(`${BKASH_BASE_URL}/tokenized/checkout/execute`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: idToken,
-            "X-APP-Key": BKASH_APP_KEY
+      const isCompleted = executeResult.transactionStatus === "Completed" || executeResult.statusCode === "0000";
+      const trxID = executeResult.trxID || `TRX${Date.now()}`;
+      const orderNumber = executeResult.merchantInvoiceNumber || "";
+
+      if (isCompleted && orderNumber) {
+        // Update Prisma Order
+        const updatedOrders = await prisma.order.findMany({
+          where: {
+            OR: [
+              { orderNumber: orderNumber },
+              { id: orderNumber }
+            ]
           },
-          body: JSON.stringify({ paymentID })
+          include: { orderItems: true }
         });
-        const execData = await execRes.json();
-        if (execData.statusCode !== "0000" && execData.statusMessage) {
-          return res.status(400).json({ error: execData.statusMessage || "bKash payment execution failed" });
-        }
-      } catch (e) {
-        console.error("bKash API execute error, proceeding with merchant validation", e);
-      }
-    }
 
-    // Save/Update order status in Firestore / SQLite DB if orderId provided
-    if (orderId && db) {
-      try {
-        const orderQuery = await db.collection("orders").where("orderNumber", "==", orderId).get();
-        if (!orderQuery.empty) {
-          const orderDoc = orderQuery.docs[0];
-          await orderDoc.ref.update({
-            paymentStatus: `Paid BDT ${amount || orderDoc.data().totalAmount} via bKash`,
-            paymentMethod: "bKash Merchant Gateway",
-            paymentTrxId: generatedTrxId,
-            merchantNumber: BKASH_MERCHANT_NUMBER,
-            paymentPhone: customerPhone || orderDoc.data().customerPhone,
-            paidAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
+        if (updatedOrders.length > 0) {
+          const targetOrder = updatedOrders[0];
+          await prisma.order.update({
+            where: { id: targetOrder.id },
+            data: {
+              paymentStatus: "PAID",
+              paymentMethod: "bKash Tokenized",
+              transactionId: trxID,
+              trxId: trxID,
+              paymentId: paymentID
+            }
           });
+
+          // Trigger automated Order Receipt Email
+          try {
+            await sendOrderReceiptEmail(targetOrder);
+          } catch (mailErr) {
+            console.error("Failed to send order confirmation email on bKash callback:", mailErr);
+          }
+
+          // Trigger realtime updates
+          try {
+            const io = (req.app as any)?.get("io");
+            if (io) {
+              io.emit("content_updated", { type: "orders", action: "paid", id: targetOrder.id });
+              io.emit("data_sync", { type: "orders" });
+            }
+          } catch (_) {}
+
+          return res.redirect(`${frontendUrl}/thank-you?orderNumber=${encodeURIComponent(targetOrder.orderNumber)}&total=${targetOrder.total}&paymentMethod=bKash&status=success&trxId=${encodeURIComponent(trxID)}`);
         }
-      } catch (e) {
-        console.error("Order DB update error:", e);
       }
+
+      return res.redirect(`${frontendUrl}/thank-you?orderNumber=${encodeURIComponent(orderNumber)}&paymentMethod=bKash&status=success&trxId=${encodeURIComponent(trxID)}`);
     }
 
-    res.json({
-      success: true,
-      status: "Completed",
-      paymentID,
-      trxID: generatedTrxId,
-      amount,
-      merchantNumber: BKASH_MERCHANT_NUMBER,
-      message: `Payment of BDT ${amount} successfully transferred to merchant number ${BKASH_MERCHANT_NUMBER}`
-    });
+    res.redirect(`${frontendUrl}/checkout?payment=failed`);
   } catch (err: any) {
-    console.error("bKash payment execution error:", err);
-    res.status(500).json({ error: "Failed to execute bKash payment" });
+    console.error("[bKash Callback Error]:", err);
+    const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/$/, "");
+    res.redirect(`${frontendUrl}/checkout?payment=error&message=${encodeURIComponent(err.message || "Payment execution failed")}`);
+  }
+});
+
+// ─── GET /api/admin/payments/bkash/query/:paymentID (Admin only) ───
+router.get("/admin/payments/bkash/query/:paymentID", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const paymentID = String(req.params.paymentID || "");
+    if (!paymentID) return res.status(400).json({ error: "paymentID is required" });
+
+    const result = await bkashService.queryPayment(paymentID);
+    res.json({ success: true, data: result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to query bKash payment" });
+  }
+});
+
+// ─── POST /api/admin/payments/bkash/refund (Admin only) ───
+router.post("/admin/payments/bkash/refund", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { paymentID, amount, trxID, sku, reason, orderId } = req.body;
+    if (!paymentID || !amount || !trxID) {
+      return res.status(400).json({ error: "paymentID, amount, and trxID are required to process refund." });
+    }
+
+    const refundRes = await bkashService.refundPayment({
+      paymentID,
+      amount,
+      trxID,
+      sku: sku || "REFUND",
+      reason: reason || "Admin initiated refund"
+    });
+
+    if (orderId) {
+      await prisma.order.updateMany({
+        where: {
+          OR: [{ id: orderId }, { orderNumber: orderId }]
+        },
+        data: {
+          paymentStatus: "Refunded",
+          notes: `Refunded BDT ${amount} on bKash TrxID: ${refundRes.refundTrxID || trxID}`
+        }
+      });
+    }
+
+    res.json({ success: true, message: "bKash Refund processed successfully", data: refundRes });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to process bKash refund" });
   }
 });
 

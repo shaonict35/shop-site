@@ -1,7 +1,12 @@
+import { emitStorefrontUpdate } from "../utils/socketSync";
 import { Router, Request, Response } from "express";
+import { PrismaClient } from "@prisma/client";
 import db from "../firebase";
+import { uploadCmsImage } from "../config/multer";
+import { deleteUploadedFile } from "../utils/file-cleanup";
 
 const router = Router();
+const prisma = new PrismaClient();
 
 const DEFAULT_PAGES_DATA: Record<string, { title: string; contentHtml: string }> = {
   "about": {
@@ -162,17 +167,36 @@ const DEFAULT_PAGES_DATA: Record<string, { title: string; contentHtml: string }>
   }
 };
 
+const SLUG_ALIASES: Record<string, string> = {
+  "our-story": "about",
+  "terms-conditions": "terms",
+  "faqs": "faq",
+  "contact-us": "contact"
+};
+
 let isPagesCleanedInDb = false;
 
 async function ensureCleanPagesInDb() {
   if (isPagesCleanedInDb) return;
   try {
     for (const [slug, data] of Object.entries(DEFAULT_PAGES_DATA)) {
+      const existingPrisma = await prisma.cmsPage.findUnique({ where: { slug } });
+      if (!existingPrisma) {
+        await prisma.cmsPage.create({
+          data: {
+            slug,
+            title: data.title,
+            contentHtml: data.contentHtml,
+            metaTitle: data.title,
+            metaDescription: `Read about ${data.title} on GlowGoodly.`
+          }
+        }).catch(() => {});
+      }
       const docRef = db.collection("cms_pages").doc(slug);
       const existing = await docRef.get();
       if (!existing.exists) {
         const pageItem = { slug, title: data.title, contentHtml: data.contentHtml, updatedAt: new Date().toISOString() };
-        await docRef.set(pageItem);
+        await docRef.set(pageItem).catch(() => {});
       }
     }
   } catch (e) {
@@ -187,7 +211,21 @@ router.get("/pages/:slug", async (req: Request, res: Response) => {
   try {
     await ensureCleanPagesInDb();
     const { slug } = req.params;
-    const cleanSlug = String(slug).toLowerCase().trim();
+    let cleanSlug = String(slug).toLowerCase().trim();
+    if (SLUG_ALIASES[cleanSlug]) cleanSlug = SLUG_ALIASES[cleanSlug];
+
+    const prismaPage = await prisma.cmsPage.findFirst({
+      where: {
+        OR: [
+          { slug: cleanSlug },
+          { slug: String(slug).toLowerCase().trim() }
+        ]
+      }
+    });
+
+    if (prismaPage) {
+      return res.json(prismaPage);
+    }
 
     const docRef = db.collection("cms_pages").doc(cleanSlug);
     const doc = await docRef.get();
@@ -197,7 +235,7 @@ router.get("/pages/:slug", async (req: Request, res: Response) => {
     }
 
     // Fallback to default page template data if not yet created in DB
-    const defaultPage = DEFAULT_PAGES_DATA[cleanSlug];
+    const defaultPage = DEFAULT_PAGES_DATA[cleanSlug] || DEFAULT_PAGES_DATA[String(slug).toLowerCase().trim()];
     if (defaultPage) {
       const pagePayload = {
         slug: cleanSlug,
@@ -219,22 +257,34 @@ router.get("/pages/:slug", async (req: Request, res: Response) => {
 router.get(["/admin/pages", "/api/admin/pages"], async (req: Request, res: Response) => {
   try {
     await ensureCleanPagesInDb();
-    const snapshot = await db.collection("cms_pages").get();
-    const pages: any[] = [];
-    snapshot.forEach((doc: any) => {
-      pages.push({ id: doc.id, ...doc.data() });
+    const prismaPages = await prisma.cmsPage.findMany();
+
+    const pagesMap = new Map();
+    prismaPages.forEach(p => {
+      pagesMap.set(p.slug, {
+        id: p.id,
+        slug: p.slug,
+        title: p.title,
+        contentHtml: p.contentHtml,
+        metaTitle: p.metaTitle,
+        metaDescription: p.metaDescription,
+        updatedAt: p.updatedAt
+      });
     });
 
-    if (pages.length === 0) {
-      // Seed initial default pages
-      for (const [slug, data] of Object.entries(DEFAULT_PAGES_DATA)) {
-        const pageItem = { slug, title: data.title, contentHtml: data.contentHtml, updatedAt: new Date().toISOString() };
-        await db.collection("cms_pages").doc(slug).set(pageItem);
-        pages.push(pageItem);
+    // Also ensure all default pages are present in response
+    for (const [slug, data] of Object.entries(DEFAULT_PAGES_DATA)) {
+      if (!pagesMap.has(slug)) {
+        pagesMap.set(slug, {
+          slug,
+          title: data.title,
+          contentHtml: data.contentHtml,
+          updatedAt: new Date().toISOString()
+        });
       }
     }
 
-    res.json(pages);
+    res.json(Array.from(pagesMap.values()));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -248,8 +298,8 @@ router.post(["/admin/pages", "/api/admin/pages"], async (req: Request, res: Resp
       return res.status(400).json({ error: "Page slug and title are required" });
     }
 
-    const cleanSlug = String(slug).toLowerCase().trim();
-    const docRef = db.collection("cms_pages").doc(cleanSlug);
+    let cleanSlug = String(slug).toLowerCase().trim();
+    if (SLUG_ALIASES[cleanSlug]) cleanSlug = SLUG_ALIASES[cleanSlug];
 
     const pageData = {
       slug: cleanSlug,
@@ -261,7 +311,28 @@ router.post(["/admin/pages", "/api/admin/pages"], async (req: Request, res: Resp
       updatedAt: new Date().toISOString(),
     };
 
-    await docRef.set(pageData);
+    await prisma.cmsPage.upsert({
+      where: { slug: cleanSlug },
+      update: {
+        title,
+        contentHtml: contentHtml || "",
+        metaTitle: metaTitle || null,
+        metaDescription: metaDescription || null,
+        updatedAt: new Date()
+      },
+      create: {
+        slug: cleanSlug,
+        title,
+        contentHtml: contentHtml || "",
+        metaTitle: metaTitle || null,
+        metaDescription: metaDescription || null
+      }
+    });
+
+    const docRef = db.collection("cms_pages").doc(cleanSlug);
+    await docRef.set(pageData).catch(() => {});
+    emitStorefrontUpdate(req, "pages", { action: "save", slug: cleanSlug });
+
     res.json({ success: true, page: pageData });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -273,8 +344,8 @@ router.put(["/admin/pages/:slug", "/api/admin/pages/:slug"], async (req: Request
   try {
     const { slug } = req.params;
     const { title, contentHtml, metaTitle, metaDescription } = req.body;
-    const cleanSlug = String(slug).toLowerCase().trim();
-    const docRef = db.collection("cms_pages").doc(cleanSlug);
+    let cleanSlug = String(slug).toLowerCase().trim();
+    if (SLUG_ALIASES[cleanSlug]) cleanSlug = SLUG_ALIASES[cleanSlug];
 
     const pageData = {
       slug: cleanSlug,
@@ -286,10 +357,100 @@ router.put(["/admin/pages/:slug", "/api/admin/pages/:slug"], async (req: Request
       updatedAt: new Date().toISOString(),
     };
 
-    await docRef.set(pageData, { merge: true });
+    await prisma.cmsPage.upsert({
+      where: { slug: cleanSlug },
+      update: {
+        title: title || cleanSlug,
+        contentHtml: contentHtml || "",
+        metaTitle: metaTitle || null,
+        metaDescription: metaDescription || null,
+        updatedAt: new Date()
+      },
+      create: {
+        slug: cleanSlug,
+        title: title || cleanSlug,
+        contentHtml: contentHtml || "",
+        metaTitle: metaTitle || null,
+        metaDescription: metaDescription || null
+      }
+    });
+
+    const docRef = db.collection("cms_pages").doc(cleanSlug);
+    await docRef.set(pageData, { merge: true }).catch(() => {});
+
     res.json({ success: true, page: pageData });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/admin/pages/upload-image — Upload image directly from PC for CMS WYSIWYG Editor
+router.post(
+  ["/admin/pages/upload-image", "/api/admin/pages/upload-image"],
+  uploadCmsImage.single("image"),
+  (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ success: false, error: "No image file provided" });
+      }
+      const imageUrl = `/uploads/cms/${req.file.filename}`;
+      res.json({
+        success: true,
+        url: imageUrl,
+        filename: req.file.filename,
+        message: "Image uploaded successfully for CMS"
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message || "Failed to upload image" });
+    }
+  }
+);
+
+// DELETE /api/admin/pages/:slug — Delete a single CMS page
+router.delete(["/admin/pages/:slug", "/api/admin/pages/:slug"], async (req: Request, res: Response) => {
+  try {
+    const { slug } = req.params;
+    const cleanSlug = String(slug).toLowerCase().trim();
+    const docRef = db.collection("cms_pages").doc(cleanSlug);
+    const existing = await docRef.get();
+    if (!existing.exists) {
+      return res.status(404).json({ success: false, error: "Page not found" });
+    }
+    await docRef.delete();
+    emitStorefrontUpdate(req, "pages", { action: "delete", slug: cleanSlug });
+    res.json({ success: true, message: `Page '${cleanSlug}' deleted successfully` });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/admin/pages/bulk-delete — Bulk Delete CMS pages
+router.post(["/admin/pages/bulk-delete", "/api/admin/pages/bulk-delete"], async (req: Request, res: Response) => {
+  try {
+    const { slugs, ids } = req.body || {};
+    const targetSlugs: string[] = Array.isArray(slugs) ? slugs : (Array.isArray(ids) ? ids : []);
+    if (!targetSlugs || targetSlugs.length === 0) {
+      return res.status(400).json({ success: false, error: "Please provide a list of page slugs to delete" });
+    }
+
+    let deletedCount = 0;
+    for (const rawSlug of targetSlugs) {
+      const cleanSlug = String(rawSlug).toLowerCase().trim();
+      try {
+        await db.collection("cms_pages").doc(cleanSlug).delete();
+        deletedCount++;
+      } catch (e) {
+        console.warn(`Failed to delete CMS page ${cleanSlug}:`, e);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Successfully deleted ${deletedCount} CMS page(s)`,
+      deletedCount
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

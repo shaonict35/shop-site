@@ -1,11 +1,13 @@
 import { Router, Request, Response } from "express";
 import db from "../firebase";
+import { PrismaClient } from "@prisma/client";
 import { authenticateJWT, requireRole, AuthenticatedRequest } from "../middleware/auth";
 import { sendOrderReceiptEmail } from "../mailer";
 import { sendCapiEvent } from "../services/capi";
 import { recordInventorySale } from "./inventory";
 
 const router = Router();
+const prisma = new PrismaClient();
 
 // POST /api/orders (Checkout - public or authenticated)
 router.post("/", async (req: AuthenticatedRequest, res: Response) => {
@@ -21,7 +23,11 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
       paymentMethod,
       items,
       couponCode,
-      shippingFee
+      shippingFee,
+      trxId,
+      transactionId,
+      senderPhone,
+      senderNumber
     } = req.body;
 
     const zoneValue = zone || deliveryZone || "Inside Dhaka City";
@@ -115,21 +121,77 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
           price: itemPrice,
           total: itemTotal,
         });
-      } else if (isManualOrder) {
-        // Direct Custom Item (Strictly allowed for Admin POS Manual Orders only)
-        const itemPrice = Math.max(0, parseFloat(item.price || item.unitPrice || 0) || 0);
-        const itemTotal = itemPrice * validQty;
-        subTotal += itemTotal;
+      } else {
+        // Check if targetId is an active Combo in database
+        let isComboItem = false;
+        try {
+          const combo = await prisma.combo.findUnique({
+            where: { id: targetId },
+            include: { items: true }
+          });
+          if (combo) {
+            isComboItem = true;
+            const comboPrice = (isManualOrder && item.price !== undefined)
+              ? Math.max(0, parseFloat(item.price) || 0)
+              : Math.max(0, Number(combo.comboPrice || combo.regularPrice || 0));
+            const itemTotal = comboPrice * validQty;
+            subTotal += itemTotal;
 
-        resolvedItems.push({
-          productId: item.productId || item.id,
-          variantId: item.variantId || item.id || `item-${Date.now()}`,
-          productName: item.productName || item.name || item.title || item.productTitle || "Custom Item",
-          variantName: item.variantName || "Standard",
-          quantity: validQty,
-          price: itemPrice,
-          total: itemTotal,
-        });
+            resolvedItems.push({
+              productId: combo.id,
+              variantId: `combo-${combo.id}`,
+              productName: combo.title,
+              variantName: "Combo Bundle",
+              quantity: validQty,
+              price: comboPrice,
+              total: itemTotal,
+              isCombo: true
+            });
+
+            // Automatically deduct stock for each included product & variant in this combo
+            for (const cItem of combo.items) {
+              const compTarget = cItem.variantId || cItem.productId;
+              if (compTarget && variantMap.has(compTarget)) {
+                const compMatch = variantMap.get(compTarget)!;
+                const { docRef: compDocRef, id: compProdId, productData: compProdData, variant: compVar } = compMatch;
+                let compUpdateObj = productUpdates.get(compProdId);
+                if (!compUpdateObj) {
+                  compUpdateObj = { docRef: compDocRef, productData: JSON.parse(JSON.stringify(compProdData)) };
+                  productUpdates.set(compProdId, compUpdateObj);
+                }
+                const deductQty = (cItem.quantity || 1) * validQty;
+                if (Array.isArray(compUpdateObj.productData.variants)) {
+                  const vIndex = compUpdateObj.productData.variants.findIndex((v: any) => v.id === compVar.id);
+                  if (vIndex > -1) {
+                    compUpdateObj.productData.variants[vIndex].stock = Math.max(0, (Number(compUpdateObj.productData.variants[vIndex].stock) || 0) - deductQty);
+                  }
+                }
+                if (compUpdateObj.productData.stock !== undefined) {
+                  compUpdateObj.productData.stock = Math.max(0, (Number(compUpdateObj.productData.stock) || 0) - deductQty);
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("Failed checking combo in order:", e);
+        }
+
+        if (!isComboItem && isManualOrder) {
+          // Direct Custom Item (Strictly allowed for Admin POS Manual Orders only)
+          const itemPrice = Math.max(0, parseFloat(item.price || item.unitPrice || 0) || 0);
+          const itemTotal = itemPrice * validQty;
+          subTotal += itemTotal;
+
+          resolvedItems.push({
+            productId: item.productId || item.id,
+            variantId: item.variantId || item.id || `item-${Date.now()}`,
+            productName: item.productName || item.name || item.title || item.productTitle || "Custom Item",
+            variantName: item.variantName || "Standard",
+            quantity: validQty,
+            price: itemPrice,
+            total: itemTotal,
+          });
+        }
       }
     }
 
@@ -200,7 +262,9 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
       discount,
       total,
       paymentMethod: paymentMethod || "Cash on Delivery",
-      paymentStatus: req.body.paymentStatus || ((paymentMethod === "COD" || paymentMethod === "Cash on Delivery") ? "Pending" : "Paid"),
+      paymentStatus: req.body.paymentStatus || ((paymentMethod === "COD" || paymentMethod === "Cash on Delivery") ? "Pending" : (paymentMethod?.toLowerCase().includes("bkash") && (trxId || transactionId) ? "PAID" : "Pending")),
+      transactionId: trxId || transactionId || null,
+      senderPhone: senderPhone || senderNumber || null,
       orderStatus: req.body.orderStatus || "Pending",
       notes: req.body.notes || (req.body.isManualOrder ? "POS / Manual Order by Admin" : ""),
       isManualOrder: Boolean(req.body.isManualOrder),
@@ -563,8 +627,8 @@ router.post("/:id/send-pathao", authenticateJWT as any, requireRole(["SuperAdmin
   }
 });
 
-// POST /api/orders/:id/send-steadfast (Dispatch order via Steadfast Courier)
-router.post("/:id/send-steadfast", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Salesman"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+// POST /api/orders/:id/send-steadfast or /:id/send-courier (Dispatch order via Steadfast Courier)
+router.post(["/:id/send-steadfast", "/:id/send-courier"], authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Salesman"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const docRef = db.collection("orders").doc(id as string);

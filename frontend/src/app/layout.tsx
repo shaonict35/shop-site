@@ -121,6 +121,7 @@ const storeSchemaJsonLd = {
 };
 
 import PromoSocketListener from "../components/PromoSocketListener";
+import GlowLoader from "../components/GlowLoader";
 
 export default function RootLayout({
   children,
@@ -198,6 +199,7 @@ export default function RootLayout({
           />
         </noscript>
         <AppProvider>
+          <GlowLoader />
           <TrackingScripts />
           {children}
           <ChatWidget />

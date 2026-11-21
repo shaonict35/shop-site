@@ -1,9 +1,14 @@
+import { emitStorefrontUpdate } from "../utils/socketSync";
 import { Router, Response } from "express";
 import db, { invalidatePrismaCache } from "../firebase";
+import prisma from "../prisma";
 import { authenticateJWT, requireRole, AuthenticatedRequest } from "../middleware/auth";
 import bcrypt from "bcryptjs";
 import { sendWelcomeUserEmail } from "../mailer";
 import { clearProductsCache } from "./products";
+import { invalidateHeroBannersCache } from "./hero-banners";
+import { invalidateBannersCache } from "./banners";
+import { deleteUploadedFile } from "../utils/file-cleanup";
 import { cleanAllDummyData } from "../clean-dummy-products";
 
 const router = Router();
@@ -19,7 +24,7 @@ router.post("/clean-dummy-data", authenticateJWT as any, requireRole(["SuperAdmi
 });
 
 // GET /api/admin/reviews (Admin only - Get unapproved reviews)
-router.get("/reviews", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.get("/reviews", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const snapshot = await db.collection("reviews")
       .where("isApproved", "==", false)
@@ -37,7 +42,7 @@ router.get("/reviews", authenticateJWT as any, requireRole(["SuperAdmin", "Manag
 });
 
 // PUT /api/admin/reviews/:id/approve (Admin only - Approve review)
-router.put("/reviews/:id/approve", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.put("/reviews/:id/approve", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const docRef = db.collection("reviews").doc(id as string);
@@ -57,7 +62,7 @@ router.put("/reviews/:id/approve", authenticateJWT as any, requireRole(["SuperAd
 });
 
 // DELETE /api/admin/reviews/:id (Admin only - Reject/Delete review)
-router.delete("/reviews/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.delete("/reviews/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const docRef = db.collection("reviews").doc(id as string);
@@ -73,7 +78,7 @@ router.delete("/reviews/:id", authenticateJWT as any, requireRole(["SuperAdmin",
 });
 
 // GET /api/admin/dashboard-stats (Admin only)
-router.get("/dashboard-stats", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Salesman"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.get("/dashboard-stats", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Salesman", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     // 1. Total Products
     const productsSnapshot = await db.collection("products").get();
@@ -168,7 +173,7 @@ router.get("/dashboard-stats", authenticateJWT as any, requireRole(["SuperAdmin"
 });
 
 // GET /api/admin/staff (Admin only)
-router.get("/staff", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.get("/staff", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const snapshot = await db.collection("users")
       .where("role", "in", ["SuperAdmin", "Manager", "Salesman", "Rider"])
@@ -223,34 +228,97 @@ router.post(["/staff", "/users"], authenticateJWT as any, requireRole(["SuperAdm
   try {
     const { name, email, password, phone, role, status, avatarUrl, imageUrl, points } = req.body;
     
-    const emailQuery = await db.collection("users").where("email", "==", email).limit(1).get();
-    if (!emailQuery.empty) {
-      return res.status(400).json({ error: "Failed to create user. Email already exists." });
+    // Strict Validation
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: "Full Name is required." });
+    }
+    if (!email || !email.trim()) {
+      return res.status(400).json({ error: "Email Address is required." });
+    }
+    const cleanEmail = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return res.status(400).json({ error: "Please enter a valid email address." });
+    }
+    if (!phone || !phone.trim()) {
+      return res.status(400).json({ error: "Phone Number is required." });
+    }
+    if (!password || !password.trim()) {
+      return res.status(400).json({ error: "Password is required." });
+    }
+    if (password.trim().length < 6) {
+      return res.status(400).json({ error: "Password must be at least 6 characters long." });
+    }
+    if (!role || !role.trim()) {
+      return res.status(400).json({ error: "User Role is required." });
     }
 
-    const passwordHash = await bcrypt.hash(password || "glow123456", 10);
-    const docRef = db.collection("users").doc();
-    const userRole = role || (req.path.includes("staff") ? "Salesman" : "Customer");
-    const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name || "User")}&background=${["Admin", "SuperAdmin"].includes(userRole) ? "7c3aed" : "e63b7a"}&color=fff&bold=true`;
-    
+    // Duplicate Email Check in both Prisma & Firestore mock
+    const existingPrisma = await prisma.user.findUnique({ where: { email: cleanEmail } });
+    if (existingPrisma) {
+      return res.status(400).json({ error: "User with this email already exists." });
+    }
+
+    const emailQuery = await db.collection("users").where("email", "==", cleanEmail).limit(1).get();
+    if (!emailQuery.empty) {
+      return res.status(400).json({ error: "User with this email already exists." });
+    }
+
+    // Role Normalization (supports SUPER_ADMIN, ADMIN, STAFF, CUSTOMER, etc.)
+    const normalizedRoleMap: Record<string, string> = {
+      SUPER_ADMIN: "SuperAdmin",
+      SUPERADMIN: "SuperAdmin",
+      ADMIN: "Admin",
+      STAFF: "Manager",
+      MANAGER: "Manager",
+      SALESMAN: "Salesman",
+      CUSTOMER: "Customer",
+      RIDER: "Rider",
+    };
+    const roleKey = (role || "").trim().toUpperCase();
+    const userRole = normalizedRoleMap[roleKey] || (req.path.includes("staff") ? "Salesman" : (role.trim() || "Customer"));
+
+    // Secure Password Hashing with bcrypt
+    const passwordHash = await bcrypt.hash(password.trim(), 10);
+    const docId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name.trim())}&background=${["Admin", "SuperAdmin"].includes(userRole) ? "7c3aed" : "e63b7a"}&color=fff&bold=true`;
+    const finalAvatar = avatarUrl || imageUrl || defaultAvatar;
+
+    // 1. Save directly into Prisma User table
+    await prisma.user.create({
+      data: {
+        id: docId,
+        name: name.trim(),
+        email: cleanEmail,
+        passwordHash,
+        phone: phone.trim(),
+        role: userRole,
+        status: status || "Active",
+        points: Number(points || 0),
+      }
+    });
+
+    // 2. Keep in-memory mock collection synced
+    const docRef = db.collection("users").doc(docId);
     const userObj = {
-      name,
-      email,
+      id: docId,
+      name: name.trim(),
+      email: cleanEmail,
       passwordHash,
-      phone: phone || null,
+      phone: phone.trim(),
       role: userRole,
       status: status || "Active",
       points: Number(points || 0),
-      avatarUrl: avatarUrl || imageUrl || defaultAvatar,
+      avatarUrl: finalAvatar,
       createdAt: new Date().toISOString(),
     };
-
     await docRef.set(userObj);
+    invalidatePrismaCache("users");
 
     res.status(201).json({
-      id: docRef.id,
+      id: docId,
       name: userObj.name,
       email: userObj.email,
+      phone: userObj.phone,
       role: userObj.role,
       status: userObj.status,
       avatarUrl: userObj.avatarUrl,
@@ -268,12 +336,30 @@ const handleUpdateUserOrStaff = async (req: AuthenticatedRequest, res: Response)
     const { id } = req.params;
     const { name, email, password, phone, role, status, avatarUrl, imageUrl, points } = req.body;
     
+    // Normalize role if provided
+    let updatedRole = role;
+    if (role) {
+      const rKey = String(role).trim().toUpperCase();
+      const rMap: Record<string, string> = {
+        SUPER_ADMIN: "SuperAdmin",
+        SUPERADMIN: "SuperAdmin",
+        ADMIN: "Admin",
+        STAFF: "Manager",
+        MANAGER: "Manager",
+        SALESMAN: "Salesman",
+        CUSTOMER: "Customer",
+        RIDER: "Rider",
+      };
+      updatedRole = rMap[rKey] || role;
+    }
+
     // Find doc by ID or Email
     let docRef = db.collection("users").doc(id as string);
     let doc = await docRef.get();
     
     if (!doc.exists && email) {
-      const snapshot = await db.collection("users").where("email", "==", email).limit(1).get();
+      const cleanEmail = String(email).trim().toLowerCase();
+      const snapshot = await db.collection("users").where("email", "==", cleanEmail).limit(1).get();
       if (!snapshot.empty) {
         docRef = snapshot.docs[0].ref;
         doc = snapshot.docs[0];
@@ -293,7 +379,7 @@ const handleUpdateUserOrStaff = async (req: AuthenticatedRequest, res: Response)
     const userData = doc.exists ? (doc.data() as any) : {};
 
     // Prevent removing the last SuperAdmin
-    if (role && role !== "SuperAdmin" && userData.role === "SuperAdmin") {
+    if (updatedRole && updatedRole !== "SuperAdmin" && userData.role === "SuperAdmin") {
       const superAdminsSnapshot = await db.collection("users").where("role", "==", "SuperAdmin").get();
       if (superAdminsSnapshot.size <= 1) {
         return res.status(400).json({ error: "Cannot change role of the last SuperAdmin." });
@@ -303,15 +389,45 @@ const handleUpdateUserOrStaff = async (req: AuthenticatedRequest, res: Response)
     const updatePayload: any = {
       updatedAt: new Date().toISOString()
     };
-    if (name) updatePayload.name = name;
-    if (email) updatePayload.email = email;
-    if (phone !== undefined) updatePayload.phone = phone;
-    if (role && isAuthorizedRole) updatePayload.role = role;
+    if (name) updatePayload.name = name.trim();
+    if (email) updatePayload.email = email.trim().toLowerCase();
+    if (phone !== undefined) updatePayload.phone = phone ? String(phone).trim() : null;
+    if (updatedRole && isAuthorizedRole) updatePayload.role = updatedRole;
     if (status && isAuthorizedRole) updatePayload.status = status;
-    if (points !== undefined) updatePayload.points = points;
+    if (points !== undefined) updatePayload.points = Number(points);
     if (avatarUrl || imageUrl) updatePayload.avatarUrl = avatarUrl || imageUrl;
     if (password && password.trim().length > 0) {
       updatePayload.passwordHash = await bcrypt.hash(password.trim(), 10);
+    }
+
+    // Update in Prisma User table
+    try {
+      const prismaUpdateData: any = {};
+      if (updatePayload.name) prismaUpdateData.name = updatePayload.name;
+      if (updatePayload.email) prismaUpdateData.email = updatePayload.email;
+      if (updatePayload.phone !== undefined) prismaUpdateData.phone = updatePayload.phone;
+      if (updatePayload.role) prismaUpdateData.role = updatePayload.role;
+      if (updatePayload.status) prismaUpdateData.status = updatePayload.status;
+      if (updatePayload.points !== undefined) prismaUpdateData.points = updatePayload.points;
+      if (updatePayload.passwordHash) prismaUpdateData.passwordHash = updatePayload.passwordHash;
+
+      await prisma.user.upsert({
+        where: { id: docRef.id },
+        update: prismaUpdateData,
+        create: {
+          id: docRef.id,
+          name: updatePayload.name || "User",
+          email: updatePayload.email || `user_${docRef.id}@glowgoodly.com`,
+          passwordHash: updatePayload.passwordHash || "default_hash",
+          phone: updatePayload.phone || null,
+          role: updatePayload.role || "Customer",
+          status: updatePayload.status || "Active",
+          points: updatePayload.points || 0,
+        }
+      });
+      invalidatePrismaCache("users");
+    } catch (pErr) {
+      console.warn("Prisma user direct update fallback note:", pErr);
     }
 
     if (doc.exists) {
@@ -319,7 +435,7 @@ const handleUpdateUserOrStaff = async (req: AuthenticatedRequest, res: Response)
     } else {
       updatePayload.id = id;
       updatePayload.createdAt = new Date().toISOString();
-      updatePayload.role = role || "SuperAdmin";
+      updatePayload.role = updatedRole || "SuperAdmin";
       updatePayload.status = status || "Active";
       await docRef.set(updatePayload);
     }
@@ -354,7 +470,15 @@ router.delete(["/staff/:id", "/users/:id"], authenticateJWT as any, requireRole(
       }
     }
 
+    // Safely delete in Prisma (cascade/nullify)
+    try {
+      await prisma.user.deleteMany({ where: { id: String(id) } });
+    } catch (pErr) {
+      console.warn("Prisma user delete fallback note:", pErr);
+    }
+
     await docRef.delete();
+    invalidatePrismaCache("users");
     res.json({ success: true, id, message: "User deleted successfully" });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -362,7 +486,7 @@ router.delete(["/staff/:id", "/users/:id"], authenticateJWT as any, requireRole(
 });
 
 // GET /api/admin/customers (Fraud Tracking)
-router.get("/customers", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Salesman"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.get("/customers", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Salesman", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const usersSnapshot = await db.collection("users").where("role", "==", "Customer").get();
     const ordersSnapshot = await db.collection("orders").get();
@@ -413,7 +537,7 @@ router.get("/customers", authenticateJWT as any, requireRole(["SuperAdmin", "Man
 });
 
 // PUT /api/admin/customers/:id/status
-router.put("/customers/:id/status", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.put("/customers/:id/status", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -434,7 +558,7 @@ router.put("/customers/:id/status", authenticateJWT as any, requireRole(["SuperA
 
 
 // GET /api/admin/inventory
-router.get("/inventory", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Salesman"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.get("/inventory", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Salesman", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const productsSnapshot = await db.collection("products").get();
     const inventoryLogsSnapshot = await db.collection("inventoryLogs").get();
@@ -479,7 +603,7 @@ router.get("/inventory", authenticateJWT as any, requireRole(["SuperAdmin", "Man
 });
 
 // POST /api/admin/inventory/adjust
-router.post("/inventory/adjust", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.post("/inventory/adjust", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { variantId, quantity, reason } = req.body;
     if (!variantId || quantity === undefined || !reason) {
@@ -537,7 +661,7 @@ router.post("/inventory/adjust", authenticateJWT as any, requireRole(["SuperAdmi
 });
 
 // GET /api/admin/vendors
-router.get("/vendors", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.get("/vendors", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const snapshot = await db.collection("vendors").get();
     const vendors: any[] = [];
@@ -552,7 +676,7 @@ router.get("/vendors", authenticateJWT as any, requireRole(["SuperAdmin", "Manag
 });
 
 // POST /api/admin/vendors
-router.post("/vendors", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.post("/vendors", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { name, contactName, email, phone, address, status } = req.body;
     if (!name) {
@@ -580,7 +704,7 @@ router.post("/vendors", authenticateJWT as any, requireRole(["SuperAdmin", "Mana
 });
 
 // PUT /api/admin/vendors/:id
-router.put("/vendors/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.put("/vendors/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { name, contactName, email, phone, address, status } = req.body;
@@ -610,7 +734,7 @@ router.put("/vendors/:id", authenticateJWT as any, requireRole(["SuperAdmin", "M
 });
 
 // DELETE /api/admin/vendors/:id
-router.delete("/vendors/:id", authenticateJWT as any, requireRole(["SuperAdmin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.delete("/vendors/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const docRef = db.collection("vendors").doc(id as string);
@@ -626,7 +750,7 @@ router.delete("/vendors/:id", authenticateJWT as any, requireRole(["SuperAdmin"]
 });
 
 // GET /api/admin/coupons
-router.get("/coupons", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Salesman"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.get("/coupons", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Salesman", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const snapshot = await db.collection("coupons").get();
     const coupons: any[] = [];
@@ -641,7 +765,7 @@ router.get("/coupons", authenticateJWT as any, requireRole(["SuperAdmin", "Manag
 });
 
 // POST /api/admin/coupons
-router.post("/coupons", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.post("/coupons", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { code, title, description, discountType, discountValue, minOrderValue, maxDiscount, expiryDate, usageLimit, tiers, isActive } = req.body;
     if (!code || !discountType || discountValue === undefined || !expiryDate) {
@@ -681,7 +805,7 @@ router.post("/coupons", authenticateJWT as any, requireRole(["SuperAdmin", "Mana
 });
 
 // PUT /api/admin/coupons/:id
-router.put("/coupons/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.put("/coupons/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { title, description, discountType, discountValue, minOrderValue, maxDiscount, expiryDate, usageLimit, tiers, isActive } = req.body;
@@ -716,7 +840,7 @@ router.put("/coupons/:id", authenticateJWT as any, requireRole(["SuperAdmin", "M
 });
 
 // PATCH /api/admin/coupons/:id/toggle
-router.patch("/coupons/:id/toggle", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.patch("/coupons/:id/toggle", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const docRef = db.collection("coupons").doc(id as string);
@@ -735,7 +859,7 @@ router.patch("/coupons/:id/toggle", authenticateJWT as any, requireRole(["SuperA
 });
 
 // DELETE /api/admin/coupons/:id
-router.delete("/coupons/:id", authenticateJWT as any, requireRole(["SuperAdmin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.delete("/coupons/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const docRef = db.collection("coupons").doc(id as string);
@@ -751,7 +875,7 @@ router.delete("/coupons/:id", authenticateJWT as any, requireRole(["SuperAdmin"]
 });
 
 // PUT /api/admin/categories/:id/image
-router.put("/categories/:id/image", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.put("/categories/:id/image", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { imageUrl } = req.body;
@@ -770,7 +894,7 @@ router.put("/categories/:id/image", authenticateJWT as any, requireRole(["SuperA
 });
 
 // PUT /api/admin/brands/:id/logo
-router.put("/brands/:id/logo", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.put("/brands/:id/logo", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { logoUrl } = req.body;
@@ -814,7 +938,7 @@ router.post("/contact", async (req: any, res: any) => {
 });
 
 // GET /api/admin/contact-messages (Admin - View all contact messages)
-router.get("/contact-messages", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Salesman"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.get("/contact-messages", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Salesman", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const snapshot = await db.collection("contact_messages").get();
     const messages: any[] = [];
@@ -829,7 +953,7 @@ router.get("/contact-messages", authenticateJWT as any, requireRole(["SuperAdmin
 });
 
 // DELETE /api/admin/contact-messages/:id (Admin - Delete contact message)
-router.delete("/contact-messages/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.delete("/contact-messages/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const docRef = db.collection("contact_messages").doc(id as string);
@@ -855,7 +979,7 @@ router.get("/categories", async (req: any, res: any) => {
 });
 
 // PUT /api/admin/categories/:id (Admin - Update category popup images and details)
-router.put("/categories/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.put("/categories/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { popupImage1, popupImage2, name, description } = req.body;
@@ -944,6 +1068,7 @@ router.post("/brands", async (req: any, res: any) => {
     const { id, name, logoUrl, originCountry } = req.body || {};
     if (!name) return res.status(400).json({ error: "Brand name is required" });
     const docId = id || name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    const cleanSlug = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
     const docRef = db.collection("brands").doc(docId);
     const existingDoc = await docRef.get();
     const existingData = existingDoc.exists ? existingDoc.data() : {};
@@ -952,11 +1077,38 @@ router.post("/brands", async (req: any, res: any) => {
       ...existingData,
       id: docId,
       name,
+      slug: cleanSlug,
       originCountry: originCountry !== undefined ? originCountry : (existingData?.originCountry || "International"),
       logoUrl: logoUrl || existingData?.logoUrl || "/placeholder-product.svg",
+      isFeatured: true,
       updatedAt: new Date().toISOString()
     };
     await docRef.set(data, { merge: true });
+
+    // Sync permanently to Prisma ORM
+    try {
+      await prisma.brand.upsert({
+        where: { id: docId },
+        create: {
+          id: docId,
+          name,
+          slug: cleanSlug,
+          logoUrl: data.logoUrl,
+          originCountry: data.originCountry,
+          isFeatured: true
+        },
+        update: {
+          name,
+          slug: cleanSlug,
+          logoUrl: data.logoUrl,
+          originCountry: data.originCountry,
+          isFeatured: true
+        }
+      });
+    } catch (pe) {
+      console.warn("Prisma brand sync in admin.ts fallback:", pe);
+    }
+
     clearProductsCache();
     invalidatePrismaCache("brands");
     res.json({ message: "Brand saved successfully", brand: data });
@@ -973,11 +1125,35 @@ const handleUpdateBrand = async (req: any, res: any) => {
     const docRef = db.collection("brands").doc(id);
     const existingDoc = await docRef.get();
     const updateData: any = { updatedAt: new Date().toISOString() };
-    if (name) updateData.name = name;
+    if (name) {
+      updateData.name = name;
+      updateData.slug = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    }
     if (logoUrl !== undefined) updateData.logoUrl = logoUrl;
     if (originCountry !== undefined) updateData.originCountry = originCountry;
     
     await docRef.set(updateData, { merge: true });
+
+    // Sync permanently to Prisma ORM
+    try {
+      await prisma.brand.upsert({
+        where: { id },
+        create: {
+          id,
+          name: name || id,
+          slug: updateData.slug || id.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+          logoUrl: logoUrl || "/placeholder-product.svg",
+          originCountry: originCountry || "International",
+          isFeatured: true
+        },
+        update: {
+          ...(name && { name, slug: updateData.slug }),
+          ...(logoUrl !== undefined && { logoUrl }),
+          ...(originCountry !== undefined && { originCountry })
+        }
+      });
+    } catch (_) {}
+
     clearProductsCache();
     invalidatePrismaCache("brands");
     const updated = existingDoc.exists ? { id, ...existingDoc.data(), ...updateData } : { id, ...updateData };
@@ -994,6 +1170,9 @@ router.delete("/brands/:id", async (req: any, res: any) => {
   try {
     const { id } = req.params;
     await db.collection("brands").doc(id).delete();
+    try {
+      await prisma.brand.delete({ where: { id } }).catch(() => null);
+    } catch (_) {}
     clearProductsCache();
     invalidatePrismaCache("brands");
     res.json({ message: "Brand deleted successfully" });
@@ -1098,6 +1277,7 @@ router.patch("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin",
         io.emit("data_sync", { type: "products", id });
       }
     } catch (_) {}
+    emitStorefrontUpdate(req, "products", { action: "patch", id });
     res.json({ id, ...current, ...updateData });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -1107,7 +1287,7 @@ router.patch("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin",
 
 
 // POST /api/admin/courier/carrybee/issue-token
-router.post("/courier/carrybee/issue-token", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.post("/courier/carrybee/issue-token", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { client_id, client_secret, username, password, base_url } = req.body;
     const baseUrl = (base_url || "https://api.carrybee.com").replace(/\/$/, "");
@@ -1133,7 +1313,7 @@ router.post("/courier/carrybee/issue-token", authenticateJWT as any, requireRole
 });
 
 // POST /api/admin/courier/pathao/test
-router.post("/courier/pathao/test", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.post("/courier/pathao/test", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { client_id, client_secret, username, password, base_url } = req.body;
     const baseUrl = (base_url || "https://api-hermes.pathao.com").replace(/\/$/, "");
@@ -1169,7 +1349,7 @@ router.post("/courier/pathao/test", authenticateJWT as any, requireRole(["SuperA
 });
 
 // POST /api/admin/courier/steadfast/test
-router.post("/courier/steadfast/test", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.post("/courier/steadfast/test", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { api_key, secret_key, base_url } = req.body;
     const baseUrl = (base_url || "https://portal.packzy.com/api/v1").replace(/\/$/, "");
@@ -1192,7 +1372,7 @@ router.post("/courier/steadfast/test", authenticateJWT as any, requireRole(["Sup
 });
 
 // POST /api/admin/courier/redx/test
-router.post("/courier/redx/test", authenticateJWT as any, requireRole(["SuperAdmin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.post("/courier/redx/test", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { access_token, base_url } = req.body;
     const baseUrl = (base_url || "https://openapi.redx.com.bd/v1.0.0").replace(/\/$/, "");
@@ -1213,9 +1393,395 @@ router.post("/courier/redx/test", authenticateJWT as any, requireRole(["SuperAdm
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/admin/orders/:id/send-courier — Dispatch order to Courier & update tracking
+// ─────────────────────────────────────────────────────────────────────────────
+router.post(
+  ["/orders/:id/send-courier", "/api/admin/orders/:id/send-courier"],
+  authenticateJWT as any,
+  requireRole(["SuperAdmin", "Manager", "Admin"]) as any,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const orderId = String(req.params.id || "");
+      if (!orderId) {
+        return res.status(400).json({ error: "Order ID is required" });
+      }
 
+      // Find order in Prisma or db
+      let order: any = await prisma.order.findFirst({
+        where: {
+          OR: [
+            { id: orderId },
+            { orderNumber: orderId }
+          ]
+        },
+        include: { orderItems: true }
+      });
 
+      if (!order) {
+        const doc = await db.collection("orders").doc(orderId).get();
+        if (doc.exists) {
+          order = { id: doc.id, ...doc.data() } as any;
+        }
+      }
 
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      const courierApiUrl = (process.env.COURIER_API_URL || "https://portal.steadfast.com.bd/api/v1").replace(/\/$/, "");
+      const courierApiKey = process.env.COURIER_API_KEY || "";
+      const courierSecretKey = process.env.COURIER_SECRET_KEY || "";
+
+      // COD calculation: 0 if payment is already PAID (e.g. via bKash / Card), or total amount if COD
+      const isPaid = (order.paymentStatus || "").toUpperCase().includes("PAID");
+      const codAmount = isPaid ? 0 : Math.round(Number(order.total || 0));
+
+      let trackingCode = `STDF-${Math.floor(1000000 + Math.random() * 9000000)}`;
+      let consignmentId = `CN-${Date.now()}`;
+      let courierResponseText = "";
+
+      if (courierApiKey && courierSecretKey) {
+        try {
+          const courierRes = await fetch(`${courierApiUrl}/create_order`, {
+            method: "POST",
+            headers: {
+              "Api-Key": courierApiKey,
+              "Secret-Key": courierSecretKey,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              invoice: order.orderNumber,
+              recipient_name: order.customerName,
+              recipient_phone: order.customerPhone,
+              recipient_address: order.address,
+              cod_amount: codAmount,
+              note: order.notes || "GlowGoodly Cosmetics & Skincare"
+            })
+          });
+
+          const resData = await courierRes.json();
+          courierResponseText = JSON.stringify(resData);
+          if (resData.status === 200 && resData.consignment) {
+            trackingCode = resData.consignment.tracking_code || trackingCode;
+            consignmentId = String(resData.consignment.consignment_id || consignmentId);
+          }
+        } catch (apiErr: any) {
+          console.warn("Live courier API failed, falling back to mock booking:", apiErr.message);
+          courierResponseText = apiErr.message;
+        }
+      } else {
+        courierResponseText = "Mock Courier Dispatch (Set COURIER_API_KEY & COURIER_SECRET_KEY in .env for live API)";
+      }
+
+      const trackingLink = `https://steadfast.com.bd/t/${trackingCode}`;
+
+      // Update Order in Prisma
+      const updatedOrder = await prisma.order.update({
+        where: { id: order.id },
+        data: {
+          orderStatus: "Shipped",
+          courierTrackingId: trackingCode,
+          courierConsignmentId: consignmentId,
+          courierName: "Steadfast Courier",
+          courierResponse: courierResponseText,
+          trackingLink: trackingLink,
+        }
+      });
+
+      // Also sync to db collection
+      try {
+        await db.collection("orders").doc(order.id).update({
+          orderStatus: "Shipped",
+          courierTrackingId: trackingCode,
+          courierConsignmentId: consignmentId,
+          courierName: "Steadfast Courier",
+          trackingLink: trackingLink,
+          updatedAt: new Date().toISOString()
+        });
+      } catch (_) {}
+
+      // Emit real-time socket event
+      const io = req.app.get("io");
+      if (io) {
+        io.emit("order_updated", {
+          id: order.id,
+          orderStatus: "Shipped",
+          courierTrackingId: trackingCode,
+          trackingLink: trackingLink
+        });
+      }
+
+      res.json({
+        message: "Order successfully submitted to courier and marked as Shipped!",
+        trackingCode,
+        consignmentId,
+        trackingLink,
+        courierName: "Steadfast Courier",
+        order: updatedOrder
+      });
+    } catch (error: any) {
+      console.error("Failed to send order to courier:", error);
+      res.status(500).json({ error: error.message || "Failed to dispatch order to courier" });
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/admin/clear-cache — Clear all in-memory, DB, and frontend sync caches
+// ─────────────────────────────────────────────────────────────────────────────
+router.post(
+  ["/clear-cache", "/api/admin/clear-cache"],
+  authenticateJWT as any,
+  requireRole(["SuperAdmin", "Manager", "Admin"]) as any,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      // 1. Purge memory caches
+      clearProductsCache();
+      invalidateHeroBannersCache();
+      invalidateBannersCache();
+      invalidatePrismaCache("products");
+      invalidatePrismaCache("categories");
+      invalidatePrismaCache("brands");
+      invalidatePrismaCache("banners");
+      invalidatePrismaCache("hero_banners");
+
+      const timestamp = Date.now().toString();
+
+      // 2. Persist CACHE_VERSION in DB setting
+      try {
+        await prisma.setting.upsert({
+          where: { key: "CACHE_VERSION" },
+          update: { value: timestamp },
+          create: { key: "CACHE_VERSION", value: timestamp }
+        });
+      } catch (_) {}
+
+      try {
+        await db.collection("settings").doc("CACHE_VERSION").set({
+          value: timestamp,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (_) {}
+
+      // 3. Emit real-time Socket.io events
+      try {
+        const io = (req.app as any)?.get("io");
+        if (io) {
+          emitStorefrontUpdate(req, "all", { action: "cache_cleared", timestamp });
+        io.emit("cache_cleared", { timestamp });
+          io.emit("content_updated", { type: "all", timestamp });
+          io.emit("data_sync", { type: "all", timestamp });
+        }
+      } catch (_) {}
+
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.json({
+        success: true,
+        message: "All website & server cache successfully cleared!",
+        timestamp: Number(timestamp)
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message || "Failed to clear cache" });
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/admin/users/bulk-delete — Bulk Delete Users / Staff
+// ─────────────────────────────────────────────────────────────────────────────
+router.post(
+  ["/users/bulk-delete", "/api/admin/users/bulk-delete"],
+  authenticateJWT as any,
+  requireRole(["SuperAdmin", "Admin"]) as any,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { ids } = req.body || {};
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ success: false, error: "Please provide an array of user IDs to delete" });
+      }
+
+      const protectedEmails = ["admin@glowgoodly.com", "support@glowgoodly.com"];
+      const currentUserId = req.user?.id;
+
+      let deletedCount = 0;
+      for (const rawId of ids) {
+        const id = String(rawId);
+        if (currentUserId && id === currentUserId) continue; // Do not delete own account
+
+        try {
+          const targetUser = await prisma.user.findUnique({ where: { id } }).catch(() => null);
+          if (targetUser && protectedEmails.includes(targetUser.email.toLowerCase())) {
+            continue; // Skip master admin accounts
+          }
+
+          if (targetUser?.avatar) deleteUploadedFile(targetUser.avatar);
+
+          await prisma.user.delete({ where: { id } }).catch(() => null);
+          await db.collection("users").doc(id).delete().catch(() => null);
+          deletedCount++;
+        } catch (itemErr) {
+          console.warn(`Failed to delete user ${id}:`, itemErr);
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Successfully deleted ${deletedCount} user(s)`,
+        count: deletedCount
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message || "Failed to bulk delete users" });
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/admin/contact-messages/bulk-delete — Bulk Delete Messages
+// ─────────────────────────────────────────────────────────────────────────────
+router.post(
+  ["/contact-messages/bulk-delete", "/messages/bulk-delete", "/api/admin/contact-messages/bulk-delete"],
+  authenticateJWT as any,
+  requireRole(["SuperAdmin", "Manager", "Admin"]) as any,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { ids } = req.body || {};
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ success: false, error: "Please provide an array of message IDs to delete" });
+      }
+
+      let deletedCount = 0;
+      for (const id of ids) {
+        try {
+          await db.collection("contact_messages").doc(String(id)).delete().catch(() => null);
+          deletedCount++;
+        } catch (_) {}
+      }
+
+      res.json({
+        success: true,
+        message: `Successfully deleted ${deletedCount} message(s)`,
+        count: deletedCount
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message || "Failed to bulk delete messages" });
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/admin/coupons/bulk-delete — Bulk Delete Coupons / Offers
+// ─────────────────────────────────────────────────────────────────────────────
+router.post(
+  ["/coupons/bulk-delete", "/offers/bulk-delete", "/api/admin/coupons/bulk-delete"],
+  authenticateJWT as any,
+  requireRole(["SuperAdmin", "Admin"]) as any,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { ids } = req.body || {};
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ success: false, error: "Please provide an array of coupon IDs to delete" });
+      }
+
+      let deletedCount = 0;
+      for (const id of ids) {
+        try {
+          await prisma.coupon.delete({ where: { id: String(id) } }).catch(() => null);
+          await db.collection("coupons").doc(String(id)).delete().catch(() => null);
+          deletedCount++;
+        } catch (_) {}
+      }
+
+      res.json({
+        success: true,
+        message: `Successfully deleted ${deletedCount} coupon(s)`,
+        count: deletedCount
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message || "Failed to bulk delete coupons" });
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/admin/sales-report — Sales Report with Shade / Variant Name & Notes
+// ─────────────────────────────────────────────────────────────────────────────
+router.get(
+  ["/sales-report", "/api/admin/sales-report"],
+  authenticateJWT as any,
+  requireRole(["SuperAdmin", "Manager", "Salesman", "Admin"]) as any,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const items = await prisma.orderItem.findMany({
+        include: {
+          order: true,
+          variant: {
+            include: {
+              product: {
+                select: { id: true, name: true, sku: true, note: true }
+              }
+            }
+          }
+        },
+        orderBy: {
+          id: "desc"
+        }
+      });
+
+      let totalRevenue = 0;
+      let totalUnits = 0;
+
+      const report = items.map((item) => {
+        const shadeName = item.variant?.name || item.variantName || "-";
+        const shadeColor = item.variant?.shadeColor || null;
+        const itemNote = item.note || "-";
+        const orderNote = item.order?.notes || "-";
+        const inventoryNote = item.variant?.product?.note || "-";
+
+        totalRevenue += item.total || 0;
+        totalUnits += item.quantity || 0;
+
+        return {
+          id: item.id,
+          orderId: item.orderId,
+          orderNumber: item.order?.orderNumber || `ORD-${item.orderId.slice(0, 8)}`,
+          date: item.order?.createdAt || new Date(),
+          customerName: item.order?.customerName || "-",
+          customerPhone: item.order?.customerPhone || "-",
+          productName: item.productName || item.variant?.product?.name || "-",
+          variantName: shadeName,
+          shadeName: shadeName,
+          shadeColor: shadeColor,
+          quantity: item.quantity,
+          price: item.price,
+          total: item.total,
+          paymentMethod: item.order?.paymentMethod || "COD",
+          paymentStatus: item.order?.paymentStatus || "Pending",
+          orderStatus: item.order?.orderStatus || "Pending",
+          itemNote: itemNote,
+          orderNote: orderNote,
+          inventoryNote: inventoryNote,
+          note: [itemNote !== "-" ? itemNote : null, inventoryNote !== "-" ? `Inv: ${inventoryNote}` : null].filter(Boolean).join(" | ") || orderNote
+        };
+      });
+
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.json({
+        success: true,
+        report,
+        summary: {
+          totalRevenue,
+          totalUnits,
+          totalOrders: new Set(items.map((i) => i.orderId)).size,
+          itemCount: report.length
+        }
+      });
+    } catch (err: any) {
+      console.error("Sales report error:", err);
+      res.status(500).json({ success: false, error: err.message || "Failed to generate sales report" });
+    }
+  }
+);
 
 export default router;
 

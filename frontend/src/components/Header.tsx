@@ -95,25 +95,47 @@ const DEFAULT_MOBILE_CATEGORIES = [
   {
     id: "cat-makeup",
     name: "Makeup",
+    emoji: "💄",
     slug: "makeup",
     subCategories: [
       { id: "sub-mu-1", name: "Face Primer" },
       { id: "sub-mu-2", name: "Foundation" },
       { id: "sub-mu-3", name: "Concealer" },
       { id: "sub-mu-4", name: "Compact Powder" },
-      { id: "sub-mu-5", name: "Lipstick" },
-      { id: "sub-mu-6", name: "Liquid Lipstick" },
-      { id: "sub-mu-7", name: "Lip Balm" },
-      { id: "sub-mu-8", name: "Kajal & Eyeliner" },
-      { id: "sub-mu-9", name: "Mascara" },
-      { id: "sub-mu-10", name: "Eye Shadow" },
-      { id: "sub-mu-11", name: "Nail Polish" },
-      { id: "sub-mu-12", name: "Makeup Remover" },
+      { id: "sub-mu-5", name: "Loose Powder & Contour" },
+      { id: "sub-mu-6", name: "Blush & Highlighter" },
+      { id: "sub-mu-7", name: "Lipstick" },
+      { id: "sub-mu-8", name: "Liquid Lipstick" },
+      { id: "sub-mu-9", name: "Lip Balm & Gloss" },
+      { id: "sub-mu-10", name: "Kajal & Eyeliner" },
+      { id: "sub-mu-11", name: "Mascara" },
+      { id: "sub-mu-12", name: "Eye Shadow" },
+      { id: "sub-mu-13", name: "Setting Spray & Fixer" },
+      { id: "sub-mu-14", name: "Nail Polish" },
+      { id: "sub-mu-15", name: "Makeup Remover" }
+    ]
+  },
+  {
+    id: "cat-kbeauty",
+    name: "K-Beauty (Korean Beauty)",
+    emoji: "🌸",
+    slug: "k-beauty",
+    subCategories: [
+      { id: "sub-kb-1", name: "Korean Cleansers & Foams" },
+      { id: "sub-kb-2", name: "Korean Toners & Mists" },
+      { id: "sub-kb-3", name: "Essence & Ampoules" },
+      { id: "sub-kb-4", name: "Snail Mucin Care" },
+      { id: "sub-kb-5", name: "Ginseng & Centella Care" },
+      { id: "sub-kb-6", name: "Korean Sheet Masks" },
+      { id: "sub-kb-7", name: "Glass Skin Serums" },
+      { id: "sub-kb-8", name: "Korean Sunscreens (Sun Gel)" },
+      { id: "sub-kb-9", name: "Korean Lip Tints" }
     ]
   },
   {
     id: "cat-skin",
     name: "Skin Care",
+    emoji: "✨",
     slug: "skincare",
     subCategories: [
       { id: "sub-sk-1", name: "Face Wash" },
@@ -125,76 +147,106 @@ const DEFAULT_MOBILE_CATEGORIES = [
       { id: "sub-sk-7", name: "Body Lotion" },
       { id: "sub-sk-8", name: "Sheet Mask" },
       { id: "sub-sk-9", name: "Acne Treatment" },
-      { id: "sub-sk-10", name: "Eye Cream" },
+      { id: "sub-sk-10", name: "Eye Cream & Patches" },
+      { id: "sub-sk-11", name: "Moisturizer & Gel" },
+      { id: "sub-sk-12", name: "Facial Scrub & Exfoliator" },
+      { id: "sub-sk-13", name: "Lip Care & Sleeping Mask" }
     ]
   },
   {
     id: "cat-hair",
     name: "Hair Care",
+    emoji: "💇",
     slug: "haircare",
     subCategories: [
       { id: "sub-hr-1", name: "Shampoo" },
       { id: "sub-hr-2", name: "Conditioner" },
       { id: "sub-hr-3", name: "Hair Oil" },
       { id: "sub-hr-4", name: "Hair Serum" },
-      { id: "sub-hr-5", name: "Hair Mask" },
+      { id: "sub-hr-5", name: "Hair Mask & Spa" },
       { id: "sub-hr-6", name: "Hair Fall Defense" },
-      { id: "sub-hr-7", name: "Dandruff Care" },
-    ]
-  },
-  {
-    id: "cat-personal",
-    name: "Personal Care",
-    slug: "personal-care",
-    subCategories: [
-      { id: "sub-pc-1", name: "Body Wash" },
-      { id: "sub-pc-2", name: "Shower Gel" },
-      { id: "sub-pc-3", name: "Deodorant & Roll-on" },
-      { id: "sub-pc-4", name: "Body Mist" },
-      { id: "sub-pc-5", name: "Hand & Foot Care" },
-      { id: "sub-pc-6", name: "Feminine Hygiene" },
-      { id: "sub-pc-7", name: "Oral Care" },
+      { id: "sub-hr-7", name: "Dandruff Solution" },
+      { id: "sub-hr-8", name: "Hair Color & Dye" }
     ]
   },
   {
     id: "cat-mom-baby",
     name: "Mom & Baby",
+    emoji: "👶",
     slug: "mom-baby",
     subCategories: [
-      { id: "sub-mb-1", name: "Baby Lotion" },
+      { id: "sub-mb-1", name: "Baby Lotion & Cream" },
       { id: "sub-mb-2", name: "Baby Wash & Shampoo" },
       { id: "sub-mb-3", name: "Baby Oil" },
       { id: "sub-mb-4", name: "Baby Powder" },
-      { id: "sub-mb-5", name: "Diapers & Wipes" },
+      { id: "sub-mb-5", name: "Diapers & Wet Wipes" },
       { id: "sub-mb-6", name: "Stretch Mark Cream" },
+      { id: "sub-mb-7", name: "Baby Rash Care" }
     ]
   },
   {
     id: "cat-fragrance",
     name: "Fragrance",
+    emoji: "🌺",
     slug: "fragrance",
     subCategories: [
-      { id: "sub-fr-1", name: "Womens Perfume" },
+      { id: "sub-fr-1", name: "Womens Perfume (EDP/EDT)" },
       { id: "sub-fr-2", name: "Mens Cologne" },
-      { id: "sub-fr-3", name: "Body Mist" },
+      { id: "sub-fr-3", name: "Body Mist & Splash" },
       { id: "sub-fr-4", name: "Attar & Oud" },
       { id: "sub-fr-5", name: "Perfume Gift Sets" },
+      { id: "sub-fr-6", name: "Pocket Perfume" }
     ]
   },
   {
     id: "cat-undergarments",
     name: "Undergarments",
+    emoji: "👗",
     slug: "undergarments",
     subCategories: [
       { id: "sub-ug-1", name: "Bras" },
       { id: "sub-ug-2", name: "Panties" },
       { id: "sub-ug-3", name: "Shapewear" },
-      { id: "sub-ug-4", name: "Nightwear" },
+      { id: "sub-ug-4", name: "Nightwear & Loungewear" },
+      { id: "sub-ug-5", name: "Sports Bras" },
+      { id: "sub-ug-6", name: "Lingerie Sets" }
+    ]
+  },
+  {
+    id: "cat-accessories",
+    name: "Accessories & Tools",
+    emoji: "🎀",
+    slug: "accessories",
+    subCategories: [
+      { id: "sub-ac-1", name: "Makeup Brushes & Kits" },
+      { id: "sub-ac-2", name: "Beauty Blenders & Sponges" },
+      { id: "sub-ac-3", name: "Eyelash Curlers & Tweezers" },
+      { id: "sub-ac-4", name: "Hair Styling Tools & Combs" },
+      { id: "sub-ac-5", name: "Trimmers & Epilators" },
+      { id: "sub-ac-6", name: "Cosmetic Bags & Organizers" },
+      { id: "sub-ac-7", name: "Mirrors & Vanity Lights" }
+    ]
+  },
+  {
+    id: "cat-personal",
+    name: "Personal Care",
+    emoji: "🧴",
+    slug: "personal-care",
+    subCategories: [
+      { id: "sub-pc-1", name: "Body Wash" },
+      { id: "sub-pc-2", name: "Shower Gel" },
+      { id: "sub-pc-3", name: "Deodorant & Roll-on" },
+      { id: "sub-pc-4", name: "Body Scrub" },
+      { id: "sub-pc-5", name: "Hand & Foot Cream" },
+      { id: "sub-pc-6", name: "Feminine Hygiene & Pads" },
+      { id: "sub-pc-7", name: "Oral Care & Toothpaste" },
+      { id: "sub-pc-8", name: "Hair Removal & Razors" }
     ]
   },
   {
     id: "cat-combo",
     name: "Combo Deals",
+    emoji: "📦",
     slug: "combo",
     subCategories: [
       { id: "sub-cb-1", name: "Skin Combos" },
@@ -202,41 +254,95 @@ const DEFAULT_MOBILE_CATEGORIES = [
       { id: "sub-cb-3", name: "Hair Combos" },
       { id: "sub-cb-4", name: "Acne Clearance Combo" },
       { id: "sub-cb-5", name: "Brightening Kit" },
-    ]
-  },
-  {
-    id: "cat-clearance",
-    name: "Clearance Sale",
-    slug: "clearance-sale",
-    subCategories: [
-      { id: "sub-cs-1", name: "Makeup Deals" },
-      { id: "sub-cs-2", name: "Skincare Deals" },
-      { id: "sub-cs-3", name: "Haircare Deals" },
-      { id: "sub-cs-4", name: "Hot Deals" },
+      { id: "sub-cb-6", name: "Winter Care Combos" }
     ]
   },
   {
     id: "cat-bogo",
     name: "Buy 1 Get 1 (BOGO)",
+    emoji: "🎁",
     slug: "bogo",
     subCategories: [
       { id: "sub-bg-1", name: "BOGO Cosmetics" },
       { id: "sub-bg-2", name: "BOGO Skincare" },
-      { id: "sub-bg-3", name: "BOGO Haircare" },
+      { id: "sub-bg-3", name: "BOGO Haircare" }
+    ]
+  },
+  {
+    id: "cat-clearance",
+    name: "Clearance Sale",
+    emoji: "🏷️",
+    slug: "clearance-sale",
+    subCategories: [
+      { id: "sub-cs-1", name: "Makeup Deals" },
+      { id: "sub-cs-2", name: "Skincare Deals" },
+      { id: "sub-cs-3", name: "Haircare Deals" },
+      { id: "sub-cs-4", name: "Hot Clearance Deals" }
     ]
   },
   {
     id: "cat-men",
     name: "Men's Care",
+    emoji: "🧔",
     slug: "men",
     subCategories: [
       { id: "sub-mn-1", name: "Mens Face Wash" },
-      { id: "sub-mn-2", name: "Beard Oil & Shaving" },
+      { id: "sub-mn-2", name: "Beard Oil & Shaving Cream" },
       { id: "sub-mn-3", name: "Mens Hair Care" },
-      { id: "sub-mn-4", name: "Mens Deodorants & Cologne" },
+      { id: "sub-mn-4", name: "Mens Deodorants & Cologne" }
+    ]
+  },
+  {
+    id: "cat-concern",
+    name: "Shop By Concern",
+    emoji: "🩺",
+    slug: "concern",
+    subCategories: [
+      { id: "sub-cn-1", name: "Acne Treatment" },
+      { id: "sub-cn-2", name: "Anti Aging" },
+      { id: "sub-cn-3", name: "Dandruff Solution" },
+      { id: "sub-cn-4", name: "Dry Skin Care" },
+      { id: "sub-cn-5", name: "Hair Fall Defense" },
+      { id: "sub-cn-6", name: "Oil Control" },
+      { id: "sub-cn-7", name: "Pore Care" },
+      { id: "sub-cn-8", name: "Spot Treatment" },
+      { id: "sub-cn-9", name: "Hair Thinning" },
+      { id: "sub-cn-10", name: "Sun Burn Recovery" }
     ]
   }
 ];
+
+function mergeCategoriesWithMaster(dbList: any[] = []): any[] {
+  const map = new Map<string, any>();
+  DEFAULT_MOBILE_CATEGORIES.forEach((cat) => {
+    const key = (cat.slug || cat.name).toLowerCase().trim();
+    map.set(key, { ...cat });
+  });
+  if (Array.isArray(dbList) && dbList.length > 0) {
+    dbList.forEach((dbCat: any) => {
+      if (!dbCat || !dbCat.name) return;
+      const key = (dbCat.slug || dbCat.name).toLowerCase().trim();
+      if (map.has(key)) {
+        const existing = map.get(key);
+        map.set(key, {
+          ...existing,
+          ...dbCat,
+          emoji: existing.emoji || dbCat.emoji || "🛍️",
+          subCategories: (Array.isArray(dbCat.subCategories) && dbCat.subCategories.length > 0)
+            ? dbCat.subCategories
+            : existing.subCategories
+        });
+      } else {
+        map.set(key, {
+          ...dbCat,
+          emoji: dbCat.emoji || "🛍️",
+          subCategories: dbCat.subCategories || dbCat.subs || []
+        });
+      }
+    });
+  }
+  return Array.from(map.values());
+}
 
 export default function Header() {
   const { cart, wishlist, cartOpen, setCartOpen, updateCartQuantity, removeFromCart, user, logout, trackingSettings } = useApp();
@@ -247,6 +353,8 @@ export default function Header() {
   const [dbBrands, setDbBrands] = useState<any[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [expandedBrands, setExpandedBrands] = useState(false);
+  const [mobileCategorySearch, setMobileCategorySearch] = useState("");
 
   useEffect(() => {
     const handleOpenMobileCategories = () => {
@@ -261,23 +369,27 @@ export default function Header() {
   useEffect(() => {
     let mounted = true;
     const loadData = (bypass = false) => {
-      fetchWithCache(`${API_BASE}/brands`, bypass).then((data) => {
-        if (mounted && Array.isArray(data)) {
-          setDbBrands(data);
+      fetchWithCache(`${API_BASE}/brands`, bypass).then((res) => {
+        if (!mounted) return;
+        const list = Array.isArray(res)
+          ? res
+          : (Array.isArray(res?.data) ? res.data : (Array.isArray(res?.brands) ? res.brands : []));
+        if (list && list.length > 0) {
+          setDbBrands(list);
         }
       }).catch(() => {});
 
-      fetchWithCache(`${API_BASE}/categories?t=${Date.now()}`, true).then((res) => {
+      fetchWithCache(`${API_BASE}/categories`, bypass).then((res) => {
         if (!mounted) return;
         const list = Array.isArray(res)
           ? res
           : (Array.isArray(res?.categories)
               ? res.categories
               : (Array.isArray(res?.data) ? res.data : null));
-        if (list && list.length > 0) {
-          setDbCategories(list);
-        }
-      }).catch(() => {});
+        setDbCategories(mergeCategoriesWithMaster(list || []));
+      }).catch(() => {
+        if (mounted) setDbCategories(mergeCategoriesWithMaster([]));
+      });
     };
 
     loadData(false);
@@ -442,75 +554,218 @@ export default function Header() {
             </div>
 
             <div className="mobile-drawer-body">
-              <div className="mobile-menu-section-title">ALL CATEGORIES</div>
+              {/* Category Search & Counter Header */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                <div className="mobile-menu-section-title" style={{ margin: 0 }}>ALL CATEGORIES</div>
+                <span style={{ fontSize: "11px", backgroundColor: "#fdf2f8", color: "#be185d", fontWeight: "800", padding: "2px 8px", borderRadius: "12px", border: "1px solid #fbcfe8" }}>
+                  {dbCategories.length} Categories
+                </span>
+              </div>
 
-              {/* Dynamic Categories from Database & Pre-loaded Fallback */}
-              {dbCategories.map((cat: any) => {
-                const catSlug = cat.slug || cat.name.toLowerCase().replace(/\s+/g, '-');
-                const catKey = cat.id || catSlug || cat.name;
-                const subs = (Array.isArray(cat.subCategories) && cat.subCategories.length > 0)
-                  ? cat.subCategories
-                  : (Array.isArray(cat.subs) ? cat.subs : []);
-                
-                if (subs.length > 0) {
-                  const isExp = expandedCategory === catKey;
+              {/* Quick Category Search Filter */}
+              <div style={{ marginBottom: "14px" }}>
+                <input
+                  type="text"
+                  placeholder="🔍 Quick search categories..."
+                  value={mobileCategorySearch}
+                  onChange={(e) => setMobileCategorySearch(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "9px 12px",
+                    borderRadius: "8px",
+                    border: "1px solid #e2e8f0",
+                    fontSize: "12.5px",
+                    backgroundColor: "#f8fafc",
+                    outline: "none",
+                    boxShadow: "inset 0 1px 2px rgba(0,0,0,0.03)"
+                  }}
+                />
+              </div>
+
+              {/* Dynamic Categories from Master List & Database */}
+              {(() => {
+                const q = mobileCategorySearch.toLowerCase().trim();
+                const filtered = dbCategories.filter((cat: any) => {
+                  if (!q) return true;
+                  const nameMatch = (cat.name || "").toLowerCase().includes(q);
+                  const subs = (Array.isArray(cat.subCategories) ? cat.subCategories : (Array.isArray(cat.subs) ? cat.subs : []));
+                  const subMatch = subs.some((s: any) => (typeof s === "string" ? s : (s.name || "")).toLowerCase().includes(q));
+                  return nameMatch || subMatch;
+                });
+
+                if (filtered.length === 0) {
                   return (
-                    <div className="mobile-menu-item" key={catKey}>
-                      <div 
-                        className="mobile-menu-row" 
-                        onClick={() => setExpandedCategory(isExp ? null : catKey)}
-                        style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
-                      >
-                        <span style={{ fontWeight: "700" }}>{cat.name}</span>
-                        <span style={{ fontSize: "11px", color: "#64748b" }}>{isExp ? "▲" : "▼"}</span>
-                      </div>
-                      {isExp && (
-                        <div className="mobile-sub-menu">
-                          <Link 
-                            href={`/shop?category=${encodeURIComponent(catSlug)}`} 
-                            onClick={() => setMobileMenuOpen(false)}
-                            style={{ fontWeight: "700", color: "#e52860" }}
-                          >
-                            All {cat.name} ➔
-                          </Link>
-                          {subs.map((sub: any) => {
-                            const subName = typeof sub === "string" ? sub : (sub.name || "");
-                            const subId = typeof sub === "string" ? sub : (sub.id || sub.name);
-                            return (
-                              <Link 
-                                key={subId} 
-                                href={`/shop?category=${encodeURIComponent(catSlug)}&sub=${encodeURIComponent(subName)}`} 
-                                onClick={() => setMobileMenuOpen(false)}
-                              >
-                                {subName}
-                              </Link>
-                            );
-                          })}
-                        </div>
-                      )}
+                    <div style={{ padding: "16px", textAlign: "center", color: "#94a3b8", fontSize: "12px" }}>
+                      No categories found for "{mobileCategorySearch}"
                     </div>
                   );
                 }
-                return (
-                  <Link 
-                    key={catKey} 
-                    href={`/shop?category=${encodeURIComponent(catSlug)}`} 
-                    className="mobile-menu-row-single" 
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <span>{cat.name}</span>
-                  </Link>
-                );
-              })}
 
-              {/* 9. Brands */}
-              <Link href="/brands" className="mobile-menu-row-single" onClick={() => setMobileMenuOpen(false)}>
-                <span>🏷️ Authentic Brands ({dbBrands.length})</span>
-              </Link>
+                return filtered.map((cat: any) => {
+                  const catSlug = cat.slug || cat.name.toLowerCase().replace(/\s+/g, '-');
+                  const catKey = cat.id || catSlug || cat.name;
+                  const subs = (Array.isArray(cat.subCategories) && cat.subCategories.length > 0)
+                    ? cat.subCategories
+                    : (Array.isArray(cat.subs) ? cat.subs : []);
+                  const catEmoji = cat.emoji || (
+                    cat.slug?.includes("makeup") ? "💄" :
+                    cat.slug?.includes("k-beauty") ? "🌸" :
+                    cat.slug?.includes("skin") ? "✨" :
+                    cat.slug?.includes("hair") ? "💇" :
+                    cat.slug?.includes("mom") ? "👶" :
+                    cat.slug?.includes("fragrance") ? "🌺" :
+                    cat.slug?.includes("undergarment") ? "👗" :
+                    cat.slug?.includes("access") ? "🎀" :
+                    cat.slug?.includes("personal") ? "🧴" :
+                    cat.slug?.includes("combo") ? "📦" :
+                    cat.slug?.includes("bogo") ? "🎁" :
+                    cat.slug?.includes("clearance") ? "🏷️" :
+                    cat.slug?.includes("men") ? "🧔" :
+                    cat.slug?.includes("concern") ? "🩺" : "🛍️"
+                  );
 
-              {/* 10. Beauty Magazine */}
+                  if (subs.length > 0) {
+                    const isExp = expandedCategory === catKey || q.length > 0;
+                    return (
+                      <div className="mobile-menu-item" key={catKey}>
+                        <div 
+                          className="mobile-menu-row" 
+                          onClick={() => setExpandedCategory(isExp && !q ? null : catKey)}
+                          style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px" }}
+                        >
+                          <span style={{ fontWeight: "700", display: "flex", alignItems: "center", gap: "8px", fontSize: "13.5px" }}>
+                            <span>{catEmoji}</span>
+                            <span>{cat.name}</span>
+                          </span>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span style={{ fontSize: "10px", color: "#94a3b8", fontWeight: "700", backgroundColor: "#f1f5f9", padding: "1px 6px", borderRadius: "10px" }}>
+                              {subs.length}
+                            </span>
+                            <span style={{ fontSize: "11px", color: "#64748b" }}>{isExp ? "▲" : "▼"}</span>
+                          </div>
+                        </div>
+                        {isExp && (
+                          <div className="mobile-sub-menu" style={{ backgroundColor: "#fdf8fb", borderLeft: "3px solid #e63b7a" }}>
+                            <Link 
+                              href={catSlug === "combo" ? "/combos" : catSlug === "bogo" ? "/shop?deal=bogo" : `/shop?category=${encodeURIComponent(catSlug)}`} 
+                              onClick={() => setMobileMenuOpen(false)}
+                              style={{ fontWeight: "800", color: "#e63b7a", display: "flex", alignItems: "center", gap: "4px" }}
+                            >
+                              <span>All {cat.name}</span>
+                              <span>➔</span>
+                            </Link>
+                            {subs.map((sub: any) => {
+                              const subName = typeof sub === "string" ? sub : (sub.name || "");
+                              const subId = typeof sub === "string" ? sub : (sub.id || sub.name);
+                              const subLink = catSlug === "concern"
+                                ? `/shop?category=skincare&sub=${encodeURIComponent(subName)}`
+                                : `/shop?category=${encodeURIComponent(catSlug)}&sub=${encodeURIComponent(subName)}`;
+                              return (
+                                <Link 
+                                  key={subId} 
+                                  href={subLink} 
+                                  onClick={() => setMobileMenuOpen(false)}
+                                >
+                                  {subName}
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  return (
+                    <Link 
+                      key={catKey} 
+                      href={`/shop?category=${encodeURIComponent(catSlug)}`} 
+                      className="mobile-menu-row-single" 
+                      onClick={() => setMobileMenuOpen(false)}
+                      style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                    >
+                      <span>{catEmoji}</span>
+                      <span>{cat.name}</span>
+                    </Link>
+                  );
+                });
+              })()}
+
+              {/* Expandable Brands Section in Mobile Drawer */}
+              <div className="mobile-menu-item">
+                <div 
+                  className="mobile-menu-row" 
+                  onClick={() => setExpandedBrands(!expandedBrands)}
+                  style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px" }}
+                >
+                  <span style={{ fontWeight: "700", display: "flex", alignItems: "center", gap: "8px", fontSize: "13.5px" }}>
+                    <span>🏷️</span>
+                    <span>Top Authentic Brands</span>
+                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ fontSize: "10px", color: "#94a3b8", fontWeight: "700", backgroundColor: "#f1f5f9", padding: "1px 6px", borderRadius: "10px" }}>
+                      {dbBrands.length > 0 ? dbBrands.length : "30+"}
+                    </span>
+                    <span style={{ fontSize: "11px", color: "#64748b" }}>{expandedBrands ? "▲" : "▼"}</span>
+                  </div>
+                </div>
+
+                {expandedBrands && (
+                  <div className="mobile-sub-menu" style={{ backgroundColor: "#fdf8fb", borderLeft: "3px solid #e63b7a", padding: "10px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", paddingBottom: "6px", borderBottom: "1px solid #fce7f3" }}>
+                      <span style={{ fontSize: "11px", fontWeight: "800", color: "#9d174d", textTransform: "uppercase" }}>Featured Brands</span>
+                      <Link 
+                        href="/brands" 
+                        onClick={() => setMobileMenuOpen(false)}
+                        style={{ fontSize: "11px", fontWeight: "800", color: "#e63b7a", textDecoration: "none" }}
+                      >
+                        View All Brands ({dbBrands.length}) ➔
+                      </Link>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+                      {dbBrands.map((b: any) => (
+                        <Link
+                          key={b.id || b.name}
+                          href={`/shop?brand=${encodeURIComponent(b.name)}`}
+                          onClick={() => setMobileMenuOpen(false)}
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            padding: "8px 4px",
+                            backgroundColor: "#ffffff",
+                            border: "1px solid #f1f5f9",
+                            borderRadius: "8px",
+                            textDecoration: "none",
+                            color: "#1e293b",
+                            textAlign: "center"
+                          }}
+                        >
+                          {b.logoUrl && (
+                            <img
+                              src={b.logoUrl}
+                              alt={b.name}
+                              style={{ width: "32px", height: "32px", objectFit: "contain", marginBottom: "4px" }}
+                              onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                            />
+                          )}
+                          <span style={{ fontSize: "10.5px", fontWeight: "700", lineHeight: "1.2", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>
+                            {b.name}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Beauty Magazine */}
               <Link href="/magazine" className="mobile-menu-row-single" onClick={() => setMobileMenuOpen(false)} style={{ background: "linear-gradient(135deg, #fff0f6, #fce7f3)", borderLeft: "3px solid #e63b7a", fontWeight: "800", color: "#e63b7a", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span>📖 Beauty Magazine (৫০ পাতা)</span>
+                <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span>📖</span>
+                  <span>Beauty Magazine (৫০ পাতা)</span>
+                </span>
                 <span style={{ fontSize: "9px", background: "#e63b7a", color: "#fff", padding: "2px 7px", borderRadius: "10px", fontWeight: "900" }}>NEW</span>
               </Link>
 
