@@ -38,18 +38,7 @@ export default function Home() {
   const [categories, setCategories] = useState<any[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [dynamicSlides, setDynamicSlides] = useState<any[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = localStorage.getItem("gg_synced_dynamic_slides");
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        }
-      } catch (e) {}
-    }
-    return [];
-  });
+  const [dynamicSlides, setDynamicSlides] = useState<any[]>([]);
   const [homepageBanners, setHomepageBanners] = useState<any[]>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -1685,103 +1674,6 @@ export default function Home() {
                         </Link>
                         <span style={{ backgroundColor: "#e2136e", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
                           HAIR CARE
-                        </span>
-                        <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                          {hasDiscount && (
-                            <span className="old-price" style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "line-through", fontWeight: "600" }}>
-                              ৳{oldPrice.toFixed(2)}
-                            </span>
-                          )}
-                          <span className="price" style={{ fontSize: "16px", fontWeight: "800", color: "#e2136e" }}>
-                            ৳{currentPrice.toFixed(2)}
-                          </span>
-                        </div>
-                        <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
-                          ★ ★ ★ ★ ★
-                        </div>
-                        {sizeLabel && (
-                          <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
-                            {sizeLabel}
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        className="add-to-cart-btn"
-                        onClick={() => handleAddToCart(p)}
-                        disabled={addingToCartId === p.id}
-                        style={{
-                          backgroundColor: addingToCartId === p.id ? "#059669" : "#e63b7a",
-                          color: "#ffffff",
-                          border: "none",
-                          padding: "12px",
-                          fontWeight: "800",
-                          fontSize: "13px",
-                          letterSpacing: "0.5px",
-                          cursor: addingToCartId === p.id ? "default" : "pointer",
-                          width: "100%",
-                          borderRadius: "0 0 12px 12px",
-                          transition: "all 0.2s ease"
-                        }}
-                      >
-                        {addingToCartId === p.id ? "✓ ADDED!" : "ADD TO BAG"}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })()}
-        
-        {/* JUST ARRIVED / NEW ARRIVALS Section */}
-        {(() => {
-          const sorted = [...products].sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-          const newArrivals = sorted.slice(0, 4);
-          if (newArrivals.length === 0) return null;
-
-          return (
-            <section style={{ margin: "40px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
-              <div style={{ position: "relative", marginBottom: "20px" }}>
-                <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", color: "#000", margin: 0 }}>
-                  JUST ARRIVED / NEW ARRIVALS
-                </h2>
-                <Link href="/shop?sort=newest" style={{ position: "absolute", right: "0", top: "50%", transform: "translateY(-50%)", backgroundColor: "#e2136e", color: "#ffffff", padding: "6px 14px", borderRadius: "20px", fontSize: "11.5px", fontWeight: "800", textDecoration: "none", boxShadow: "0 2px 8px rgba(226,19,110,0.25)" }}>
-                  SEE ALL ›
-                </Link>
-              </div>
-
-              <div className="homepage-product-grid mobile-limit-2">
-                {newArrivals.map((p) => {
-                  const primaryImage = getProductImage(p);
-                  const primaryVariant = p.variants?.[0];
-                  const oldPrice = primaryVariant?.price || 0;
-                  const currentPrice = primaryVariant?.discountPrice || primaryVariant?.price || 0;
-                  const hasDiscount = Boolean(primaryVariant?.discountPrice && primaryVariant.discountPrice < primaryVariant.price);
-                  const discountPercent = hasDiscount && oldPrice > 0 ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100) : 0;
-                  const sizeLabel = (primaryVariant as any)?.size || (primaryVariant?.name && !primaryVariant.name.toLowerCase().includes("default") ? primaryVariant.name : "");
-
-                  return (
-                    <div key={p.id} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
-                      {hasDiscount && discountPercent > 0 && (
-                        <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
-                          {discountPercent}% OFF
-                        </div>
-                      )}
-
-                      <div className={`wishlist-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)}>
-                        <svg fill={wishlist.includes(p.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-                        </svg>
-                      </div>
-                      <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <img src={primaryImage} alt={p.name} loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).src = FALLBACK_PRODUCT_IMG; }} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
-                      </Link>
-                      <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
-                        <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                          {p.name}
-                        </Link>
-                        <span style={{ backgroundColor: "#10b981", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
-                          JUST ARRIVED
                         </span>
                         <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
                           {hasDiscount && (

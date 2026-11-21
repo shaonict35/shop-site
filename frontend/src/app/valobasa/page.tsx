@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useApp } from "../../context/AppContext";
-import { clearAllCache, triggerGlobalDataSync, API_BASE, fetchWithCache } from "../../utils/api";
+import { clearAllCache, triggerGlobalDataSync, API_BASE, fetchWithCache, safeImageUrl } from "../../utils/api";
 
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import SocketIoPromoBroadcaster from "../../components/SocketIoPromoBroadcaster";
@@ -5817,24 +5817,24 @@ export default function ValobasaAdminPanel() {
               {/* ═══════════ CATEGORY & CONCERN QUICK UPLOAD & LINK MANAGER SECTION ═══════════ */}
               {(() => {
                 const CARD_SLOTS = [
-                  { id: "Category: Makeup", label: "Makeup", emoji: "💄", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=makeup" },
-                  { id: "Category: Skin", label: "Skin Care", emoji: "🌸", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=skincare" },
-                  { id: "Category: Hair", label: "Hair Care", emoji: "💇", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=haircare" },
-                  { id: "Category: Personal Care", label: "Personal Care", emoji: "🧾", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=personal-care" },
-                  { id: "Category: Mom & Baby", label: "Mom & Baby", emoji: "👶", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=mom-baby" },
-                  { id: "Category: Fragrance", label: "Fragrance", emoji: "🌺", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=fragrance" },
-                  { id: "Category: Undergarments", label: "Undergarments", emoji: "👗", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=undergarments" },
-                  { id: "Category: Combo", label: "Combo", emoji: "📦", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=combo" },
-                  { id: "Concern: Acne", label: "Acne Treatment", emoji: "🌿", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare&sub=Acne%20Treatment" },
-                  { id: "Concern: Anti Aging", label: "Anti Aging", emoji: "✨", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare&sub=Anti%20Aging" },
-                  { id: "Concern: Dandruff", label: "Dandruff", emoji: "💧", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=haircare&sub=Dandruff" },
-                  { id: "Concern: Dry Skin", label: "Dry Skin", emoji: "🧾", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare&sub=Dry%20Skin" },
-                  { id: "Concern: Hair Fall", label: "Hair Fall", emoji: "💇‍♀️", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=haircare&sub=Hair%20Fall" },
-                  { id: "Concern: Oil Control", label: "Oil Control", emoji: "🏃", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare" },
-                  { id: "Concern: Pore Care", label: "Pore Care", emoji: "🧴", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare&sub=Pore%20Care" },
-                  { id: "Concern: Spot Treatment", label: "Spot Treatment", emoji: "🎯", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare" },
-                  { id: "Concern: Hair Thinning", label: "Hair Thinning", emoji: "🌾", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=haircare" },
-                  { id: "Concern: Sun Burn", label: "Sun Burn", emoji: "☀️", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare" },
+                  { id: "cat-makeup", label: "Makeup", emoji: "💄", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=makeup" },
+                  { id: "cat-kbeauty", label: "K-Beauty", emoji: "✨", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=k-beauty" },
+                  { id: "cat-haircare", label: "Hair Care", emoji: "💇", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=haircare" },
+                  { id: "cat-mombaby", label: "Mom & Baby", emoji: "👶", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=mom-baby" },
+                  { id: "cat-skincare", label: "Skin Care", emoji: "🌸", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=skincare" },
+                  { id: "cat-accessories", label: "Accessories", emoji: "👜", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=accessories" },
+                  { id: "cat-undergarments", label: "Undergarments", emoji: "👗", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=undergarments" },
+                  { id: "cat-fragrance", label: "Fragrance", emoji: "🌺", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=fragrance" },
+                  { id: "concern-card-acne", label: "Acne Treatment", emoji: "🌿", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare&sub=Acne%20Treatment" },
+                  { id: "concern-card-anti-aging", label: "Anti Aging", emoji: "✨", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare&sub=Anti%20Aging" },
+                  { id: "concern-card-dandruff", label: "Dandruff", emoji: "💧", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=haircare&sub=Dandruff" },
+                  { id: "concern-card-dry-skin", label: "Dry Skin", emoji: "🧾", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare&sub=Dry%20Skin" },
+                  { id: "concern-card-hair-fall", label: "Hair Fall", emoji: "💇‍♀️", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=haircare&sub=Hair%20Fall" },
+                  { id: "concern-card-oil-control", label: "Oil Control", emoji: "🏃", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare" },
+                  { id: "concern-card-pore-care", label: "Pore Care", emoji: "🧴", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare&sub=Pore%20Care" },
+                  { id: "concern-card-spot-treatment", label: "Spot Treatment", emoji: "🎯", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare" },
+                  { id: "concern-card-hair-thinning", label: "Hair Thinning", emoji: "🌾", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=haircare" },
+                  { id: "concern-card-sun-burn", label: "Sun Burn", emoji: "☀️", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare" },
                 ];
 
                 const handleCardImageUpload = async (slotId: string, slotLabel: string, file: File, defaultSlotLink?: string) => {
@@ -5858,11 +5858,18 @@ export default function ValobasaAdminPanel() {
                       const resized = canvas.toDataURL("image/jpeg", 0.88);
                       // Find existing banner for this slot
                       const slotSlug = slotLabel.toLowerCase().replace(/\s+/g, "-");
+                      const cleanSlotSlug = slotSlug.replace(/[^a-z0-9]/g, "");
+                      const slotIdClean = slotId.toLowerCase().replace(/[^a-z0-9]/g, "");
                       const existing = banners.find((b: any) => {
+                        if (!b) return false;
                         const p = (b.page || "").toLowerCase().trim();
                         const id = (b.id || "").toLowerCase().trim();
                         const s = slotId.toLowerCase().trim();
-                        return p === s || id === s || id === `cat-card-${slotSlug}` || id === `concern-card-${slotSlug}`;
+                        const cleanId = id.replace(/[^a-z0-9]/g, "");
+                        const cleanTitle = (b.title || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+                        return p === s || id === s || cleanId === slotIdClean || cleanId === cleanSlotSlug ||
+                               cleanId.includes(slotIdClean) || slotIdClean.includes(cleanId) ||
+                               cleanTitle.includes(cleanSlotSlug) || cleanSlotSlug.includes(cleanTitle);
                       });
                       const targetLink = (cardLinks[slotId] !== undefined ? cardLinks[slotId] : (existing?.linkUrl || defaultSlotLink || `/shop?category=${encodeURIComponent(slotSlug)}`)).trim();
                       const payload = {
@@ -5884,6 +5891,26 @@ export default function ValobasaAdminPanel() {
                         } else {
                           res = await fetch(`${API_BASE}/banners`, { method: "POST", headers: { "Content-Type": "application/json", ...getAuthHeader() }, body: JSON.stringify(payload) });
                         }
+                        // Also persist to local-banners for instant decoupled sync
+                        try {
+                          await fetch(`/api/local-banners`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              section: slotId.startsWith("cat-") ? "shopByCategory" : "shopByConcern",
+                              banner: {
+                                id: slotId,
+                                title: slotLabel + " Card",
+                                imageUrl: resized,
+                                mobileImageUrl: resized,
+                                tabletImageUrl: resized,
+                                linkUrl: targetLink,
+                                isActive: true
+                              }
+                            })
+                          });
+                        } catch (_) {}
+
                         if (res.ok) {
                           clearAllCache();
                           triggerGlobalDataSync();
@@ -5906,11 +5933,18 @@ export default function ValobasaAdminPanel() {
                   setSavingCardLinkId(slotId);
                   try {
                     const slotSlug = slotLabel.toLowerCase().replace(/\s+/g, "-");
+                    const cleanSlotSlug = slotSlug.replace(/[^a-z0-9]/g, "");
+                    const slotIdClean = slotId.toLowerCase().replace(/[^a-z0-9]/g, "");
                     const existing = banners.find((b: any) => {
+                      if (!b) return false;
                       const p = (b.page || "").toLowerCase().trim();
                       const id = (b.id || "").toLowerCase().trim();
                       const s = slotId.toLowerCase().trim();
-                      return p === s || id === s || id === `cat-card-${slotSlug}` || id === `concern-card-${slotSlug}`;
+                      const cleanId = id.replace(/[^a-z0-9]/g, "");
+                      const cleanTitle = (b.title || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+                      return p === s || id === s || cleanId === slotIdClean || cleanId === cleanSlotSlug ||
+                             cleanId.includes(slotIdClean) || slotIdClean.includes(cleanId) ||
+                             cleanTitle.includes(cleanSlotSlug) || cleanSlotSlug.includes(cleanTitle);
                     });
 
                     let res;
@@ -5932,7 +5966,7 @@ export default function ValobasaAdminPanel() {
                         });
                       }
                     } else {
-                      const targetId = slotId.startsWith("Category:") ? `cat-card-${slotSlug}` : `concern-card-${slotSlug}`;
+                      const targetId = slotId;
                       const payload = {
                         id: targetId,
                         title: slotLabel + " Card",
@@ -5981,19 +6015,26 @@ export default function ValobasaAdminPanel() {
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(195px, 1fr))", gap: "16px" }}>
                           {CARD_SLOTS.filter(s => s.section === sec).map(slot => {
                             const slotSlug = slot.label.toLowerCase().replace(/\s+/g, "-");
+                            const cleanSlotSlug = slotSlug.replace(/[^a-z0-9]/g, "");
+                            const slotIdClean = slot.id.toLowerCase().replace(/[^a-z0-9]/g, "");
                             const existing = banners.find((b: any) => {
+                              if (!b) return false;
                               const p = (b.page || "").toLowerCase().trim();
                               const id = (b.id || "").toLowerCase().trim();
                               const s = slot.id.toLowerCase().trim();
-                              return p === s || id === s || id === `cat-card-${slotSlug}` || id === `concern-card-${slotSlug}`;
+                              const cleanId = id.replace(/[^a-z0-9]/g, "");
+                              const cleanTitle = (b.title || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+                              return p === s || id === s || cleanId === slotIdClean || cleanId === cleanSlotSlug ||
+                                     cleanId.includes(slotIdClean) || slotIdClean.includes(cleanId) ||
+                                     cleanTitle.includes(cleanSlotSlug) || cleanSlotSlug.includes(cleanTitle);
                             });
-                            const currentImg = existing?.imageUrl;
+                            const currentImg = existing?.imageUrl ? safeImageUrl(existing.imageUrl) : "";
                             const currentLink = cardLinks[slot.id] !== undefined ? cardLinks[slot.id] : (existing?.linkUrl || slot.defaultLink);
 
                             return (
                               <div key={slot.id} style={{ border: `1.5px solid ${currentImg ? "#a78bfa" : "#cbd5e1"}`, borderRadius: "10px", overflow: "hidden", backgroundColor: "#ffffff", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", display: "flex", flexDirection: "column" }}>
                                 {/* Image Preview */}
-                                <div style={{ height: "115px", background: currentImg ? `url(${currentImg}) center/cover` : "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", borderBottom: "1px solid #f1f5f9" }}>
+                                <div style={{ height: "115px", background: currentImg ? `url("${currentImg}") center/cover no-repeat` : "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", borderBottom: "1px solid #f1f5f9" }}>
                                   {!currentImg && (
                                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", color: "#94a3b8" }}>
                                       <span style={{ fontSize: "32px", marginBottom: "2px" }}>{slot.emoji}</span>
@@ -6131,24 +6172,25 @@ export default function ValobasaAdminPanel() {
                     const filteredList = uniqueBanners.filter((b: any) => {
                       const p = (b.page || "").toLowerCase();
                       const t = (b.title || "").toLowerCase();
+                      const id = (b.id || "").toLowerCase();
                       if (bannerCategoryFilter === "All") return true;
                       if (bannerCategoryFilter === "Hero Slides") {
-                        return p.includes("hero") || t.includes("hero") || p.includes("slide");
+                        return p.includes("hero") || t.includes("hero") || p.includes("slide") || id.includes("hero");
                       }
                       if (bannerCategoryFilter === "Deals You Cannot Miss") {
-                        return p.includes("deal") || p.includes("wide") || t.includes("deal");
+                        return p.includes("deal") || p.includes("wide") || t.includes("deal") || id.startsWith("deal-");
                       }
                       if (bannerCategoryFilter === "Top Brands & Offers") {
-                        return p.includes("brand") || t.includes("brand");
+                        return p.includes("brand") || t.includes("brand") || id.startsWith("brand-");
                       }
                       if (bannerCategoryFilter === "Limited Time Offers") {
-                        return p.includes("limited") || t.includes("limited") || p.includes("bogo") || p.includes("combo") || p.includes("offers") || p.includes("clearance") || t.includes("bogo") || t.includes("combo") || t.includes("offers") || t.includes("clearance");
+                        return p.includes("limited") || t.includes("limited") || p.includes("bogo") || p.includes("combo") || p.includes("offers") || p.includes("clearance") || t.includes("bogo") || t.includes("combo") || t.includes("offers") || t.includes("clearance") || id.startsWith("lto-");
                       }
                       if (bannerCategoryFilter === "Category Cards") {
-                        return p.includes("category") || t.includes("category") || p.startsWith("cat-");
+                        return p.includes("category") || t.includes("category") || id.startsWith("cat-") || id.startsWith("catcard");
                       }
                       if (bannerCategoryFilter === "Shop By Concern Cards") {
-                        return p.includes("concern") || t.includes("concern") || p.startsWith("concern");
+                        return p.includes("concern") || t.includes("concern") || id.startsWith("concern");
                       }
                       return true;
                     });
@@ -6160,12 +6202,13 @@ export default function ValobasaAdminPanel() {
                     return filteredList.map((b: any, idx: number) => {
                       const isHero = b.page === "Hero Slides" || b.title?.includes("Hero");
                       const isWide = b.page === "Homepage Wide Banner";
+                      const bannerImgSrc = safeImageUrl(b.imageUrl);
 
                       return (
                         <div key={b.id ? `${b.id}-${idx}` : idx} style={{ border: "1px solid #e2e8f0", borderRadius: "10px", overflow: "hidden", backgroundColor: "#ffffff", boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
                           <div style={{ height: "140px", width: "100%", backgroundColor: "#f1f5f9", overflow: "hidden", position: "relative" }}>
-                            {b.imageUrl && b.imageUrl.trim() ? (
-                              <img src={b.imageUrl} alt={b.title || "Banner"} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            {bannerImgSrc && bannerImgSrc.trim() ? (
+                              <img src={bannerImgSrc} alt={b.title || "Banner"} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                             ) : (
                               <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: "12px", fontWeight: "700" }}>
                                 <span style={{ fontSize: "24px", marginBottom: "4px" }}>🖼️</span>

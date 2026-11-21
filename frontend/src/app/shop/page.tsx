@@ -149,6 +149,12 @@ const productMatchesSubcategory = (p: Product, subName: string) => {
   const target = (subName || "").toLowerCase().trim();
   const cName = p.category?.name?.toLowerCase() || "";
   const pName = (p.category as any)?.parent?.name?.toLowerCase() || "";
+  const subObjName = (p as any).subcategory?.name?.toLowerCase() || "";
+
+  // 0. Match explicit subcategory field (for Combos & Products)
+  if (subObjName && (subObjName === target || subObjName.includes(target) || target.includes(subObjName))) {
+    return true;
+  }
 
   // 1. Exact or partial match in DB category name
   if (cName === target || (target && cName.includes(target))) {
@@ -360,6 +366,13 @@ function ShopPageContent() {
         const formattedCombos = (Array.isArray(comboData) ? comboData : []).filter((c: any) => c.isActive !== false).map((c: any) => {
           const hasFreeGift = Array.isArray(c.items) && c.items.some((it: any) => it.isFreeGift);
           const freeGiftItem = hasFreeGift ? c.items.find((it: any) => it.isFreeGift) : null;
+          const comboCategory = c.category && c.category.name 
+            ? c.category 
+            : (c.categoryId ? { id: c.categoryId, name: c.categoryId, slug: String(c.categoryId).toLowerCase().replace(/[^a-z0-9]+/g, "-") } : null);
+          const comboSubcategory = c.subcategory && c.subcategory.name 
+            ? c.subcategory 
+            : (c.subcategoryId ? { id: c.subcategoryId, name: c.subcategoryId, slug: String(c.subcategoryId).toLowerCase().replace(/[^a-z0-9]+/g, "-") } : null);
+
           return {
             id: c.id,
             name: c.title,
@@ -368,8 +381,11 @@ function ShopPageContent() {
             price: c.regularPrice || c.comboPrice,
             discountPrice: c.comboPrice,
             images: [c.bannerImage || "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&auto=format&fit=crop&q=80"],
-            category: c.category || { id: c.categoryId, name: "Perfect Match COMBO", slug: "combo" },
-            campaignName: "COMBO",
+            category: comboCategory,
+            subcategory: comboSubcategory,
+            categoryId: c.categoryId,
+            subcategoryId: c.subcategoryId,
+            campaignName: (comboCategory?.slug === "combo" || comboCategory?.name?.toLowerCase().includes("combo")) ? "COMBO" : (comboCategory?.name || "COMBO"),
             isCombo: true,
             hasFreeGift,
             freeGiftTitle: freeGiftItem ? (freeGiftItem.product?.name || "Free Gift Included") : undefined,
@@ -445,7 +461,7 @@ function ShopPageContent() {
             let inParent = false;
             if (targetCat === "bogo") inParent = (p.campaignName === "BOGO" || p.category?.name?.toLowerCase().includes("bogo") || p.name?.toLowerCase().includes("bogo"));
             else if (targetCat === "exclusive" || targetCat === "exclusive offers") inParent = (p.campaignName === "EXCLUSIVE" || p.category?.name?.toLowerCase().includes("exclusive") || p.name?.toLowerCase().includes("exclusive"));
-            else if (targetCat === "combo" || targetCat === "perfect match combo") inParent = (p.campaignName === "COMBO" || p.category?.name?.toLowerCase().includes("combo") || p.name?.toLowerCase().includes("combo"));
+            else if (targetCat === "combo" || targetCat === "perfect match combo") inParent = ((p as any).isCombo ? (!p.category || (p.category as any)?.slug === "combo" || p.category?.name?.toLowerCase().includes("combo")) : (p.campaignName === "COMBO" || p.category?.name?.toLowerCase().includes("combo") || p.name?.toLowerCase().includes("combo")));
             else if (targetCat === "clearance-sale" || targetCat === "clearance sale") inParent = (p.campaignName === "CLEARANCE" || p.category?.name?.toLowerCase().includes("clearance") || p.name?.toLowerCase().includes("clearance"));
             else {
               let matchNames = [targetCat];
@@ -898,7 +914,7 @@ function ShopPageContent() {
                 <p style={{ fontSize: "13.5px", color: "#64748b" }}>Try tweaking your search or price filter slider to see more items.</p>
               </div>
             ) : (
-              <div className="product-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: "20px" }}>
+              <div className="product-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 240px))", gap: "20px", justifyContent: "start", alignItems: "stretch" }}>
                 {visibleProducts.map((p) => {
                   const v = p.variants?.[0] || { price: p.price, discountPrice: p.discountPrice, name: "Standard" };
                   const isDiscounted = v.discountPrice !== null && v.discountPrice !== undefined && v.discountPrice > 0;
@@ -911,7 +927,7 @@ function ShopPageContent() {
                   const discountPercent = isDiscounted && v.price > displayPrice ? Math.round(((v.price - displayPrice) / v.price) * 100) : 25;
 
                   return (
-                    <div key={p.id} className="product-card" style={{ position: "relative", backgroundColor: "#ffffff", borderRadius: "14px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", transition: "all 0.2s ease" }}>
+                    <div key={p.id} className="product-card" style={{ position: "relative", backgroundColor: "#ffffff", borderRadius: "14px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", transition: "all 0.2s ease", maxWidth: "260px", width: "100%" }}>
                       
                       {/* Top Left Discount Badge (Matches Image 1) */}
                       {isDiscounted && (

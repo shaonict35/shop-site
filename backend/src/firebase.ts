@@ -834,9 +834,9 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
       create: {
         id,
         orderNumber: data.orderNumber || `ORD-${Date.now()}`,
-        customerName: data.customerName,
-        customerEmail: data.customerEmail,
-        customerPhone: data.customerPhone,
+        customerName: data.customerName || "Customer",
+        customerEmail: data.customerEmail || `${(data.customerPhone || "customer").replace(/[^0-9]/g, "") || "customer"}@glowgoodly.com`,
+        customerPhone: data.customerPhone || "",
         address: data.address,
         zone: data.zone,
         deliveryCharge: Number(data.deliveryCharge),

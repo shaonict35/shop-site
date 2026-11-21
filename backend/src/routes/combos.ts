@@ -19,17 +19,53 @@ async function enrichComboItems(combos: any[]) {
       if (d.id) prodMap.set(d.id, d);
     });
 
-    const catSnap = await db.collection("categories").get();
+    // Also get Prisma products for comprehensive mapping
+    try {
+      const prismaProds = await prisma.product.findMany({
+        include: { variants: true, images: true }
+      });
+      prismaProds.forEach((p: any) => {
+        if (!prodMap.has(p.id)) {
+          prodMap.set(p.id, {
+            id: p.id,
+            name: p.name,
+            price: p.variants?.[0]?.price || 0,
+            discountPrice: p.variants?.[0]?.discountPrice || null,
+            imageUrl: p.images?.find((img: any) => img.isPrimary)?.url || p.images?.[0]?.url || "/placeholder-product.svg",
+            images: p.images || []
+          });
+        }
+      });
+    } catch (_) {}
+
+    // Enrich categories from Prisma Category table & Firestore
     const catMap = new Map();
-    catSnap.forEach((doc: any) => {
-      const d = doc.data();
-      catMap.set(doc.id, d);
-      if (d.id) catMap.set(d.id, d);
-    });
+    try {
+      const prismaCats = await prisma.category.findMany();
+      prismaCats.forEach((c: any) => {
+        const catObj = { id: c.id, name: c.name, slug: c.slug || c.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"), parentId: c.parentId };
+        catMap.set(c.id, catObj);
+        if (c.slug) catMap.set(c.slug, catObj);
+        if (c.name) catMap.set(c.name.toLowerCase(), catObj);
+      });
+    } catch (_) {}
+
+    // Preset standard combo categories
+    catMap.set("cat-combo", { id: "cat-combo", name: "Combo Deals", slug: "combo" });
+    catMap.set("perfect-match-combo", { id: "perfect-match-combo", name: "Perfect Match Combo", slug: "combo" });
+    catMap.set("clearance-sale", { id: "clearance-sale", name: "Clearance Sale", slug: "clearance-sale" });
+
+    const resolveCategory = (idOrSlug: string | null) => {
+      if (!idOrSlug) return null;
+      if (catMap.has(idOrSlug)) return catMap.get(idOrSlug);
+      if (catMap.has(idOrSlug.toLowerCase())) return catMap.get(idOrSlug.toLowerCase());
+      return { id: idOrSlug, name: idOrSlug, slug: idOrSlug.toLowerCase().replace(/[^a-z0-9]+/g, "-") };
+    };
 
     return combos.map(c => ({
       ...c,
-      category: c.categoryId ? (catMap.get(c.categoryId) || { id: c.categoryId, name: c.categoryId }) : null,
+      category: resolveCategory(c.categoryId),
+      subcategory: resolveCategory(c.subcategoryId),
       items: (c.items || []).map((it: any) => {
         const p = prodMap.get(it.productId);
         return {

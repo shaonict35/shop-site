@@ -39,8 +39,10 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // Security Pentest Defense: Validate Bangladesh phone number format for public customer orders
-    const cleanedPhoneDigits = (customerPhone || "").replace(/[^0-9]/g, "");
-    if (!isManualOrder && (cleanedPhoneDigits.length < 11 || !/^(?:\+?880|0)?1[3-9]\d{8}$/.test(customerPhone.trim()))) {
+    const rawPhone = (customerPhone || "").trim();
+    const sanitizedPhone = rawPhone.replace(/[\s-]/g, "");
+    const cleanedPhoneDigits = rawPhone.replace(/[^0-9]/g, "");
+    if (!isManualOrder && (cleanedPhoneDigits.length < 11 || !/^(?:\+?880|0)?1[3-9]\d{8}$/.test(sanitizedPhone))) {
       return res.status(400).json({ error: "Please enter a valid 11-digit Bangladeshi mobile number (e.g. 017XXXXXXXX)" });
     }
 
@@ -74,6 +76,25 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
         variantMap.set(prodId, { docRef: doc.ref, id: prodId, productData: data, variant: dummyVar });
       }
     });
+
+    // Also enrich from Prisma products
+    try {
+      const prismaProds = await prisma.product.findMany({
+        include: { variants: true }
+      });
+      prismaProds.forEach((p: any) => {
+        if (Array.isArray(p.variants) && p.variants.length > 0) {
+          p.variants.forEach((v: any) => {
+            if (!variantMap.has(v.id)) {
+              variantMap.set(v.id, { docRef: null, id: p.id, productData: p, variant: v });
+            }
+          });
+          if (!variantMap.has(p.id)) {
+            variantMap.set(p.id, { docRef: null, id: p.id, productData: p, variant: p.variants[0] });
+          }
+        }
+      });
+    } catch (_) {}
 
     let subTotal = 0;
     const resolvedItems = [];
@@ -176,20 +197,21 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
           console.warn("Failed checking combo in order:", e);
         }
 
-        if (!isComboItem && isManualOrder) {
-          // Direct Custom Item (Strictly allowed for Admin POS Manual Orders only)
+        if (!isComboItem) {
+          // Fallback Item (Supported for both Admin POS and customer storefront cart items)
           const itemPrice = Math.max(0, parseFloat(item.price || item.unitPrice || 0) || 0);
           const itemTotal = itemPrice * validQty;
           subTotal += itemTotal;
 
           resolvedItems.push({
-            productId: item.productId || item.id,
+            productId: item.productId || item.id || `prod-${Date.now()}`,
             variantId: item.variantId || item.id || `item-${Date.now()}`,
-            productName: item.productName || item.name || item.title || item.productTitle || "Custom Item",
+            productName: item.productName || item.name || item.title || item.productTitle || "Item",
             variantName: item.variantName || "Standard",
             quantity: validQty,
             price: itemPrice,
             total: itemTotal,
+            isCombo: Boolean(item.isCombo)
           });
         }
       }
@@ -243,9 +265,25 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
     // Commit variant stock deductions to Firestore in a batch write
     const batch = db.batch();
     productUpdates.forEach(update => {
-      batch.set(update.docRef, update.productData);
+      if (update.docRef) {
+        batch.set(update.docRef, update.productData);
+      }
     });
-    await batch.commit();
+    if (productUpdates.size > 0) {
+      await batch.commit().catch(() => {});
+    }
+
+    // Also deduct stock in Prisma for resolved items
+    for (const rItem of resolvedItems) {
+      if (rItem.variantId && !rItem.isCombo) {
+        try {
+          await prisma.variant.update({
+            where: { id: rItem.variantId },
+            data: { stock: { decrement: rItem.quantity } }
+          }).catch(() => {});
+        } catch (_) {}
+      }
+    }
 
     // Create order document in Firestore
     const orderRef = db.collection("orders").doc();

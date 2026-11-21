@@ -220,18 +220,26 @@ export default function CheckoutPage() {
         customerId: user?.id || null,
         customerName: checkoutName,
         customerEmail: email || null,
-        customerPhone: checkoutPhone,
+        customerPhone: (checkoutPhone || "").trim().replace(/[\s-]/g, ""),
         address: checkoutAddress,
         zone,
         paymentMethod: paymentMethod === "bKash" 
           ? (isBkashApi ? "bKash Tokenized" : "bKash Merchant (Manual)")
           : "Cash on Delivery (COD)",
-        paymentPhone: paymentMethod === "bKash" ? (bkashSenderNumber.trim() || checkoutPhone) : checkoutPhone,
-        senderPhone: paymentMethod === "bKash" ? (bkashSenderNumber.trim() || null) : null,
+        paymentPhone: paymentMethod === "bKash" ? (bkashSenderNumber.trim().replace(/[\s-]/g, "") || checkoutPhone.replace(/[\s-]/g, "")) : checkoutPhone.replace(/[\s-]/g, ""),
+        senderPhone: paymentMethod === "bKash" ? (bkashSenderNumber.trim().replace(/[\s-]/g, "") || null) : null,
         trxId: paymentMethod === "bKash" && !isBkashApi ? bkashTrxId.trim().toUpperCase() : null,
         transactionId: paymentMethod === "bKash" && !isBkashApi ? bkashTrxId.trim().toUpperCase() : null,
         paymentStatus: isBkashApi ? "PENDING_PAYMENT" : (paymentMethod === "bKash" ? "PAID" : "Pending COD"),
-        items: cart.map((i) => ({ variantId: i.id, quantity: i.quantity })),
+        items: cart.map((i) => ({ 
+          variantId: i.id, 
+          productId: (i as any).productId || i.id, 
+          productName: i.name, 
+          variantName: (i as any).variantName || "Standard", 
+          quantity: i.quantity, 
+          price: i.price, 
+          isCombo: Boolean((i as any).isCombo) 
+        })),
         couponCode: effectiveDiscount > 0 ? (couponCode || `AUTO_${autoDiscount}OFF`) : null,
       };
 

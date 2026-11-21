@@ -84,7 +84,7 @@ app.get("/cosmetics_circle_illustration.png", (req, res) => {
   const filePath = findAssetFile("cosmetics_circle_illustration.png");
   if (filePath) {
     res.setHeader("Content-Type", "image/png");
-    res.setHeader("Cache-Control", "public, max-age=2592000");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     return res.sendFile(filePath);
   }
   res.status(404).end();
@@ -964,6 +964,8 @@ app.get("/", (req, res) => {
 			pointer-events: none;
 			z-index: 2;
 			background: transparent;
+			mix-blend-mode: multiply;
+			border-radius: 50%;
 		}
 
 		/* Center Solar System Orbit Ring & Revolving Glowing Planet */
@@ -1172,7 +1174,7 @@ app.get("/", (req, res) => {
 					<div class="wreath-sketch-ring sketch-ring-3"></div>
 
 					<!-- Circular cosmetics wreath image with multiply blend for 100% transparent background -->
-					<img src="/cosmetics_circle_illustration.png" alt="Cosmetics Frame" class="wreath-img" onerror="this.style.opacity='0.25';" />
+					<img src="/cosmetics_circle_illustration.png?v=3" alt="Cosmetics Frame" class="wreath-img" onerror="this.style.opacity='0.25';" />
 
 					<!-- GlowGoodly Logo Center Solar System Orbit Ring & Revolving Planet -->
 					<div class="center-solar-system">
