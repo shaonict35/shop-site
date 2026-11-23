@@ -70,9 +70,17 @@ function notifyCareersSync(req: Request, action: string, extra?: any) {
   } catch (_) {}
 }
 
-// Ensure default jobs exist in Prisma
+// Ensure default jobs exist in Prisma only once upon initial startup
 async function ensurePrismaJobs() {
   try {
+    const seeded = await prisma.setting.findUnique({
+      where: { key: "CAREERS_SEEDED" }
+    });
+    if (seeded) {
+      // Careers already initialized or intentionally cleared by admin. Do NOT re-seed!
+      return;
+    }
+
     const count = await prisma.career.count();
     if (count === 0) {
       for (const dj of DEFAULT_JOBS) {
@@ -91,6 +99,12 @@ async function ensurePrismaJobs() {
         });
       }
     }
+
+    await prisma.setting.upsert({
+      where: { key: "CAREERS_SEEDED" },
+      create: { key: "CAREERS_SEEDED", value: "true" },
+      update: { value: "true" }
+    });
   } catch (err) {
     console.warn("Failed to seed initial Prisma careers:", err);
   }
@@ -234,8 +248,8 @@ const handleBulkDeleteJobs = async (req: AuthenticatedRequest, res: Response) =>
   }
 };
 
-router.post("/bulk-delete", authenticateJWT as any, requireRole(["SUPER_ADMIN", "ADMIN", "SuperAdmin", "Admin"]) as any, handleBulkDeleteJobs);
-router.post("/jobs/bulk-delete", authenticateJWT as any, requireRole(["SUPER_ADMIN", "ADMIN", "SuperAdmin", "Admin"]) as any, handleBulkDeleteJobs);
+router.post("/bulk-delete", authenticateJWT as any, requireRole(["SUPER_ADMIN", "ADMIN", "SuperAdmin", "Admin", "Manager", "Staff", "Salesman"]) as any, handleBulkDeleteJobs);
+router.post("/jobs/bulk-delete", authenticateJWT as any, requireRole(["SUPER_ADMIN", "ADMIN", "SuperAdmin", "Admin", "Manager", "Staff", "Salesman"]) as any, handleBulkDeleteJobs);
 
 // ─── 5. ADMIN: UPDATE JOB OPENING ─────────────────────────────────────────────
 const handleUpdateJob = async (req: AuthenticatedRequest, res: Response) => {
@@ -300,7 +314,14 @@ router.patch("/jobs/:id", authenticateJWT as any, requireRole(["SUPER_ADMIN", "A
 const handleDeleteJob = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    await prisma.career.delete({ where: { id: id as string } });
+    // Mark as seeded so future count === 0 will never re-seed deleted jobs
+    await prisma.setting.upsert({
+      where: { key: "CAREERS_SEEDED" },
+      create: { key: "CAREERS_SEEDED", value: "true" },
+      update: { value: "true" }
+    }).catch(() => {});
+
+    await prisma.career.deleteMany({ where: { id: id as string } });
 
     notifyCareersSync(req, "delete", { id });
 
@@ -314,8 +335,37 @@ const handleDeleteJob = async (req: AuthenticatedRequest, res: Response) => {
   }
 };
 
-router.delete("/:id", authenticateJWT as any, requireRole(["SUPER_ADMIN", "ADMIN", "SuperAdmin", "Admin"]) as any, handleDeleteJob);
-router.delete("/jobs/:id", authenticateJWT as any, requireRole(["SUPER_ADMIN", "ADMIN", "SuperAdmin", "Admin"]) as any, handleDeleteJob);
+const handleDeleteAllJobs = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    // Mark as seeded so future count === 0 will never re-seed deleted jobs
+    await prisma.setting.upsert({
+      where: { key: "CAREERS_SEEDED" },
+      create: { key: "CAREERS_SEEDED", value: "true" },
+      update: { value: "true" }
+    }).catch(() => {});
+
+    const result = await prisma.career.deleteMany({});
+
+    notifyCareersSync(req, "delete_all", { count: result.count });
+
+    res.json({
+      success: true,
+      message: `All ${result.count} job opening(s) deleted successfully`,
+      count: result.count
+    });
+  } catch (error: any) {
+    console.error("Delete all careers error:", error);
+    res.status(500).json({ error: error.message || "Failed to delete all job openings" });
+  }
+};
+
+router.delete("/all", authenticateJWT as any, requireRole(["SUPER_ADMIN", "ADMIN", "SuperAdmin", "Admin", "Manager", "Staff", "Salesman"]) as any, handleDeleteAllJobs);
+router.delete("/jobs/all", authenticateJWT as any, requireRole(["SUPER_ADMIN", "ADMIN", "SuperAdmin", "Admin", "Manager", "Staff", "Salesman"]) as any, handleDeleteAllJobs);
+router.post("/delete-all", authenticateJWT as any, requireRole(["SUPER_ADMIN", "ADMIN", "SuperAdmin", "Admin", "Manager", "Staff", "Salesman"]) as any, handleDeleteAllJobs);
+router.post("/jobs/delete-all", authenticateJWT as any, requireRole(["SUPER_ADMIN", "ADMIN", "SuperAdmin", "Admin", "Manager", "Staff", "Salesman"]) as any, handleDeleteAllJobs);
+
+router.delete("/:id", authenticateJWT as any, requireRole(["SUPER_ADMIN", "ADMIN", "SuperAdmin", "Admin", "Manager", "Staff", "Salesman"]) as any, handleDeleteJob);
+router.delete("/jobs/:id", authenticateJWT as any, requireRole(["SUPER_ADMIN", "ADMIN", "SuperAdmin", "Admin", "Manager", "Staff", "Salesman"]) as any, handleDeleteJob);
 
 // ─── 7. PUBLIC: APPLY FOR A JOB ────────────────────────────────────────────────
 router.post("/apply", async (req: Request, res: Response) => {
@@ -366,7 +416,7 @@ router.post("/apply", async (req: Request, res: Response) => {
 });
 
 // ─── 8. ADMIN: GET ALL JOB APPLICATIONS ─────────────────────────────────────────
-router.get("/applications", authenticateJWT as any, requireRole(["SUPER_ADMIN", "ADMIN", "SuperAdmin", "Admin", "Manager"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.get("/applications", authenticateJWT as any, requireRole(["SUPER_ADMIN", "ADMIN", "SuperAdmin", "Admin", "Manager", "Staff", "Salesman"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const docRef = db.collection("settings").doc("JOB_APPLICATIONS");
     const snap = await docRef.get();
@@ -378,7 +428,7 @@ router.get("/applications", authenticateJWT as any, requireRole(["SUPER_ADMIN", 
 });
 
 // ─── 9. ADMIN: DELETE A JOB APPLICATION ────────────────────────────────────────
-router.delete("/applications/:id", authenticateJWT as any, requireRole(["SUPER_ADMIN", "ADMIN", "SuperAdmin", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.delete("/applications/:id", authenticateJWT as any, requireRole(["SUPER_ADMIN", "ADMIN", "SuperAdmin", "Admin", "Manager", "Staff", "Salesman"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const docRef = db.collection("settings").doc("JOB_APPLICATIONS");
@@ -393,7 +443,7 @@ router.delete("/applications/:id", authenticateJWT as any, requireRole(["SUPER_A
 });
 
 // ─── 10. ADMIN: BULK DELETE JOB APPLICATIONS ───────────────────────────────────
-router.post("/applications/bulk-delete", authenticateJWT as any, requireRole(["SUPER_ADMIN", "ADMIN", "SuperAdmin", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.post("/applications/bulk-delete", authenticateJWT as any, requireRole(["SUPER_ADMIN", "ADMIN", "SuperAdmin", "Admin", "Manager", "Staff", "Salesman"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { ids } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {

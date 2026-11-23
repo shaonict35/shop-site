@@ -156,7 +156,10 @@ export default function SeasonalOfferPage() {
         totalAmount: grandTotal,
         paymentMethod: "Cash on Delivery",
         status: "Pending",
-        notes: `Order placed from Seasonal Offer Landing Page [Zone: ${zoneLabel}]`
+        isLandingPage: true,
+        source: "Landing Page Order",
+        orderType: "Landing Page Order",
+        notes: `[Landing Page Order] Order placed from Seasonal Offer Landing Page [Zone: ${zoneLabel}]`
       };
 
       const res = await fetch(`${API_BASE}/orders`, {

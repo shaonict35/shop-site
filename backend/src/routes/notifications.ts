@@ -17,7 +17,7 @@ const getActiveNotification = async (req: Request, res: Response) => {
         id: "notif-active-1",
         title: "👉 ৯৯ টাকায় Face Wash+Moisturizer!! 😍",
         message: "মাত্র ৯৯ টাকায় কিনুন Glow & Hydrate Duo (Rajkonna Glow Booster Wash + Enso Skin Light Gel)!! অর্ডার করুন এখনই!!",
-        imageUrl: "/images/deals/deal-1.png",
+        imageUrl: "",
         linkUrl: "/shop?deal=combo",
         isActive: true,
         createdAt: new Date().toISOString(),
@@ -25,14 +25,15 @@ const getActiveNotification = async (req: Request, res: Response) => {
     }
 
     const doc = snapshot.docs[0];
-    return res.json({ id: doc.id, ...doc.data() });
+    const data = doc.data();
+    return res.json({ id: doc.id, ...data, imageUrl: "" });
   } catch (err: any) {
     console.warn("Active notification fetch fallback notice:", err.message);
     return res.json({
       id: "notif-active-1",
       title: "👉 ৯৯ টাকায় Face Wash+Moisturizer!! 😍",
       message: "মাত্র ৯৯ টাকায় কিনুন Glow & Hydrate Duo (Rajkonna Glow Booster Wash + Enso Skin Light Gel)!! অর্ডার করুন এখনই!!",
-      imageUrl: "/images/deals/deal-1.png",
+      imageUrl: "",
       linkUrl: "/shop?deal=combo",
       isActive: true,
       createdAt: new Date().toISOString(),

@@ -89,7 +89,8 @@ router.get("/public", async (req, res) => {
       "GA4_MEASUREMENT_ID",
       "GTM_CONTAINER_ID",
       "PAGES_CUSTOMIZATION_CONFIG",
-      "SEASONAL_OFFER_DATA"
+      "SEASONAL_OFFER_DATA",
+      "AVAILABLE_OFFERS"
     ];
     const settings = await prisma.setting.findMany({
       where: { key: { in: keys } }
@@ -540,6 +541,37 @@ router.post("/custom-apis/test", authenticateJWT as any, requireRole(["SuperAdmi
     }
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/settings/available-offers
+router.get("/available-offers", async (req, res) => {
+  try {
+    const setting = await prisma.setting.findUnique({
+      where: { key: "AVAILABLE_OFFERS" }
+    });
+    if (!setting) return res.json([]);
+    res.json(JSON.parse(setting.value));
+  } catch (e: any) {
+    res.json([]);
+  }
+});
+
+// POST /api/settings/available-offers
+router.post("/available-offers", async (req, res) => {
+  try {
+    const offers = req.body;
+    await prisma.setting.upsert({
+      where: { key: "AVAILABLE_OFFERS" },
+      update: { value: JSON.stringify(offers) },
+      create: { key: "AVAILABLE_OFFERS", value: JSON.stringify(offers) }
+    });
+    invalidatePrismaCache();
+    invalidatePublicSettingsCache();
+    emitStorefrontUpdate(req, "settings", { key: "AVAILABLE_OFFERS" });
+    res.json({ success: true, offers });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
   }
 });
 

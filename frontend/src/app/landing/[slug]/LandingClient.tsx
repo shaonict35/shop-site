@@ -138,7 +138,10 @@ export default function DynamicLandingPage() {
         totalAmount: grandTotal,
         paymentMethod: "Cash on Delivery",
         status: "Pending",
-        notes: `Order placed from Landing Page [/${slug}] [Zone: ${zoneLabel}]`
+        isLandingPage: true,
+        source: "Landing Page Order",
+        orderType: "Landing Page Order",
+        notes: `[Landing Page Order] Order placed from Landing Page [/${slug}] [Zone: ${zoneLabel}]`
       };
 
       const res = await fetch(`${API_BASE}/orders`, {

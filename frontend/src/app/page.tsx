@@ -1,10 +1,9 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { fetchWithCache, API_BASE, API_ROOT, getProductUrl, subscribeToDataSync, safeImageUrl } from "../utils/api";
+import { fetchWithCache, API_BASE, API_ROOT, getProductUrl, subscribeToDataSync, safeImageUrl, idbGet, MASTER_HOMEPAGE_BANNERS } from "../utils/api";
 import { registerFcmToken } from "../utils/fcm";
 import { io } from "socket.io-client";
-import defaultHomepageBanners from "../data/homepage-banners.json";
 
 import Header from "../components/Header";
 import PromoBanner from "../components/PromoBanner";
@@ -27,9 +26,59 @@ interface Product {
 
 const FALLBACK_PRODUCT_IMG = "/placeholder-product.svg";
 
+const DEFAULT_HERO_SLIDES = [
+  { img: "/images/sliders/slider-1.png", title: "Nirvana Makeup", desc: "Special offers", link: "/shop?brand=nirvana" },
+  { img: "/images/sliders/slider-2.png", title: "July Jaw Droppers", desc: "Special deals on international brands", link: "/shop?deal=jaw-droppers" },
+  { img: "/images/sliders/slider-3.png", title: "Treasure of Glow", desc: "Premium skincare", link: "/shop?deal=treasure-of-glow" }
+];
+
+const defaultHomepageBanners: Record<string, any[]> = {
+  dealsYouCannotMiss: [],
+  topBrandsOffers: [],
+  limitedTimeOffers: [],
+  shopByCategory: [],
+  shopByConcern: [],
+  promoBanner: []
+};
+
 const getProductImage = (p: any): string => {
   const raw = p?.images?.find((img: any) => img.isPrimary)?.url || p?.images?.[0]?.url || p?.imageUrl;
-  return safeImageUrl(raw, FALLBACK_PRODUCT_IMG, p?.updatedAt);
+  return safeImageUrl(raw, FALLBACK_PRODUCT_IMG);
+};
+
+// Helper to load frontend hero banners directly from localStorage
+const loadFrontendHeroBanners = () => {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = localStorage.getItem("gg_frontend_hero_banners");
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const deletedRaw = localStorage.getItem("gg_deleted_banner_ids");
+        const deletedIds: string[] = deletedRaw ? JSON.parse(deletedRaw) : [];
+        const activeOnly = parsed.filter((b: any) => b && !deletedIds.includes(b.id) && (b.isActive === undefined || b.isActive === true || b.isActive === "true" || String(b.isActive) !== "false"));
+        if (activeOnly.length > 0) {
+          return activeOnly.map((b: any, idx: number) => {
+            const rawUrl = b.mediaUrl || b.imageUrl || b.url || b.img;
+            const resolvedUrl = safeImageUrl(rawUrl);
+            const mediaType = b.mediaType || (rawUrl?.includes(".mp4") || rawUrl?.includes(".webm") ? "video" : rawUrl?.includes(".gif") ? "gif" : "image");
+            return {
+              id: b.id || `frontend-hero-${idx}`,
+              title: b.title || "GlowGoodly Hero Banner",
+              desc: b.subtitle || b.desc || "",
+              mediaUrl: resolvedUrl,
+              mediaType,
+              img: resolvedUrl,
+              mobileImg: b.mobileImageUrl || resolvedUrl,
+              tabletImg: b.tabletImageUrl || resolvedUrl,
+              link: b.ctaLink || b.linkUrl || b.link || "/shop"
+            };
+          });
+        }
+      }
+    }
+  } catch (e) { }
+  return [];
 };
 
 export default function Home() {
@@ -40,42 +89,19 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [dynamicSlides, setDynamicSlides] = useState<any[]>([]);
   const [homepageBanners, setHomepageBanners] = useState<any[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = localStorage.getItem("gg_synced_homepage_banners");
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        }
-      } catch (e) {}
-    }
-    return [
-      ...(defaultHomepageBanners.dealsYouCannotMiss || []),
-      ...(defaultHomepageBanners.topBrandsOffers || []),
-      ...(defaultHomepageBanners.limitedTimeOffers || []),
-      ...(defaultHomepageBanners.shopByCategory || []),
-      ...(defaultHomepageBanners.shopByConcern || [])
-    ];
+    return Array.isArray(MASTER_HOMEPAGE_BANNERS) ? MASTER_HOMEPAGE_BANNERS : [];
   });
-  const [dynamicSections, setDynamicSections] = useState<Record<string, any[]>>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = localStorage.getItem("gg_synced_dynamic_sections");
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (parsed && typeof parsed === "object") return parsed;
-        }
-      } catch (e) {}
-    }
-    return {
-      DEALS_YOU_CANNOT_MISS: defaultHomepageBanners.dealsYouCannotMiss || [],
-      TOP_BRANDS_OFFERS: defaultHomepageBanners.topBrandsOffers || [],
-      LIMITED_TIME_OFFERS: defaultHomepageBanners.limitedTimeOffers || [],
-      SHOP_BY_CATEGORY: defaultHomepageBanners.shopByCategory || [],
-      SHOP_BY_CONCERN: defaultHomepageBanners.shopByConcern || [],
-      PROMO_BANNER: (defaultHomepageBanners as any).promoBanner || [],
-    };
+  const [dynamicSections, setDynamicSections] = useState<Record<string, any[]>>({
+    DEALS_YOU_CANNOT_MISS: [],
+    TOP_BRANDS_OFFERS: [],
+    LIMITED_TIME_OFFERS: [],
+    SHOP_BY_CATEGORY: [],
+    SHOP_BY_CONCERN: [],
+    PROMO_BANNER: [],
   });
+  const [deletedBannerIds, setDeletedBannerIds] = useState<string[]>([]);
+  const [cardLinks, setCardLinks] = useState<Record<string, string>>({});
+  const [isClientMounted, setIsClientMounted] = useState<boolean>(false);
 
   const getBannerForPage = (identifier: string, fallbackImg: string = "", fallbackTitle: string = "", fallbackLink: string = "#") => {
     const rawTerm = (identifier || "").trim();
@@ -86,96 +112,74 @@ export default function Home() {
       if (!b) return false;
       const p = (b.page || "").toLowerCase().trim();
       const id = (b.id || "").toLowerCase().trim();
-      const t = (b.title || "").toLowerCase().trim();
       const cleanId = id.replace(/[^a-z0-9]/g, "");
       const cleanP = p.replace(/[^a-z0-9]/g, "");
-      const cleanT = t.replace(/[^a-z0-9]/g, "");
 
-      // 1. Direct or sanitized ID match ("dealcard1" == "dealcard1", "deal-card-1" == "deal card 1")
-      if (id === term || cleanId === cleanTerm) return true;
+      // 1. Direct exact match
+      if (id === term || p === term || cleanId === cleanTerm || cleanP === cleanTerm) return true;
 
-      // 2. Specific card slot matching
-      if (cleanTerm === "dealcard1" && (cleanId.includes("dealcard1") || cleanId === "deal1" || cleanT.includes("dealcard1"))) return true;
-      if (cleanTerm === "dealcard2" && (cleanId.includes("dealcard2") || cleanId === "deal2" || cleanT.includes("dealcard2"))) return true;
-      if (cleanTerm === "dealcard3" && (cleanId.includes("dealcard3") || cleanId === "deal3" || cleanT.includes("dealcard3"))) return true;
-      if (cleanTerm === "dealcard4" && (cleanId.includes("dealcard4") || cleanId === "deal4" || cleanT.includes("dealcard4"))) return true;
+      // 2. Exact slot mapping without wildcards
+      if (cleanTerm === "dealcard1" && (cleanId === "deal1" || cleanId === "dealcard1")) return true;
+      if (cleanTerm === "dealcard2" && (cleanId === "deal2" || cleanId === "dealcard2")) return true;
+      if (cleanTerm === "dealcard3" && (cleanId === "deal3" || cleanId === "dealcard3")) return true;
+      if (cleanTerm === "dealcard4" && (cleanId === "deal4" || cleanId === "dealcard4")) return true;
 
-      if (cleanTerm === "brandoffer1" && (cleanId.includes("brandoffer1") || cleanId === "brandoffer1" || cleanT.includes("brandoffer1"))) return true;
-      if (cleanTerm === "brandoffer2" && (cleanId.includes("brandoffer2") || cleanId === "brandoffer2" || cleanT.includes("brandoffer2"))) return true;
-      if (cleanTerm === "brandoffer5" && (cleanId.includes("brandoffer5") || cleanId.includes("brandoffer3") || cleanT.includes("brandoffer5"))) return true;
-      if (cleanTerm === "brandoffer6" && (cleanId.includes("brandoffer6") || cleanId.includes("brandoffer4") || cleanT.includes("brandoffer6"))) return true;
+      if (cleanTerm === "brandoffer1" && (cleanId === "brandoffer1")) return true;
+      if (cleanTerm === "brandoffer2" && (cleanId === "brandoffer2")) return true;
+      if ((cleanTerm === "brandoffer5" || cleanTerm === "brandoffer3") && (cleanId === "brandoffer5" || cleanId === "brandoffer3")) return true;
+      if ((cleanTerm === "brandoffer6" || cleanTerm === "brandoffer4") && (cleanId === "brandoffer6" || cleanId === "brandoffer4")) return true;
 
-      // 3. Wide banner matching
-      if (cleanTerm.includes("wide") || cleanTerm.includes("exclusivesavings") || cleanTerm.includes("beautymusthaves")) {
-        if (cleanId.includes("wide") || cleanP.includes("wide") || cleanT.includes("wide") || cleanT.includes("beautymusthaves")) return true;
+      if (cleanTerm === "bogo" && (cleanId === "limitedbogo" || cleanId === "bogo")) return true;
+      if (cleanTerm === "combo" && (cleanId === "limitedcombo" || cleanId === "combo")) return true;
+      if (cleanTerm === "offers" && (cleanId === "limitedoffers" || cleanId === "offers")) return true;
+      if ((cleanTerm === "clearance" || cleanTerm === "clearancesale") && (cleanId === "limitedclearance" || cleanId === "clearancesale")) return true;
+
+      if (cleanTerm.includes("widebanner") || cleanTerm === "homepagewidebanner") {
+        if (cleanId === "widebanner1" || cleanId === "homepagewidebanner" || cleanP === "homepagewidebanner") return true;
+      }
+      if (cleanTerm.includes("promobanner")) {
+        if (cleanId === "promobanner1" || cleanId === "promobannerlux" || cleanP === "promobanner") return true;
       }
 
-      // 4. Four deal strip matching
-      if (cleanTerm === "bogo" && (cleanId.includes("bogo") || cleanT.includes("bogo"))) return true;
-      if (cleanTerm === "combo" && (cleanId.includes("combo") || cleanT.includes("combo"))) return true;
-      if (cleanTerm === "offers" && (cleanId.includes("dealstripoffers") || (cleanId.includes("offers") && cleanP.includes("deal")) || cleanT.includes("exclusiveoffers"))) return true;
-      if ((cleanTerm.includes("clearance") || cleanTerm.includes("sale")) && (cleanId.includes("clearance") || cleanT.includes("clearance"))) return true;
-
-      // 5. Category matching with alias & ID support
-      if (term.startsWith("category:")) {
-        const catPart = term.replace("category:", "").trim().replace(/[^a-z0-9]/g, "");
-        if (cleanId.includes(`catcard${catPart}`) || cleanId.includes(`cat${catPart}`) || cleanT.includes(catPart) || cleanP.includes(catPart)) return true;
-        return false;
+      // Categories
+      if (cleanTerm.startsWith("category")) {
+        const sub = cleanTerm.replace("category", "");
+        if (cleanId === `catcard${sub}` || cleanId === `cat${sub}` || cleanP === `category${sub}`) return true;
       }
-
-      // 6. Concern matching with alias & ID support
-      if (term.startsWith("concern:")) {
-        const conPart = term.replace("concern:", "").trim().replace(/[^a-z0-9]/g, "");
-        if (cleanId.includes(`concerncard${conPart}`) || cleanId.includes(conPart) || cleanT.includes(conPart)) return true;
-        return false;
-      }
-
-      // 7. Generic fuzzy match
-      if (cleanTerm.length >= 3) {
-        if (cleanId.includes(cleanTerm) || cleanT.includes(cleanTerm) || cleanTerm.includes(cleanId)) return true;
+      // Concerns
+      if (cleanTerm.startsWith("concern")) {
+        const sub = cleanTerm.replace("concern", "");
+        if (cleanId === `concerncard${sub}` || cleanId === `concern${sub}` || cleanP === `concern${sub}`) return true;
       }
 
       return false;
     });
 
-    if (typeof window !== "undefined") {
-      try {
-        const deletedRaw = localStorage.getItem("gg_deleted_banner_ids");
-        if (deletedRaw) {
-          const deletedIds: string[] = JSON.parse(deletedRaw);
-          if (deletedIds.includes(term) || (found && (deletedIds.includes(found.id) || deletedIds.includes(found.page)))) {
-            return { img: "", mobileImg: "", tabletImg: "", title: "", link: fallbackLink };
-          }
-        }
-      } catch (e) {}
+    if (deletedBannerIds.length > 0) {
+      if (
+        deletedBannerIds.includes(term) ||
+        deletedBannerIds.includes(rawTerm) ||
+        (found && (deletedBannerIds.includes(found.id) || deletedBannerIds.includes(found.page) || deletedBannerIds.includes(found.title)))
+      ) {
+        return { img: "", mobileImg: "", tabletImg: "", title: "", link: fallbackLink };
+      }
+    }
+
+    let targetLink = (found && found.linkUrl) ? found.linkUrl : fallbackLink;
+    if (found?.id && cardLinks[found.id]) {
+      targetLink = cardLinks[found.id];
     }
 
     const rawImg = found ? (found.imageUrl || found.image || found.mediaUrl) : "";
-    let cleanImg = safeImageUrl(rawImg, "");
-    if (cleanImg && !cleanImg.startsWith("data:") && found && (found.updatedAt || found.createdAt)) {
-      const v = encodeURIComponent(String(found.updatedAt || found.createdAt));
-      cleanImg += (cleanImg.includes("?") ? `&v=${v}` : `?v=${v}`);
-    }
+    const cleanImg = safeImageUrl(rawImg, "");
     const finalImg = cleanImg || fallbackImg;
-
-    let finalMobileImg = safeImageUrl(found && found.mobileImageUrl ? found.mobileImageUrl : finalImg, finalImg);
-    if (finalMobileImg && !finalMobileImg.startsWith("data:") && found && (found.updatedAt || found.createdAt)) {
-      const v = encodeURIComponent(String(found.updatedAt || found.createdAt));
-      finalMobileImg += (finalMobileImg.includes("?") ? `&v=${v}` : `?v=${v}`);
-    }
-
-    let finalTabletImg = safeImageUrl(found && found.tabletImageUrl ? found.tabletImageUrl : finalImg, finalImg);
-    if (finalTabletImg && !finalTabletImg.startsWith("data:") && found && (found.updatedAt || found.createdAt)) {
-      const v = encodeURIComponent(String(found.updatedAt || found.createdAt));
-      finalTabletImg += (finalTabletImg.includes("?") ? `&v=${v}` : `?v=${v}`);
-    }
 
     return {
       img: finalImg,
-      mobileImg: finalMobileImg,
-      tabletImg: finalTabletImg,
+      mobileImg: safeImageUrl(found && found.mobileImageUrl ? found.mobileImageUrl : finalImg, finalImg),
+      tabletImg: safeImageUrl(found && found.tabletImageUrl ? found.tabletImageUrl : finalImg, finalImg),
       title: (found && found.title) ? found.title : fallbackTitle,
-      link: (found && found.linkUrl) ? found.linkUrl : fallbackLink
+      link: targetLink
     };
   };
 
@@ -193,7 +197,7 @@ export default function Home() {
   const getCategoryImage = (catName: string) => {
     const found = categories.find((c: any) => c.name?.toLowerCase() === catName?.toLowerCase());
     if (found && (found.imageUrl || found.image)) {
-      return safeImageUrl(found.imageUrl || found.image, undefined, found.updatedAt);
+      return safeImageUrl(found.imageUrl || found.image);
     }
     return "/cosmetics_circle_illustration.png";
   };
@@ -214,7 +218,59 @@ export default function Home() {
   const [isHeroPaused, setIsHeroPaused] = useState(false);
   const [bannersLoaded, setBannersLoaded] = useState(true);
 
-  const activeSlidesList = dynamicSlides;
+  const activeSlidesList = dynamicSlides.length > 0 ? dynamicSlides : DEFAULT_HERO_SLIDES;
+
+  // Real-time synchronization with Frontend LocalStorage Hero Banner updates
+  useEffect(() => {
+    setIsClientMounted(true);
+    const local = loadFrontendHeroBanners();
+    if (local.length > 0) {
+      setDynamicSlides(local);
+    }
+    if (typeof window !== "undefined") {
+      idbGet("gg_frontend_hero_banners").then((stored) => {
+        if (Array.isArray(stored) && stored.length > 0) {
+          const deletedRaw = localStorage.getItem("gg_deleted_banner_ids");
+          const deletedIds: string[] = deletedRaw ? JSON.parse(deletedRaw) : [];
+          const active = stored.filter((b: any) => b && !deletedIds.includes(b.id) && b.isActive !== false);
+          if (active.length > 0) {
+            setDynamicSlides(active.map((b: any, idx: number) => {
+              const rawUrl = b.mediaUrl || b.imageUrl || b.url || b.img;
+              const resolvedUrl = safeImageUrl(rawUrl);
+              return {
+                id: b.id || `frontend-hero-${idx}`,
+                title: b.title || "GlowGoodly Hero Banner",
+                desc: b.subtitle || b.desc || "",
+                mediaUrl: resolvedUrl,
+                mediaType: b.mediaType || "image",
+                img: resolvedUrl,
+                mobileImg: b.mobileImageUrl || resolvedUrl,
+                tabletImg: b.tabletImageUrl || resolvedUrl,
+                link: b.ctaLink || b.linkUrl || b.link || "/shop"
+              };
+            }));
+          }
+        }
+      });
+    }
+
+    const onHeroUpdate = () => {
+      const updated = loadFrontendHeroBanners();
+      if (updated.length > 0) {
+        setDynamicSlides(updated);
+      } else {
+        setDynamicSlides([]);
+      }
+    };
+
+    window.addEventListener("gg_hero_banners_updated", onHeroUpdate);
+    window.addEventListener("storage", onHeroUpdate);
+
+    return () => {
+      window.removeEventListener("gg_hero_banners_updated", onHeroUpdate);
+      window.removeEventListener("storage", onHeroUpdate);
+    };
+  }, []);
 
   // Auto rotate slides smoothly (pauses on hover)
   useEffect(() => {
@@ -249,96 +305,180 @@ export default function Home() {
   useEffect(() => {
     registerFcmToken();
 
+    const applyFrontendBanners = () => {
+      if (typeof window === "undefined") return;
+      try {
+        const deletedRaw = localStorage.getItem("gg_deleted_banner_ids");
+        const deletedIds: string[] = deletedRaw ? JSON.parse(deletedRaw) : [];
+        const cardLinksRaw = localStorage.getItem("gg_card_links");
+        const cardLinks: Record<string, string> = cardLinksRaw ? JSON.parse(cardLinksRaw) : {};
+
+        setDeletedBannerIds(deletedIds);
+        setCardLinks(cardLinks);
+
+        let storedBanners: any[] = [];
+        const storedBannersRaw = localStorage.getItem("gg_frontend_home_banners");
+        if (storedBannersRaw) {
+          try {
+            const parsed = JSON.parse(storedBannersRaw);
+            if (Array.isArray(parsed) && parsed.length > 0) storedBanners = parsed;
+          } catch (e) {}
+        }
+        if (storedBanners.length === 0) {
+          const cachedRaw = localStorage.getItem("gg_synced_homepage_banners");
+          if (cachedRaw) {
+            try {
+              const parsed = JSON.parse(cachedRaw);
+              if (Array.isArray(parsed) && parsed.length > 0) storedBanners = parsed;
+            } catch (e) {}
+          }
+        }
+
+        const heroStoredRaw = localStorage.getItem("gg_frontend_hero_banners");
+        if (heroStoredRaw) {
+          try {
+            const parsedHero = JSON.parse(heroStoredRaw);
+            if (Array.isArray(parsedHero)) {
+              parsedHero.forEach((hb: any, idx: number) => {
+                const hId = hb.id || `hero-slide-${idx + 1}`;
+                if (!storedBanners.some((b: any) => b.id === hId)) {
+                  storedBanners.push({
+                    id: hId,
+                    title: hb.title || `Hero Slide ${idx + 1}`,
+                    page: "Hero Slides",
+                    imageUrl: hb.mediaUrl || hb.imageUrl || hb.img,
+                    mobileImageUrl: hb.mobileImageUrl || hb.mediaUrl || hb.imageUrl || hb.img,
+                    tabletImageUrl: hb.tabletImageUrl || hb.mediaUrl || hb.imageUrl || hb.img,
+                    linkUrl: hb.ctaLink || hb.linkUrl || hb.link || "/shop",
+                    isActive: hb.isActive !== false,
+                    sortOrder: hb.order || idx + 1
+                  });
+                }
+              });
+            }
+          } catch (e) {}
+        }
+
+        const map = new Map();
+        (MASTER_HOMEPAGE_BANNERS || []).forEach((item) => {
+          const isDeleted = deletedIds.includes(item.id) || deletedIds.includes(item.page);
+          map.set(item.id, {
+            ...item,
+            imageUrl: isDeleted ? "" : item.imageUrl
+          });
+        });
+
+        storedBanners.forEach((b: any) => {
+          if (!b || !b.id) return;
+          const isDeleted = deletedIds.includes(b.id) || (b.page && deletedIds.includes(b.page));
+          if (map.has(b.id)) {
+            const existing = map.get(b.id);
+            map.set(b.id, {
+              ...existing,
+              ...b,
+              imageUrl: isDeleted ? "" : (b.imageUrl ?? existing.imageUrl)
+            });
+          } else {
+            if (!isDeleted) map.set(b.id, b);
+          }
+        });
+
+        setHomepageBanners(Array.from(map.values()));
+
+        // Also update dynamicSections
+        setDynamicSections((prev) => {
+          const updated = { ...prev };
+          storedBanners.forEach((b: any) => {
+            if (!b || deletedIds.includes(b.id) || deletedIds.includes(b.page)) return;
+            const p = (b.page || "").toLowerCase();
+            const id = (b.id || "").toLowerCase();
+            const customLink = cardLinks[b.id] || b.linkUrl;
+            const bannerObj = { ...b, linkUrl: customLink || b.linkUrl };
+
+            if (p.includes("category") || id.startsWith("cat-card-") || id.startsWith("cat-")) {
+              const list = [...(updated.SHOP_BY_CATEGORY || [])];
+              const cleanDef = (b.title || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+              const idx = list.findIndex(c => c.id === b.id || (b.title && c.title && c.title.toLowerCase().replace(/[^a-z0-9]/g, "").includes(cleanDef)));
+              if (idx >= 0) list[idx] = { ...list[idx], ...bannerObj };
+              else list.push(bannerObj);
+              updated.SHOP_BY_CATEGORY = list;
+            } else if (p.includes("concern") || id.startsWith("concern-card-") || id.startsWith("concern-")) {
+              const list = [...(updated.SHOP_BY_CONCERN || [])];
+              const cleanDef = (b.title || "").toLowerCase().replace(/[^a-z0-9]/g, "").replace("treatment", "").replace("solution", "");
+              const idx = list.findIndex(c => c.id === b.id || (b.title && c.title && c.title.toLowerCase().replace(/[^a-z0-9]/g, "").includes(cleanDef)));
+              if (idx >= 0) list[idx] = { ...list[idx], ...bannerObj };
+              else list.push(bannerObj);
+              updated.SHOP_BY_CONCERN = list;
+            } else if (p.includes("deal") || id.startsWith("deal-")) {
+              const list = [...(updated.DEALS_YOU_CANNOT_MISS || [])];
+              const idx = list.findIndex(c => c.id === b.id || (b.page && c.page && b.page.toLowerCase().trim() === c.page.toLowerCase().trim()));
+              if (idx >= 0) list[idx] = { ...list[idx], ...bannerObj };
+              else list.push(bannerObj);
+              updated.DEALS_YOU_CANNOT_MISS = list;
+            } else if (p.includes("brand offer") || id.startsWith("brand-offer-")) {
+              const list = [...(updated.TOP_BRANDS_OFFERS || [])];
+              const idx = list.findIndex(c => c.id === b.id || (b.page && c.page && b.page.toLowerCase().trim() === c.page.toLowerCase().trim()));
+              if (idx >= 0) list[idx] = { ...list[idx], ...bannerObj };
+              else list.push(bannerObj);
+              updated.TOP_BRANDS_OFFERS = list;
+            } else if (p.includes("bogo") || p.includes("combo") || p.includes("offers") || p.includes("clearance") || id.startsWith("lto-") || id.startsWith("limited-")) {
+              const list = [...(updated.LIMITED_TIME_OFFERS || [])];
+              const idx = list.findIndex(c => c.id === b.id || (id.includes("bogo") && c.id.includes("bogo")) || (id.includes("combo") && c.id.includes("combo")) || (id.includes("offers") && c.id.includes("exclusive")) || (id.includes("clearance") && c.id.includes("sale")));
+              if (idx >= 0) list[idx] = { ...list[idx], ...bannerObj };
+              else list.push(bannerObj);
+              updated.LIMITED_TIME_OFFERS = list;
+            } else if (p.includes("wide") || p.includes("promo") || id.includes("wide") || id.startsWith("promo-")) {
+              updated.PROMO_BANNER = [bannerObj];
+            }
+          });
+
+          if (deletedIds.length > 0) {
+            Object.keys(updated).forEach((key) => {
+              updated[key] = (updated[key] || []).filter(
+                (item: any) => !deletedIds.includes(item.id) && !deletedIds.includes(item.page)
+              );
+            });
+          }
+
+          return updated;
+        });
+
+        if (typeof window !== "undefined") {
+          idbGet("gg_frontend_home_banners").then((idbBanners) => {
+            if (Array.isArray(idbBanners) && idbBanners.length > 0) {
+              setHomepageBanners((prev) => {
+                const map = new Map();
+                (prev || []).forEach((item: any) => {
+                  if (item && item.id && !deletedIds.includes(item.id) && !deletedIds.includes(item.page)) {
+                    map.set(item.id, item);
+                  }
+                });
+                idbBanners.forEach((b: any) => {
+                  if (b && b.id && !deletedIds.includes(b.id) && !deletedIds.includes(b.page)) {
+                    map.set(b.id, { ...(map.get(b.id) || {}), ...b });
+                  }
+                });
+                return Array.from(map.values());
+              });
+            }
+          });
+        }
+      } catch (e) {
+        console.error("Error applying frontend banners", e);
+      }
+    };
+
+    applyFrontendBanners();
+    window.addEventListener("gg_home_banners_updated", applyFrontendBanners);
+    window.addEventListener("storage", applyFrontendBanners);
+
     const fetchMetadata = async (bypass: boolean = true) => {
       try {
         const timestamp = Date.now();
-        let combinedSlides: any[] = [];
-        // 1. Fetch internal local dynamic homepage banners & config (instant & decoupled from backend)
-        try {
-          const [localBannersRes, heroBannersRes] = await Promise.all([
-            fetch(`/api/local-banners?t=${timestamp}`, { cache: "no-store" }).then(r => r.ok ? r.json() : null).catch(() => null),
-            fetch(`/api/hero-banners-local?t=${timestamp}`, { cache: "no-store" }).then(r => r.ok ? r.json() : null).catch(() => null),
-          ]);
-
-          const heroSource = (Array.isArray(heroBannersRes) && heroBannersRes.length > 0)
-            ? heroBannersRes
-            : (Array.isArray(localBannersRes?.heroBanners) && localBannersRes.heroBanners.length > 0 ? localBannersRes.heroBanners : []);
-
-          if (heroSource.length > 0) {
-            const localHeroSlides = heroSource
-              .filter((b: any) => b.isActive !== false)
-              .map((b: any, idx: number) => {
-                const rawUrl = b.mediaUrl || b.imageUrl || "";
-                const isVideoFile = rawUrl.includes(".mp4") || rawUrl.includes(".webm") || rawUrl.includes(".mov");
-                const isGifFile = rawUrl.includes(".gif");
-                const detectedType = b.mediaType || (isVideoFile ? "video" : isGifFile ? "gif" : "image");
-                const resolved = safeImageUrl(rawUrl);
-                return {
-                  id: b.id || `hero-local-${idx}`,
-                  title: b.title || "GlowGoodly",
-                  desc: b.subtitle || "",
-                  mediaUrl: resolved,
-                  mediaType: detectedType,
-                  img: resolved,
-                  mobileImg: safeImageUrl(b.mobileImageUrl || rawUrl),
-                  tabletImg: safeImageUrl(b.tabletImageUrl || rawUrl),
-                  link: b.linkUrl || b.ctaLink || "/shop"
-                };
-              });
-            if (localHeroSlides.length > 0) {
-              combinedSlides = localHeroSlides;
-              setDynamicSlides(combinedSlides);
-              if (typeof window !== "undefined") {
-                try { localStorage.setItem("gg_synced_dynamic_slides", JSON.stringify(combinedSlides)); } catch (_) {}
-              }
-            } else {
-              setDynamicSlides([]);
-              if (typeof window !== "undefined") {
-                try { localStorage.removeItem("gg_synced_dynamic_slides"); } catch (_) {}
-              }
-            }
-          } else {
-            setDynamicSlides([]);
-            if (typeof window !== "undefined") {
-              try { localStorage.removeItem("gg_synced_dynamic_slides"); } catch (_) {}
-            }
-          }
-
-          if (localBannersRes) {
-            const newSections = {
-              DEALS_YOU_CANNOT_MISS: localBannersRes.dealsYouCannotMiss || defaultHomepageBanners.dealsYouCannotMiss || [],
-              TOP_BRANDS_OFFERS: localBannersRes.topBrandsOffers || defaultHomepageBanners.topBrandsOffers || [],
-              LIMITED_TIME_OFFERS: localBannersRes.limitedTimeOffers || defaultHomepageBanners.limitedTimeOffers || [],
-              SHOP_BY_CATEGORY: localBannersRes.shopByCategory || defaultHomepageBanners.shopByCategory || [],
-              SHOP_BY_CONCERN: localBannersRes.shopByConcern || defaultHomepageBanners.shopByConcern || [],
-              PROMO_BANNER: localBannersRes.promoBanner || (defaultHomepageBanners as any).promoBanner || [],
-            };
-            setDynamicSections(newSections);
-
-            const flattenedLocal = [
-              ...(localBannersRes.heroBanners || []),
-              ...(localBannersRes.dealsYouCannotMiss || []),
-              ...(localBannersRes.topBrandsOffers || []),
-              ...(localBannersRes.limitedTimeOffers || []),
-              ...(localBannersRes.shopByCategory || []),
-              ...(localBannersRes.shopByConcern || []),
-              ...(localBannersRes.promoBanner || [])
-            ];
-            setHomepageBanners(flattenedLocal);
-            if (typeof window !== "undefined") {
-              try {
-                localStorage.setItem("gg_synced_homepage_banners", JSON.stringify(flattenedLocal));
-                localStorage.setItem("gg_synced_dynamic_sections", JSON.stringify(newSections));
-              } catch (_) {}
-            }
-          }
-        } catch (_) {}
-
-        // 2. Fetch backend categories, brands & banners (deduplicated & unified)
-        const [categoriesRes, brandsRes, backendBannersRes] = await Promise.all([
-          fetchWithCache(`${API_BASE}/categories`, bypass).catch(() => null),
-          fetchWithCache(`${API_BASE}/brands`, bypass).catch(() => null),
-          fetchWithCache(`${API_BASE}/banners?t=${timestamp}`, bypass).catch(() => null),
+        // Fetch categories and brands strictly from backend API for product filtering
+        const [categoriesRes, brandsRes] = await Promise.all([
+          fetchWithCache(`${API_BASE}/categories?t=${timestamp}`, true).catch(() => null),
+          fetchWithCache(`${API_BASE}/brands?t=${timestamp}`, true).catch(() => null),
         ]);
 
         if (Array.isArray(categoriesRes) && categoriesRes.length > 0) {
@@ -348,66 +488,10 @@ export default function Home() {
           setBrands(brandsRes);
         }
 
-        if (Array.isArray(backendBannersRes) && backendBannersRes.length > 0) {
-          setHomepageBanners((prev) => {
-            const map = new Map();
-            (prev || []).forEach((item: any) => {
-              if (item && item.id) map.set(item.id, item);
-            });
-            backendBannersRes.forEach((b: any) => {
-              if (b && b.id) map.set(b.id, { ...(map.get(b.id) || {}), ...b });
-            });
-            return Array.from(map.values());
-          });
-
-          // Also merge into dynamicSections
-          setDynamicSections((prev) => {
-            const updated = { ...prev };
-            backendBannersRes.forEach((b: any) => {
-              const p = (b.page || "").toLowerCase();
-              const id = (b.id || "").toLowerCase();
-              if (p.includes("category") || id.startsWith("cat-card-") || id.startsWith("cat-")) {
-                const list = [...(updated.SHOP_BY_CATEGORY || [])];
-                const idx = list.findIndex(c => c.id === b.id || (b.title && c.title && c.title.toLowerCase().includes(b.title.toLowerCase())));
-                if (idx >= 0) list[idx] = { ...list[idx], ...b };
-                else list.push(b);
-                updated.SHOP_BY_CATEGORY = list;
-              } else if (p.includes("concern") || id.startsWith("concern-card-") || id.startsWith("concern-")) {
-                const list = [...(updated.SHOP_BY_CONCERN || [])];
-                const idx = list.findIndex(c => c.id === b.id || (b.title && c.title && c.title.toLowerCase().replace(/[^a-z0-9]/g, "").includes(b.title.toLowerCase().replace(/[^a-z0-9]/g, ""))));
-                if (idx >= 0) list[idx] = { ...list[idx], ...b };
-                else list.push(b);
-                updated.SHOP_BY_CONCERN = list;
-              } else if (p.includes("deal") || id.startsWith("deal-")) {
-                const list = [...(updated.DEALS_YOU_CANNOT_MISS || [])];
-                const idx = list.findIndex(c => c.id === b.id);
-                if (idx >= 0) list[idx] = { ...list[idx], ...b };
-                else list.push(b);
-                updated.DEALS_YOU_CANNOT_MISS = list;
-              } else if (p.includes("brand offer") || id.startsWith("brand-offer-")) {
-                const list = [...(updated.TOP_BRANDS_OFFERS || [])];
-                const idx = list.findIndex(c => c.id === b.id);
-                if (idx >= 0) list[idx] = { ...list[idx], ...b };
-                else list.push(b);
-                updated.TOP_BRANDS_OFFERS = list;
-              } else if (p.includes("bogo") || p.includes("combo") || p.includes("offers") || p.includes("clearance") || id.startsWith("lto-") || id.startsWith("limited-")) {
-                const list = [...(updated.LIMITED_TIME_OFFERS || [])];
-                const idx = list.findIndex(c => c.id === b.id);
-                if (idx >= 0) list[idx] = { ...list[idx], ...b };
-                else list.push(b);
-                updated.LIMITED_TIME_OFFERS = list;
-              }
-            });
-            return updated;
-          });
-        }
-
-        if (combinedSlides.length > 0) {
-          setDynamicSlides(combinedSlides);
-        }
-
-        if (combinedSlides.length > 0) {
-          setDynamicSlides(combinedSlides);
+        // Hero banners strictly load from frontend LocalStorage (no backend banner fetch)
+        const localHeroSlides = loadFrontendHeroBanners();
+        if (localHeroSlides.length > 0) {
+          setDynamicSlides(localHeroSlides);
         }
 
         const notifRes = await fetchWithCache(`${API_BASE}/notifications/active?t=${timestamp}`, true).catch(() => null);
@@ -443,6 +527,8 @@ export default function Home() {
     const unsub = subscribeToDataSync(() => fetchMetadata(true));
 
     return () => {
+      window.removeEventListener("gg_home_banners_updated", applyFrontendBanners);
+      window.removeEventListener("storage", applyFrontendBanners);
       unsub();
       if (socket) socket.disconnect();
     };
@@ -479,7 +565,7 @@ export default function Home() {
     setAddingToCartId(product.id);
     const primaryVariant = product.variants?.[0];
     const primaryImage = getProductImage(product);
-    const effectivePrice = primaryVariant 
+    const effectivePrice = primaryVariant
       ? (primaryVariant.discountPrice || primaryVariant.price)
       : ((product as any).price || 0);
 
@@ -529,7 +615,7 @@ export default function Home() {
       </h1>
 
       {/* Full-width Dynamic Promotional Banner Slider - Preloaded CSS Sliding Carousel */}
-      {activeSlidesList.length > 0 && (() => {
+      {(() => {
         const safeSlideIdx = activeSlide % (activeSlidesList.length || 1);
         return (
           <section
@@ -556,7 +642,7 @@ export default function Home() {
             >
               {activeSlidesList.map((slide, idx) => {
                 const isVideo = slide?.mediaType === "video" || slide?.mediaUrl?.includes(".mp4") || slide?.mediaUrl?.includes(".webm");
-                const slideImg = slide?.img || slide?.mediaUrl || "/placeholder-product.svg";
+                const slideImg = slide?.img || slide?.mediaUrl || DEFAULT_HERO_SLIDES[idx % DEFAULT_HERO_SLIDES.length].img;
                 const slideMobileImg = slide?.mobileImg || slideImg;
                 const slideTabletImg = slide?.tabletImg || slideImg;
                 const isExternal = slide?.link?.startsWith("http");
@@ -850,7 +936,7 @@ export default function Home() {
                       onClick={() => handleAddToCart(p)}
                       disabled={addingToCartId === p.id}
                       style={{
-                        backgroundColor: addingToCartId === p.id ? "#059669" : "#e63b7a",
+                        backgroundColor: addingToCartId === p.id ? "#059669" : "#581c87",
                         color: "#ffffff",
                         border: "none",
                         padding: "12px",
@@ -863,7 +949,7 @@ export default function Home() {
                         transition: "all 0.2s ease"
                       }}
                     >
-                      {addingToCartId === p.id ? "✓ ADDED!" : "ADD TO BAG"}
+                      {addingToCartId === p.id ? "✓ ADDED!" : "ADD TO CART"}
                     </button>
                   </div>
                 );
@@ -950,7 +1036,7 @@ export default function Home() {
                         onClick={() => handleAddToCart(p)}
                         disabled={addingToCartId === p.id}
                         style={{
-                          backgroundColor: addingToCartId === p.id ? "#059669" : "#e63b7a",
+                          backgroundColor: addingToCartId === p.id ? "#059669" : "#581c87",
                           color: "#ffffff",
                           border: "none",
                           padding: "12px",
@@ -963,7 +1049,7 @@ export default function Home() {
                           transition: "all 0.2s ease"
                         }}
                       >
-                        {addingToCartId === p.id ? "✓ ADDED!" : "ADD TO BAG"}
+                        {addingToCartId === p.id ? "✓ ADDED!" : "ADD TO CART"}
                       </button>
                     </div>
                   );
@@ -974,54 +1060,89 @@ export default function Home() {
         })()}
 
         {/* DEALS YOU CANNOT MISS Section */}
-        {(() => {
-          const DEFAULT_DEAL_CARDS = [
-            { id: "deal-1", title: "Ombre 30% Off", fallbackImg: "/banners/deal-1.png", linkUrl: "/shop?deal=ombre" },
-            { id: "deal-2", title: "Serum Flat 25% Off", fallbackImg: "/banners/deal-2.png", linkUrl: "/shop?deal=serum" },
-            { id: "deal-3", title: "Lipstick Buy 1 Get 1", fallbackImg: "/banners/deal-3.gif", linkUrl: "/shop?deal=lipstick" },
-            { id: "deal-4", title: "Sunscreen Special", fallbackImg: "/banners/deal-4.jpg", linkUrl: "/shop?deal=sunscreen" }
-          ];
-
-          const dycmItems = DEFAULT_DEAL_CARDS.map((defCard) => {
-            const uploaded = (dynamicSections.DEALS_YOU_CANNOT_MISS || []).find((c: any) => c.id === defCard.id);
-            return {
-              ...defCard,
-              ...(uploaded || {}),
-              imageUrl: uploaded?.imageUrl || defCard.fallbackImg,
-              linkUrl: uploaded?.linkUrl || defCard.linkUrl,
-              updatedAt: uploaded?.updatedAt
-            };
-          });
-
-          return (
-            <section style={{ margin: "30px 0 40px 0" }}>
-              <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "20px", color: "#000" }}>
-                DEALS YOU CANNOT MISS
-              </h2>
-              <div className="dycm-grid">
-                {dycmItems.map((item: any, idx: number) => {
-                  const img = safeImageUrl(item.imageUrl, item.fallbackImg, item.updatedAt);
-                  const link = item.linkUrl || "/shop";
-                  return (
-                    <Link key={item.id || idx} href={link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-                      {img ? (
-                        <img 
-                          src={img} 
-                          alt={item.title || `Deal Card ${idx + 1}`} 
-                          style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} 
-                        />
-                      ) : (
-                        <div style={{ width: "100%", aspectRatio: "1/1", background: "linear-gradient(135deg, #fdf2f8, #fce7f3)", display: "flex", alignItems: "center", justifyContent: "center", color: "#db2777", fontWeight: "800", fontSize: "13px", textAlign: "center", padding: "10px" }}>
-                          {item.title || "Special Deal"}
-                        </div>
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })()}
+        <section style={{ margin: "30px 0 40px 0" }}>
+          <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "20px", color: "#000" }}>
+            DEALS YOU CANNOT MISS
+          </h2>
+          <div className="dycm-grid" suppressHydrationWarning>
+            {/* Card 1 */}
+            {(() => {
+              const b = getBannerForPage("Deal Card 1", "", "Ombre 30% Off", "/shop?deal=ombre");
+              return (
+                <Link href={b.link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
+                  {b.img ? (
+                    <img
+                      src={b.img}
+                      alt={b.title || "Deal Card 1"}
+                      style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }}
+                    />
+                  ) : (
+                    <div style={{ width: "100%", aspectRatio: "1/1", background: "linear-gradient(135deg, #fdf2f8, #fce7f3)", display: "flex", alignItems: "center", justifyContent: "center", color: "#db2777", fontWeight: "800", fontSize: "13px", textAlign: "center", padding: "10px" }}>
+                      {b.title || "Special Deal"}
+                    </div>
+                  )}
+                </Link>
+              );
+            })()}
+            {/* Card 2 */}
+            {(() => {
+              const b = getBannerForPage("Deal Card 2", "", "Marico Free Delivery", "/shop?deal=marico");
+              return (
+                <Link href={b.link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
+                  {b.img ? (
+                    <img
+                      src={b.img}
+                      alt={b.title || "Deal Card 2"}
+                      style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }}
+                    />
+                  ) : (
+                    <div style={{ width: "100%", aspectRatio: "1/1", background: "linear-gradient(135deg, #eff6ff, #dbeafe)", display: "flex", alignItems: "center", justifyContent: "center", color: "#2563eb", fontWeight: "800", fontSize: "13px", textAlign: "center", padding: "10px" }}>
+                      {b.title || "Free Delivery Deal"}
+                    </div>
+                  )}
+                </Link>
+              );
+            })()}
+            {/* Card 3 */}
+            {(() => {
+              const b = getBannerForPage("Deal Card 3", "", "PNS Campaign", "/shop?deal=pns");
+              return (
+                <Link href={b.link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
+                  {b.img ? (
+                    <img
+                      src={b.img}
+                      alt={b.title || "Deal Card 3"}
+                      style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }}
+                    />
+                  ) : (
+                    <div style={{ width: "100%", aspectRatio: "1/1", background: "linear-gradient(135deg, #f0fdf4, #dcfce7)", display: "flex", alignItems: "center", justifyContent: "center", color: "#16a34a", fontWeight: "800", fontSize: "13px", textAlign: "center", padding: "10px" }}>
+                      {b.title || "Campaign Offer"}
+                    </div>
+                  )}
+                </Link>
+              );
+            })()}
+            {/* Card 4 */}
+            {(() => {
+              const b = getBannerForPage("Deal Card 4", "", "Senora Deal", "/shop?deal=senora");
+              return (
+                <Link href={b.link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
+                  {b.img ? (
+                    <img
+                      src={b.img}
+                      alt={b.title || "Deal Card 4"}
+                      style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }}
+                    />
+                  ) : (
+                    <div style={{ width: "100%", aspectRatio: "1/1", background: "linear-gradient(135deg, #faf5ff, #f3e8ff)", display: "flex", alignItems: "center", justifyContent: "center", color: "#9333ea", fontWeight: "800", fontSize: "13px", textAlign: "center", padding: "10px" }}>
+                      {b.title || "Top Deal"}
+                    </div>
+                  )}
+                </Link>
+              );
+            })()}
+          </div>
+        </section>
 
         {/* SKIN CARE Section */}
         {(() => {
@@ -1099,7 +1220,7 @@ export default function Home() {
                         onClick={() => handleAddToCart(p)}
                         disabled={addingToCartId === p.id}
                         style={{
-                          backgroundColor: addingToCartId === p.id ? "#059669" : "#e63b7a",
+                          backgroundColor: addingToCartId === p.id ? "#059669" : "#581c87",
                           color: "#ffffff",
                           border: "none",
                           padding: "12px",
@@ -1112,7 +1233,7 @@ export default function Home() {
                           transition: "all 0.2s ease"
                         }}
                       >
-                        {addingToCartId === p.id ? "✓ ADDED!" : "ADD TO BAG"}
+                        {addingToCartId === p.id ? "✓ ADDED!" : "ADD TO CART"}
                       </button>
                     </div>
                   );
@@ -1123,54 +1244,89 @@ export default function Home() {
         })()}
 
         {/* TOP BRANDS & OFFERS Section */}
-        {(() => {
-          const DEFAULT_BRAND_OFFERS = [
-            { id: "brand-offer-1", title: "Beauty Glazed Festive Offer", fallbackImg: "/banners/brand-offer-1.png", linkUrl: "/shop?brand=beauty-glazed" },
-            { id: "brand-offer-2", title: "Pudaier Glam Kits", fallbackImg: "/banners/brand-offer-2.gif", linkUrl: "/shop?brand=pudaier" },
-            { id: "brand-offer-3", title: "L'Oreal Paris Haircare", fallbackImg: "/banners/brand-offer-5.png", linkUrl: "/shop?brand=loreal" },
-            { id: "brand-offer-4", title: "Wet n Wild Essentials", fallbackImg: "/banners/brand-offer-6.gif", linkUrl: "/shop?brand=wet-n-wild" }
-          ];
-
-          const brandItems = DEFAULT_BRAND_OFFERS.map((defCard) => {
-            const uploaded = (dynamicSections.TOP_BRANDS_OFFERS || []).find((c: any) => c.id === defCard.id);
-            return {
-              ...defCard,
-              ...(uploaded || {}),
-              imageUrl: uploaded?.imageUrl || defCard.fallbackImg,
-              linkUrl: uploaded?.linkUrl || defCard.linkUrl,
-              updatedAt: uploaded?.updatedAt
-            };
-          });
-
-          return (
-            <section style={{ margin: "30px 0" }}>
-              <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "16px", color: "#000" }}>
-                TOP BRANDS & OFFERS
-              </h2>
-              <div className="top-brands-grid">
-                {brandItems.map((item: any, idx: number) => {
-                  const img = safeImageUrl(item.imageUrl, item.fallbackImg, item.updatedAt);
-                  const link = item.linkUrl || "/shop";
-                  return (
-                    <Link key={item.id || idx} href={link} style={{ display: "block", overflow: "hidden", borderRadius: "10px", transition: "transform 0.2s ease" }} className="promo-card-hover">
-                      {img ? (
-                        <img 
-                          src={img} 
-                          alt={item.title || `Brand Offer ${idx + 1}`} 
-                          style={{ width: "100%", height: "auto", display: "block", borderRadius: "10px" }} 
-                        />
-                      ) : (
-                        <div style={{ width: "100%", aspectRatio: "1/1", background: "linear-gradient(135deg, #f8fafc, #f1f5f9)", display: "flex", alignItems: "center", justifyContent: "center", color: "#475569", fontWeight: "800", fontSize: "13px", textAlign: "center", padding: "10px", borderRadius: "10px" }}>
-                          {item.title || "Brand Offer"}
-                        </div>
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })()}
+        <section style={{ margin: "30px 0" }}>
+          <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "16px", color: "#000" }}>
+            TOP BRANDS & OFFERS
+          </h2>
+          <div className="top-brands-grid" suppressHydrationWarning>
+            {/* Banner 1 */}
+            {(() => {
+              const b = getBannerForPage("Brand Offer 1", "", "The Ordinary", "/shop?brand=the-ordinary");
+              return (
+                <Link href={b.link} style={{ display: "block", overflow: "hidden", borderRadius: "10px", transition: "transform 0.2s ease" }} className="promo-card-hover">
+                  {b.img ? (
+                    <img
+                      src={b.img}
+                      alt={b.title || "Brand Offer 1"}
+                      style={{ width: "100%", height: "auto", display: "block", borderRadius: "10px" }}
+                    />
+                  ) : (
+                    <div style={{ width: "100%", aspectRatio: "1/1", background: "linear-gradient(135deg, #f8fafc, #f1f5f9)", display: "flex", alignItems: "center", justifyContent: "center", color: "#475569", fontWeight: "800", fontSize: "13px", textAlign: "center", padding: "10px", borderRadius: "10px" }}>
+                      {b.title || "Brand Offer 1"}
+                    </div>
+                  )}
+                </Link>
+              );
+            })()}
+            {/* Banner 2 */}
+            {(() => {
+              const b = getBannerForPage("Brand Offer 2", "", "Skin Cafe", "/shop?brand=skin-cafe");
+              return (
+                <Link href={b.link} style={{ display: "block", overflow: "hidden", borderRadius: "10px", transition: "transform 0.2s ease" }} className="promo-card-hover">
+                  {b.img ? (
+                    <img
+                      src={b.img}
+                      alt={b.title || "Brand Offer 2"}
+                      style={{ width: "100%", height: "auto", display: "block", borderRadius: "10px" }}
+                    />
+                  ) : (
+                    <div style={{ width: "100%", aspectRatio: "1/1", background: "linear-gradient(135deg, #f0fdf4, #dcfce7)", display: "flex", alignItems: "center", justifyContent: "center", color: "#16a34a", fontWeight: "800", fontSize: "13px", textAlign: "center", padding: "10px", borderRadius: "10px" }}>
+                      {b.title || "Brand Offer 2"}
+                    </div>
+                  )}
+                </Link>
+              );
+            })()}
+            {/* Banner 5 */}
+            {(() => {
+              const b = getBannerForPage("Brand Offer 5", "", "Treasure of Glow", "/shop?brand=treasure-of-glow");
+              return (
+                <Link href={b.link} style={{ display: "block", overflow: "hidden", borderRadius: "10px", transition: "transform 0.2s ease" }} className="promo-card-hover">
+                  {b.img ? (
+                    <img
+                      src={b.img}
+                      alt={b.title || "Brand Offer 5"}
+                      style={{ width: "100%", height: "auto", display: "block", borderRadius: "10px" }}
+                    />
+                  ) : (
+                    <div style={{ width: "100%", aspectRatio: "1/1", background: "linear-gradient(135deg, #fdf2f8, #fce7f3)", display: "flex", alignItems: "center", justifyContent: "center", color: "#db2777", fontWeight: "800", fontSize: "13px", textAlign: "center", padding: "10px", borderRadius: "10px" }}>
+                      {b.title || "Brand Offer 5"}
+                    </div>
+                  )}
+                </Link>
+              );
+            })()}
+            {/* Banner 6 */}
+            {(() => {
+              const b = getBannerForPage("Brand Offer 6", "", "Trimmer Offer", "/shop?category=trimmer");
+              return (
+                <Link href={b.link} style={{ display: "block", overflow: "hidden", borderRadius: "10px", transition: "transform 0.2s ease" }} className="promo-card-hover">
+                  {b.img ? (
+                    <img
+                      src={b.img}
+                      alt={b.title || "Brand Offer 6"}
+                      style={{ width: "100%", height: "auto", display: "block", borderRadius: "10px" }}
+                    />
+                  ) : (
+                    <div style={{ width: "100%", aspectRatio: "1/1", background: "linear-gradient(135deg, #eff6ff, #dbeafe)", display: "flex", alignItems: "center", justifyContent: "center", color: "#2563eb", fontWeight: "800", fontSize: "13px", textAlign: "center", padding: "10px", borderRadius: "10px" }}>
+                      {b.title || "Brand Offer 6"}
+                    </div>
+                  )}
+                </Link>
+              );
+            })()}
+          </div>
+        </section>
 
         {/* BOGO Section */}
         {(() => {
@@ -1248,7 +1404,7 @@ export default function Home() {
                         onClick={() => handleAddToCart(p)}
                         disabled={addingToCartId === p.id}
                         style={{
-                          backgroundColor: addingToCartId === p.id ? "#059669" : "#e63b7a",
+                          backgroundColor: addingToCartId === p.id ? "#059669" : "#581c87",
                           color: "#ffffff",
                           border: "none",
                           padding: "12px",
@@ -1261,7 +1417,7 @@ export default function Home() {
                           transition: "all 0.2s ease"
                         }}
                       >
-                        {addingToCartId === p.id ? "✓ ADDED!" : "ADD TO BAG"}
+                        {addingToCartId === p.id ? "✓ ADDED!" : "ADD TO CART"}
                       </button>
                     </div>
                   );
@@ -1347,7 +1503,7 @@ export default function Home() {
                         onClick={() => handleAddToCart(p)}
                         disabled={addingToCartId === p.id}
                         style={{
-                          backgroundColor: addingToCartId === p.id ? "#059669" : "#e63b7a",
+                          backgroundColor: addingToCartId === p.id ? "#059669" : "#581c87",
                           color: "#ffffff",
                           border: "none",
                           padding: "12px",
@@ -1360,7 +1516,7 @@ export default function Home() {
                           transition: "all 0.2s ease"
                         }}
                       >
-                        {addingToCartId === p.id ? "✓ ADDED!" : "ADD TO BAG"}
+                        {addingToCartId === p.id ? "✓ ADDED!" : "ADD TO CART"}
                       </button>
                     </div>
                   );
@@ -1371,54 +1527,89 @@ export default function Home() {
         })()}
 
         {/* LIMITED TIME OFFERS Section */}
-        {(() => {
-          const DEFAULT_LTO_CARDS = [
-            { id: "lto-bogo", title: "DOUBLE THE FUN WITH BOGO", fallbackImg: "/banners/offer-bogo.jpg", linkUrl: "/shop?deal=bogo" },
-            { id: "lto-combo", title: "PERFECT MATCH COMBO", fallbackImg: "/banners/offer-combo.jpg", linkUrl: "/combos" },
-            { id: "lto-exclusive", title: "EXCLUSIVE OFFERS", fallbackImg: "/banners/offer-exclusive.jpg", linkUrl: "/shop?deal=exclusive" },
-            { id: "lto-sale", title: "CLEARANCE SALE", fallbackImg: "/banners/offer-sale.jpg", linkUrl: "/shop?category=clearance-sale" }
-          ];
-
-          const limitedItems = DEFAULT_LTO_CARDS.map((defCard) => {
-            const uploaded = (dynamicSections.LIMITED_TIME_OFFERS || []).find((c: any) => c.id === defCard.id);
-            return {
-              ...defCard,
-              ...(uploaded || {}),
-              imageUrl: uploaded?.imageUrl || defCard.fallbackImg,
-              linkUrl: uploaded?.linkUrl || defCard.linkUrl,
-              updatedAt: uploaded?.updatedAt
-            };
-          });
-
-          return (
-            <section style={{ margin: "40px 0" }}>
-              <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "20px", color: "#000" }}>
-                LIMITED TIME OFFERS
-              </h2>
-              <div className="limited-offers-grid">
-                {limitedItems.map((item: any, idx: number) => {
-                  const img = safeImageUrl(item.imageUrl, item.fallbackImg, item.updatedAt);
-                  const link = item.linkUrl || "/shop";
-                  return (
-                    <Link key={item.id || idx} href={link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
-                      {img ? (
-                        <img 
-                          src={img} 
-                          alt={item.title || `Offer ${idx + 1}`} 
-                          style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }} 
-                        />
-                      ) : (
-                        <div style={{ width: "100%", aspectRatio: "1/1", background: "linear-gradient(135deg, #fce7f3, #fbcfe8)", display: "flex", alignItems: "center", justifyContent: "center", color: "#db2777", fontWeight: "900", fontSize: "14px", textAlign: "center", padding: "10px" }}>
-                          {item.title || "Limited Time Offer"}
-                        </div>
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })()}
+        <section style={{ margin: "40px 0" }}>
+          <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "20px", color: "#000" }}>
+            LIMITED TIME OFFERS
+          </h2>
+          <div className="limited-offers-grid" suppressHydrationWarning>
+            {/* Card 1: BOGO */}
+            {(() => {
+              const b = getBannerForPage("BOGO", "", "BOGO Deals", "/shop?campaign=BOGO");
+              return (
+                <Link href={b.link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
+                  {b.img ? (
+                    <img
+                      src={b.img}
+                      alt={b.title || "BOGO Offer"}
+                      style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }}
+                    />
+                  ) : (
+                    <div style={{ width: "100%", aspectRatio: "1/1", background: "linear-gradient(135deg, #fce7f3, #fbcfe8)", display: "flex", alignItems: "center", justifyContent: "center", color: "#db2777", fontWeight: "900", fontSize: "14px", textAlign: "center", padding: "10px" }}>
+                      {b.title || "BOGO Deals"}
+                    </div>
+                  )}
+                </Link>
+              );
+            })()}
+            {/* Card 2: COMBO */}
+            {(() => {
+              const b = getBannerForPage("COMBO", "", "Combo Specials", "/shop?campaign=COMBO");
+              return (
+                <Link href={b.link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
+                  {b.img ? (
+                    <img
+                      src={b.img}
+                      alt={b.title || "COMBO Offer"}
+                      style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }}
+                    />
+                  ) : (
+                    <div style={{ width: "100%", aspectRatio: "1/1", background: "linear-gradient(135deg, #eff6ff, #bfdbfe)", display: "flex", alignItems: "center", justifyContent: "center", color: "#1d4ed8", fontWeight: "900", fontSize: "14px", textAlign: "center", padding: "10px" }}>
+                      {b.title || "Combo Specials"}
+                    </div>
+                  )}
+                </Link>
+              );
+            })()}
+            {/* Card 3: OFFERS */}
+            {(() => {
+              const b = getBannerForPage("OFFERS", "", "Special Offers", "/shop?campaign=OFFERS");
+              return (
+                <Link href={b.link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
+                  {b.img ? (
+                    <img
+                      src={b.img}
+                      alt={b.title || "Exclusive Offers"}
+                      style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }}
+                    />
+                  ) : (
+                    <div style={{ width: "100%", aspectRatio: "1/1", background: "linear-gradient(135deg, #f0fdf4, #bbf7d0)", display: "flex", alignItems: "center", justifyContent: "center", color: "#15803d", fontWeight: "900", fontSize: "14px", textAlign: "center", padding: "10px" }}>
+                      {b.title || "Exclusive Offers"}
+                    </div>
+                  )}
+                </Link>
+              );
+            })()}
+            {/* Card 4: Clearance SALE */}
+            {(() => {
+              const b = getBannerForPage("Clearance SALE", "", "Clearance Sale", "/shop?campaign=Clearance%20SALE");
+              return (
+                <Link href={b.link} style={{ display: "block", overflow: "hidden", borderRadius: "8px" }} className="promo-card-hover">
+                  {b.img ? (
+                    <img
+                      src={b.img}
+                      alt={b.title || "Clearance Sale"}
+                      style={{ width: "100%", height: "auto", aspectRatio: "1/1", objectFit: "cover", display: "block" }}
+                    />
+                  ) : (
+                    <div style={{ width: "100%", aspectRatio: "1/1", background: "linear-gradient(135deg, #fff7ed, #fed7aa)", display: "flex", alignItems: "center", justifyContent: "center", color: "#c2410c", fontWeight: "900", fontSize: "14px", textAlign: "center", padding: "10px" }}>
+                      {b.title || "Clearance Sale"}
+                    </div>
+                  )}
+                </Link>
+              );
+            })()}
+          </div>
+        </section>
 
         {/* PERFECT MATCH WITH COMBO Section */}
         {(() => {
@@ -1501,7 +1692,7 @@ export default function Home() {
                         onClick={() => handleAddToCart(p)}
                         disabled={addingToCartId === p.id}
                         style={{
-                          backgroundColor: addingToCartId === p.id ? "#059669" : "#e63b7a",
+                          backgroundColor: addingToCartId === p.id ? "#059669" : "#581c87",
                           color: "#ffffff",
                           border: "none",
                           padding: "12px",
@@ -1514,7 +1705,7 @@ export default function Home() {
                           transition: "all 0.2s ease"
                         }}
                       >
-                        {addingToCartId === p.id ? "✓ ADDED!" : "ADD TO BAG"}
+                        {addingToCartId === p.id ? "✓ ADDED!" : "ADD TO CART"}
                       </button>
                     </div>
                   );
@@ -1600,7 +1791,7 @@ export default function Home() {
                         onClick={() => handleAddToCart(p)}
                         disabled={addingToCartId === p.id}
                         style={{
-                          backgroundColor: addingToCartId === p.id ? "#059669" : "#e63b7a",
+                          backgroundColor: addingToCartId === p.id ? "#059669" : "#581c87",
                           color: "#ffffff",
                           border: "none",
                           padding: "12px",
@@ -1613,7 +1804,7 @@ export default function Home() {
                           transition: "all 0.2s ease"
                         }}
                       >
-                        {addingToCartId === p.id ? "✓ ADDED!" : "ADD TO BAG"}
+                        {addingToCartId === p.id ? "✓ ADDED!" : "ADD TO CART"}
                       </button>
                     </div>
                   );
@@ -1623,7 +1814,65 @@ export default function Home() {
           );
         })()}
 
-        {/* HAIR CARE Section */}
+        {/* SHOP BEAUTY PRODUCTS BY CATEGORY Section */}
+        {(() => {
+          const displayCats = (categories && categories.length > 0 ? categories.filter((c: any) => !c.parentId).slice(0, 8) : [
+            { name: "Makeup", slug: "makeup" },
+            { name: "Skin", slug: "skin" },
+            { name: "Hair", slug: "hair" },
+            { name: "Personal Care", slug: "personal-care" },
+            { name: "Mom & Baby", slug: "mom-baby" },
+            { name: "Fragrance", slug: "fragrance" },
+            { name: "Undergarments", slug: "undergarments" },
+            { name: "Combo", slug: "combo" }
+          ]).map((item: any) => {
+            const fromDb = categories.find((c: any) => c.name?.toLowerCase().trim() === item.name.toLowerCase() || c.slug === item.slug) || item;
+            return {
+              id: fromDb?.id || `cat-${item.slug}`,
+              name: fromDb?.name || item.name,
+              slug: fromDb?.slug || item.slug,
+              imageUrl: safeImageUrl(fromDb?.imageUrl || fromDb?.image, "/placeholder-product.svg")
+            };
+          });
+
+          return (
+            <section style={{ margin: "40px 0" }}>
+              <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "20px", color: "#000" }}>
+                SHOP BEAUTY PRODUCTS BY CATEGORY
+              </h2>
+              <div className="categories-grid" suppressHydrationWarning>
+                {displayCats.map((cat: any) => {
+                  const catLink = `/shop?category=${encodeURIComponent(cat.slug)}`;
+                  const bannerInfo = getBannerForPage(`Category: ${cat.name}`, "", cat.name, catLink);
+                  const catImg = bannerInfo.img ? safeImageUrl(bannerInfo.img, "") : "";
+                  return (
+                    <Link
+                      key={cat.id || cat.name}
+                      href={bannerInfo.link || catLink}
+                      style={{ display: "block", borderRadius: "10px", overflow: "hidden", cursor: "pointer", textDecoration: "none" }}
+                      className="promo-card-hover"
+                    >
+                      {catImg ? (
+                        <img
+                          src={catImg}
+                          alt={cat.name}
+                          style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block", borderRadius: "10px" }}
+                        />
+                      ) : (
+                        <div style={{ width: "100%", aspectRatio: "1 / 1", background: "linear-gradient(135deg, #fdf2f8, #fbcfe8)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", borderRadius: "10px", padding: "10px" }}>
+                          <span style={{ fontSize: "28px", marginBottom: "4px" }}>✨</span>
+                          <span style={{ fontSize: "12px", fontWeight: "800", color: "#db2777", textAlign: "center" }}>{cat.name}</span>
+                        </div>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })()}
+
+        {/* HAIR CARE Section (Below SHOP BEAUTY PRODUCTS BY CATEGORY) */}
         {(() => {
           const hairProducts = products
             .filter(p => p.category?.name?.toLowerCase().includes("hair") || p.name?.toLowerCase().includes("hair") || p.name?.toLowerCase().includes("shampoo") || p.name?.toLowerCase().includes("conditioner"))
@@ -1699,7 +1948,7 @@ export default function Home() {
                         onClick={() => handleAddToCart(p)}
                         disabled={addingToCartId === p.id}
                         style={{
-                          backgroundColor: addingToCartId === p.id ? "#059669" : "#e63b7a",
+                          backgroundColor: addingToCartId === p.id ? "#059669" : "#581c87",
                           color: "#ffffff",
                           border: "none",
                           padding: "12px",
@@ -1712,7 +1961,7 @@ export default function Home() {
                           transition: "all 0.2s ease"
                         }}
                       >
-                        {addingToCartId === p.id ? "✓ ADDED!" : "ADD TO BAG"}
+                        {addingToCartId === p.id ? "✓ ADDED!" : "ADD TO CART"}
                       </button>
                     </div>
                   );
@@ -1722,18 +1971,11 @@ export default function Home() {
           );
         })()}
 
-        {/* LUXURY PROMOTIONAL BANNER (Above SHOP BY CONCERN - As in Uploaded Design) */}
+        {/* Promotional Banner (Lux Royale Promo) */}
         {(() => {
-          const promo = (dynamicSections.PROMO_BANNER && dynamicSections.PROMO_BANNER[0])
-            || {
-                id: "promo-lux-royale",
-                title: "LUX Royale - Win Authentic GUCCI Bag",
-                imageUrl: "/banners/lux-royale-promo.jpg",
-                linkUrl: "/shop?brand=lux"
-              };
-
-          const promoImg = safeImageUrl(promo.imageUrl, "/banners/lux-royale-promo.jpg", promo.updatedAt);
-          const promoLink = promo.linkUrl || "/shop";
+          const promo = getBannerForPage("Promo Banner", "/banners/lux-royale-promo.jpg", "Promotional Offer", "/shop");
+          const promoImg = promo.img || "/banners/lux-royale-promo.jpg";
+          const promoLink = promo.link || "/shop";
 
           return (
             <section style={{ margin: "25px 0 35px 0" }}>
@@ -1766,87 +2008,96 @@ export default function Home() {
           );
         })()}
 
-        {/* SHOP BEAUTY PRODUCTS BY CATEGORY (Placed Above SHOP BY CONCERN - 8 Category Cards) */}
+        {/* JUST ARRIVED / NEW ARRIVALS Section */}
         {(() => {
-          const DEFAULT_CATEGORY_CARDS = [
-            { id: "cat-makeup", title: "MAKEUP", fallbackImg: "/banners/cat-makeup.jpg", linkUrl: "/shop?category=makeup" },
-            { id: "cat-kbeauty", title: "K-BEAUTY", fallbackImg: "/banners/cat-kbeauty.jpg", linkUrl: "/shop?category=k-beauty" },
-            { id: "cat-haircare", title: "HAIR CARE", fallbackImg: "/banners/cat-haircare.jpg", linkUrl: "/shop?category=haircare" },
-            { id: "cat-mombaby", title: "MOM & BABY", fallbackImg: "/banners/cat-mombaby.jpg", linkUrl: "/shop?category=mom-baby" },
-            { id: "cat-skincare", title: "SKIN CARE", fallbackImg: "/banners/cat-skincare.jpg", linkUrl: "/shop?category=skincare" },
-            { id: "cat-accessories", title: "ACCESSORIES", fallbackImg: "/banners/cat-accessories.jpg", linkUrl: "/shop?category=accessories" },
-            { id: "cat-undergarments", title: "UNDERGARMENTS", fallbackImg: "/banners/cat-undergarments.jpg", linkUrl: "/shop?category=undergarments" },
-            { id: "cat-fragrance", title: "FRAGRANCE", fallbackImg: "/banners/cat-fragrance.jpg", linkUrl: "/shop?category=fragrance" }
-          ];
-
-          const categoryCards = DEFAULT_CATEGORY_CARDS.map((defCard) => {
-            const defSlug = defCard.id.replace("cat-", "");
-            const uploaded = (dynamicSections.SHOP_BY_CATEGORY || []).find((c: any) => {
-              if (!c) return false;
-              if (c.id === defCard.id) return true;
-              if (c.id === `cat-card-${defSlug}`) return true;
-              const cleanC = (c.title || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-              const cleanDef = defCard.title.toLowerCase().replace(/[^a-z0-9]/g, "");
-              if (cleanC.includes(cleanDef) || cleanDef.includes(cleanC)) return true;
-              const pClean = (c.page || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-              if (pClean.includes(cleanDef)) return true;
-              return false;
-            });
-            return {
-              ...defCard,
-              ...(uploaded || {}),
-              imageUrl: uploaded?.imageUrl || defCard.fallbackImg,
-              linkUrl: uploaded?.linkUrl || defCard.linkUrl,
-              updatedAt: uploaded?.updatedAt
-            };
-          });
+          const sorted = [...products].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+          const newArrivals = sorted.slice(0, 4);
+          if (newArrivals.length === 0) return null;
 
           return (
             <section style={{ margin: "35px 0 35px 0" }}>
-              <div style={{ textAlign: "center", marginBottom: "20px" }}>
-                <h2 style={{ fontSize: "14px", fontWeight: "900", color: "#000000", textTransform: "uppercase", letterSpacing: "1.5px", margin: 0 }}>
-                  SHOP BEAUTY PRODUCTS BY CATEGORY
+              <div style={{ position: "relative", marginBottom: "20px" }}>
+                <h2 style={{ fontSize: "14px", fontWeight: "900", color: "#000000", textTransform: "uppercase", letterSpacing: "1.5px", textAlign: "center", margin: 0 }}>
+                  JUST ARRIVED
                 </h2>
+                <Link href="/shop?sort=newest" style={{ position: "absolute", right: "0", top: "50%", transform: "translateY(-50%)", backgroundColor: "#e2136e", color: "#ffffff", padding: "6px 14px", borderRadius: "20px", fontSize: "11.5px", fontWeight: "800", textDecoration: "none", boxShadow: "0 2px 8px rgba(226,19,110,0.25)" }}>
+                  SEE ALL ›
+                </Link>
               </div>
 
-              <div className="categories-grid">
-                {categoryCards.map((cat: any, idx: number) => {
-                  const catTitle = cat.title || cat.name || "Category";
-                  const catLink = cat.linkUrl || `/shop?category=${encodeURIComponent(cat.slug || getCategorySlug(catTitle))}`;
-                  const catImg = safeImageUrl(cat.imageUrl, "/placeholder-product.svg", cat.updatedAt);
+              <div className="homepage-product-grid mobile-limit-2">
+                {newArrivals.map((p) => {
+                  const primaryImage = getProductImage(p);
+                  const primaryVariant = p.variants?.[0];
+                  const oldPrice = primaryVariant?.price || 0;
+                  const currentPrice = primaryVariant?.discountPrice || primaryVariant?.price || 0;
+                  const hasDiscount = Boolean(primaryVariant?.discountPrice && primaryVariant.discountPrice < primaryVariant.price);
+                  const discountPercent = hasDiscount && oldPrice > 0 ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100) : 0;
+                  const sizeLabel = (primaryVariant as any)?.size || (primaryVariant?.name && !primaryVariant.name.toLowerCase().includes("default") ? primaryVariant.name : "");
 
                   return (
-                    <Link
-                      key={cat.id || idx}
-                      href={catLink}
-                      style={{
-                        display: "block",
-                        borderRadius: "16px",
-                        overflow: "hidden",
-                        boxShadow: "0 4px 15px rgba(226, 40, 110, 0.12)",
-                        transition: "transform 0.25s ease, box-shadow 0.25s ease",
-                        textDecoration: "none",
-                        backgroundColor: "#e6196e",
-                        aspectRatio: "1 / 1",
-                        width: "100%",
-                      }}
-                      className="promo-card-hover"
-                    >
-                      <img
-                        src={catImg}
-                        alt={catTitle}
-                        width={500}
-                        height={500}
+                    <div key={p.id} className="product-card" style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}>
+                      {hasDiscount && discountPercent > 0 && (
+                        <div style={{ backgroundColor: "#e2136e", color: "#fff", fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "0 0 10px 0", position: "absolute", top: 0, left: 0, zIndex: 5 }}>
+                          {discountPercent}% OFF
+                        </div>
+                      )}
+
+                      <div className={`wishlist-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)}>
+                        <svg fill={wishlist.includes(p.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                        </svg>
+                      </div>
+                      <Link href={getProductUrl(p)} className="card-image" style={{ height: "230px", backgroundColor: "#ffffff", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <img src={primaryImage} alt={p.name} loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).src = FALLBACK_PRODUCT_IMG; }} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
+                      </Link>
+                      <div className="card-body" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, justifyContent: "space-between" }}>
+                        <Link href={getProductUrl(p)} className="card-title" style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", textDecoration: "none", lineHeight: "1.3", marginBottom: "8px", height: "38px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                          {p.name}
+                        </Link>
+                        <span style={{ backgroundColor: "#10b981", color: "#ffffff", fontSize: "10px", fontWeight: "900", padding: "3px 12px", borderRadius: "12px", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
+                          JUST ARRIVED
+                        </span>
+                        <div className="card-price-row" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                          {hasDiscount && (
+                            <span className="old-price" style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "line-through", fontWeight: "600" }}>
+                              ৳{oldPrice.toFixed(2)}
+                            </span>
+                          )}
+                          <span className="price" style={{ fontSize: "16px", fontWeight: "800", color: "#e2136e" }}>
+                            ৳{currentPrice.toFixed(2)}
+                          </span>
+                        </div>
+                        <div style={{ color: "#f59e0b", fontSize: "13px", display: "flex", gap: "2px", marginBottom: "4px" }}>
+                          ★ ★ ★ ★ ★
+                        </div>
+                        {sizeLabel && (
+                          <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e293b", marginBottom: "10px" }}>
+                            {sizeLabel}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        className="add-to-cart-btn"
+                        onClick={() => handleAddToCart(p)}
+                        disabled={addingToCartId === p.id}
                         style={{
+                          backgroundColor: addingToCartId === p.id ? "#059669" : "#581c87",
+                          color: "#ffffff",
+                          border: "none",
+                          padding: "12px",
+                          fontWeight: "800",
+                          fontSize: "13px",
+                          letterSpacing: "0.5px",
+                          cursor: addingToCartId === p.id ? "default" : "pointer",
                           width: "100%",
-                          height: "100%",
-                          aspectRatio: "1 / 1",
-                          objectFit: "cover",
-                          display: "block"
+                          borderRadius: "0 0 12px 12px",
+                          transition: "all 0.2s ease"
                         }}
-                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/placeholder-product.svg"; }}
-                      />
-                    </Link>
+                      >
+                        {addingToCartId === p.id ? "✓ ADDED!" : "ADD TO CART"}
+                      </button>
+                    </div>
                   );
                 })}
               </div>
@@ -1855,86 +2106,59 @@ export default function Home() {
         })()}
 
         {/* SHOP BY CONCERN Section */}
-        {(() => {
-          const DEFAULT_CONCERN_CARDS = [
-            { id: "concern-card-acne", title: "Acne Treatment", icon: "🌿", color: "#ecfdf5", border: "#a7f3d0", linkUrl: "/shop?category=skincare&sub=Acne%20Treatment", extra: false },
-            { id: "concern-card-anti-aging", title: "Anti Aging Treatment", icon: "✨", color: "#fffbeb", border: "#fde68a", linkUrl: "/shop?category=skincare&sub=Anti%20Aging", extra: false },
-            { id: "concern-card-dandruff", title: "Dandruff Solution", icon: "💧", color: "#eff6ff", border: "#bfdbfe", linkUrl: "/shop?category=haircare&sub=Dandruff", extra: false },
-            { id: "concern-card-dry-skin", title: "Dry Skin Treatment", icon: "🧴", color: "#fef2f2", border: "#fecaca", linkUrl: "/shop?category=skincare&sub=Dry%20Skin", extra: false },
-            { id: "concern-card-hair-fall", title: "Hair Fall Treatment", icon: "💇‍♀️", color: "#faf5ff", border: "#e9d5ff", linkUrl: "/shop?category=haircare&sub=Hair%20Fall", extra: true },
-            { id: "concern-card-oil-control", title: "Oil Control Treatment", icon: "🍃", color: "#f0fdf4", border: "#bbf7d0", linkUrl: "/shop?category=skincare", extra: true },
-            { id: "concern-card-pore-care", title: "Pore Care", icon: "🫧", color: "#f0f9ff", border: "#bae6fd", linkUrl: "/shop?category=skincare&sub=Pore%20Care", extra: true },
-            { id: "concern-card-spot-treatment", title: "Spot Treatment", icon: "🎯", color: "#fdf4ff", border: "#f5d0fe", linkUrl: "/shop?category=skincare", extra: true },
-            { id: "concern-card-hair-thinning", title: "Hair Thinning Solution", icon: "🌾", color: "#fff7ed", border: "#fed7aa", linkUrl: "/shop?category=haircare", extra: true },
-            { id: "concern-card-sun-burn", title: "Sun Burn Treatment", icon: "☀️", color: "#fff1f2", border: "#fecdd3", linkUrl: "/shop?category=skincare", extra: true }
-          ];
-
-          const concernItems = DEFAULT_CONCERN_CARDS.map((defCard) => {
-            const defClean = defCard.title.toLowerCase().replace(/[^a-z0-9]/g, "").replace("treatment", "").replace("solution", "");
-            const uploaded = (dynamicSections.SHOP_BY_CONCERN || []).find((c: any) => {
-              if (!c) return false;
-              if (c.id === defCard.id) return true;
-              const cClean = (c.title || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-              if (cClean.includes(defClean)) return true;
-              const pClean = (c.page || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-              if (pClean.includes(defClean)) return true;
-              return false;
-            });
-            return {
-              ...defCard,
-              ...(uploaded || {}),
-              imageUrl: uploaded?.imageUrl !== undefined ? uploaded.imageUrl : "",
-              linkUrl: uploaded?.linkUrl || defCard.linkUrl,
-              updatedAt: uploaded?.updatedAt
-            };
-          });
-
-          return (
-            <section style={{ margin: "20px 0 10px 0" }}>
-              <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "20px", color: "#000" }}>
-                SHOP BY CONCERN
-              </h2>
-              <div className="concerns-grid">
-                {concernItems.map((concern: any, idx: number) => {
-                  const img = safeImageUrl(concern.imageUrl, "", concern.updatedAt);
-                  const link = concern.linkUrl || "/shop";
-                  return (
-                    <Link
-                      key={concern.id || idx}
-                      href={link}
-                      style={{ display: "block", overflow: "hidden", borderRadius: "10px", textDecoration: "none" }}
-                      className={`promo-card-hover ${concern.extra ? "concern-card-extra" : ""}`}
-                    >
-                      {img ? (
-                        <img
-                          src={img}
-                          alt={concern.title}
-                          style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block", borderRadius: "10px" }}
-                        />
-                      ) : (
-                        <div style={{
-                          aspectRatio: "1 / 1",
-                          backgroundColor: concern.color || "#f8fafc",
-                          border: `1.5px solid ${concern.border || "#e2e8f0"}`,
-                          borderRadius: "10px",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          padding: "10px",
-                          boxShadow: "0 2px 6px rgba(0,0,0,0.03)"
-                        }}>
-                          <span style={{ fontSize: "24px", marginBottom: "4px" }}>{concern.icon || "✨"}</span>
-                          <span style={{ fontSize: "11px", fontWeight: "800", color: "#1e293b", textAlign: "center", lineHeight: "1.2" }}>{concern.title}</span>
-                        </div>
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })()}
+        <section style={{ margin: "20px 0 10px 0" }}>
+          <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "20px", color: "#000" }}>
+            SHOP BY CONCERN
+          </h2>
+          <div className="concerns-grid" suppressHydrationWarning>
+            {[
+              { id: "Concern: Acne", title: "Acne Treatment", icon: "🌿", color: "#ecfdf5", border: "#a7f3d0", link: "/shop?category=skincare&sub=Acne%20Treatment", extra: false },
+              { id: "Concern: Anti Aging", title: "Anti Aging Treatment", icon: "✨", color: "#fffbeb", border: "#fde68a", link: "/shop?category=skincare&sub=Anti%20Aging", extra: false },
+              { id: "Concern: Dandruff", title: "Dandruff Solution", icon: "💧", color: "#eff6ff", border: "#bfdbfe", link: "/shop?category=haircare&sub=Dandruff", extra: false },
+              { id: "Concern: Dry Skin", title: "Dry Skin Treatment", icon: "🧴", color: "#fef2f2", border: "#fecaca", link: "/shop?category=skincare&sub=Dry%20Skin", extra: false },
+              { id: "Concern: Hair Fall", title: "Hair Fall Treatment", icon: "💇‍♀️", color: "#faf5ff", border: "#e9d5ff", link: "/shop?category=haircare&sub=Hair%20Fall", extra: true },
+              { id: "Concern: Oil Control", title: "Oil Control Treatment", icon: "🍃", color: "#f0fdf4", border: "#bbf7d0", link: "/shop?category=skincare", extra: true },
+              { id: "Concern: Pore Care", title: "Pore Care", icon: "🫧", color: "#f0f9ff", border: "#bae6fd", link: "/shop?category=skincare&sub=Pore%20Care", extra: true },
+              { id: "Concern: Spot Treatment", title: "Spot Treatment", icon: "🎯", color: "#fdf4ff", border: "#f5d0fe", link: "/shop?category=skincare", extra: true },
+              { id: "Concern: Hair Thinning", title: "Hair Thinning Solution", icon: "🌾", color: "#fff7ed", border: "#fed7aa", link: "/shop?category=haircare", extra: true },
+              { id: "Concern: Sun Burn", title: "Sun Burn Treatment", icon: "☀️", color: "#fff1f2", border: "#fecdd3", link: "/shop?category=skincare", extra: true }
+            ].map((concern) => {
+              const banner = getBannerForPage(concern.id, "", concern.title, concern.link);
+              return (
+                <Link
+                  key={concern.id}
+                  href={banner.link}
+                  style={{ display: "block", overflow: "hidden", borderRadius: "10px", textDecoration: "none" }}
+                  className={`promo-card-hover ${concern.extra ? "concern-card-extra" : ""}`}
+                >
+                  {banner.img ? (
+                    <img
+                      src={banner.img}
+                      alt={concern.title}
+                      style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block", borderRadius: "10px" }}
+                    />
+                  ) : (
+                    <div style={{
+                      aspectRatio: "1 / 1",
+                      backgroundColor: concern.color,
+                      border: `1.5px solid ${concern.border}`,
+                      borderRadius: "10px",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: "10px",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.03)"
+                    }}>
+                      <span style={{ fontSize: "24px", marginBottom: "4px" }}>{concern.icon}</span>
+                      <span style={{ fontSize: "11px", fontWeight: "800", color: "#1e293b", textAlign: "center", lineHeight: "1.2" }}>{concern.title}</span>
+                    </div>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </section>
 
         {/* End of content sections */}
       </main>
@@ -1991,7 +2215,7 @@ export default function Home() {
                 <span style={{ fontSize: "11px", fontWeight: "600", color: "#64748b" }}>Live Offer</span>
               </div>
             </div>
-            <button 
+            <button
               onClick={() => {
                 localStorage.setItem("glowgoodly_last_notification_closed", activeNotification.id);
                 setShowNotification(false);
@@ -2017,13 +2241,13 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Optional Banner Image */}
-          {activeNotification.imageUrl && !activeNotification.imageUrl.includes("shop.glowgoodly.com") && (
+          {/* Optional Banner Image - Disabled for clean notifications */}
+          {false && activeNotification.imageUrl && (
             <div style={{ width: "100%", height: "130px", overflow: "hidden", backgroundColor: "#f8fafc" }}>
-              <img 
-                src={safeImageUrl(activeNotification.imageUrl, FALLBACK_PRODUCT_IMG)} 
-                alt="Promo Banner" 
-                style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+              <img
+                src={safeImageUrl(activeNotification.imageUrl, FALLBACK_PRODUCT_IMG)}
+                alt="Promo Banner"
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
               />
             </div>
           )}
@@ -2050,7 +2274,7 @@ export default function Home() {
               {activeNotification.message}
             </p>
             {activeNotification.linkUrl && (
-              <Link 
+              <Link
                 href={activeNotification.linkUrl}
                 onClick={() => {
                   localStorage.setItem("glowgoodly_last_notification_closed", activeNotification.id);

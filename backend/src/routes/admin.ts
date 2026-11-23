@@ -5,7 +5,7 @@ import prisma from "../prisma";
 import { authenticateJWT, requireRole, AuthenticatedRequest } from "../middleware/auth";
 import bcrypt from "bcryptjs";
 import { sendWelcomeUserEmail } from "../mailer";
-import { clearProductsCache } from "./products";
+import { clearProductsCache, resolveCategory, resolveBrand, MASTER_CATEGORIES_DATA, MASTER_BRANDS_DATA } from "./products";
 import { invalidateHeroBannersCache } from "./hero-banners";
 import { invalidateBannersCache } from "./banners";
 import { deleteUploadedFile } from "../utils/file-cleanup";
@@ -23,18 +23,20 @@ router.post("/clean-dummy-data", authenticateJWT as any, requireRole(["SuperAdmi
   }
 });
 
-// GET /api/admin/reviews (Admin only - Get unapproved reviews)
-router.get("/reviews", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+// GET /api/admin/reviews (Admin only - Get all or unapproved reviews)
+router.get("/reviews", authenticateJWT as any, requireRole(["SUPER_ADMIN", "ADMIN", "SuperAdmin", "Manager", "Admin", "Staff", "Salesman"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const snapshot = await db.collection("reviews")
-      .where("isApproved", "==", false)
-      .get();
+    let queryRef: any = db.collection("reviews");
+    if (req.query.unapprovedOnly === "true") {
+      queryRef = queryRef.where("isApproved", "==", false);
+    }
+    const snapshot = await queryRef.get();
       
     const reviews: any[] = [];
-    snapshot.forEach(doc => {
+    snapshot.forEach((doc: any) => {
       reviews.push({ id: doc.id, ...doc.data() });
     });
-    reviews.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    reviews.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     res.json(reviews);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -42,7 +44,7 @@ router.get("/reviews", authenticateJWT as any, requireRole(["SuperAdmin", "Manag
 });
 
 // PUT /api/admin/reviews/:id/approve (Admin only - Approve review)
-router.put("/reviews/:id/approve", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.put("/reviews/:id/approve", authenticateJWT as any, requireRole(["SUPER_ADMIN", "ADMIN", "SuperAdmin", "Manager", "Admin", "Staff", "Salesman"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const docRef = db.collection("reviews").doc(id as string);
@@ -52,6 +54,7 @@ router.put("/reviews/:id/approve", authenticateJWT as any, requireRole(["SuperAd
     }
 
     await docRef.update({ isApproved: true });
+    emitStorefrontUpdate(req, "reviews", { action: "approve", id });
     res.json({
       message: "Review approved successfully",
       review: { id, ...doc.data(), isApproved: true },
@@ -62,16 +65,16 @@ router.put("/reviews/:id/approve", authenticateJWT as any, requireRole(["SuperAd
 });
 
 // DELETE /api/admin/reviews/:id (Admin only - Reject/Delete review)
-router.delete("/reviews/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+router.delete("/reviews/:id", authenticateJWT as any, requireRole(["SUPER_ADMIN", "ADMIN", "SuperAdmin", "Manager", "Admin", "Staff", "Salesman"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const docRef = db.collection("reviews").doc(id as string);
     const doc = await docRef.get();
-    if (!doc.exists) {
-      return res.status(404).json({ error: "Review not found" });
+    if (doc.exists) {
+      await docRef.delete();
     }
-    await docRef.delete();
-    res.json({ message: "Review deleted successfully" });
+    emitStorefrontUpdate(req, "reviews", { action: "delete", id });
+    res.json({ success: true, message: "Review deleted successfully" });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -972,7 +975,17 @@ router.get("/categories", async (req: any, res: any) => {
     snapshot.forEach(doc => {
       categories.push({ id: doc.id, ...doc.data() });
     });
-    res.json(categories);
+    let result = categories;
+    if (result.length === 0) {
+      result = MASTER_CATEGORIES_DATA;
+    } else {
+      MASTER_CATEGORIES_DATA.forEach(mc => {
+        if (!result.some(r => r.id === mc.id || r.slug === mc.slug || r.name.toLowerCase() === mc.name.toLowerCase())) {
+          result.push(mc);
+        }
+      });
+    }
+    res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -1056,7 +1069,17 @@ router.get("/brands", async (req: any, res: any) => {
     snapshot.forEach(doc => {
       brands.push({ id: doc.id, ...doc.data() });
     });
-    res.json(brands);
+    let result = brands;
+    if (result.length === 0) {
+      result = MASTER_BRANDS_DATA;
+    } else {
+      MASTER_BRANDS_DATA.forEach(mb => {
+        if (!result.some(b => b.id === mb.id || b.slug === mb.slug || b.name.toLowerCase() === mb.name.toLowerCase())) {
+          result.push(mb);
+        }
+      });
+    }
+    res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -1181,11 +1204,11 @@ router.delete("/brands/:id", async (req: any, res: any) => {
   }
 });
 
-// PATCH /api/admin/products/:id — Admin: update product name, description, images
-router.patch("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+// PATCH /api/admin/products/:id — Admin: update product name, description, images, categories
+router.patch("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin", "Salesman"]) as any, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, description, brandId, categoryId, metaTitle, metaDescription, metaKeywords, imageUrl, imageUrl2, imageUrl3, imageUrl4, price, discountPrice, costPrice, stock } = req.body;
+    const { name, description, brandId, categoryId, subcategoryId, metaTitle, metaDescription, metaKeywords, campaignName, imageUrl, imageUrl2, imageUrl3, imageUrl4, price, discountPrice, costPrice, stock } = req.body;
 
     const docRef = db.collection("products").doc(id as string);
     const doc = await docRef.get();
@@ -1202,41 +1225,51 @@ router.patch("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin",
     if (metaTitle !== undefined) updateData.metaTitle = metaTitle;
     if (metaDescription !== undefined) updateData.metaDescription = metaDescription;
     if (metaKeywords !== undefined) updateData.metaKeywords = metaKeywords;
+    if (campaignName !== undefined) updateData.campaignName = campaignName;
+    if (req.body.status !== undefined) updateData.status = req.body.status;
+    if (req.body.isActive !== undefined) updateData.isActive = Boolean(req.body.isActive);
+    if (req.body.inStock !== undefined) updateData.inStock = Boolean(req.body.inStock);
 
     if (brandId !== undefined) {
-      updateData.brandId = brandId;
-      try {
-        const brandDoc = await db.collection("brands").doc(brandId).get();
-        updateData.brand = brandDoc.exists ? { id: brandDoc.id, ...brandDoc.data() } : null;
-      } catch (_) {}
-    }
-    if (categoryId !== undefined) {
-      updateData.categoryId = categoryId;
-      try {
-        const catDoc = await db.collection("categories").doc(categoryId).get();
-        updateData.category = catDoc.exists ? { id: catDoc.id, ...catDoc.data() } : null;
-      } catch (_) {}
+      const resolvedBrand = await resolveBrand(brandId);
+      updateData.brandId = resolvedBrand.brandId || brandId;
+      updateData.brand = resolvedBrand.brand;
     }
 
-    // Update images array
-    if (imageUrl !== undefined || imageUrl2 !== undefined || imageUrl3 !== undefined || imageUrl4 !== undefined) {
-      const newImages = [];
-      if (imageUrl) newImages.push({ url: imageUrl, isPrimary: true });
-      if (imageUrl2) newImages.push({ url: imageUrl2, isPrimary: false });
-      if (imageUrl3) newImages.push({ url: imageUrl3, isPrimary: false });
-      if (imageUrl4) newImages.push({ url: imageUrl4, isPrimary: false });
-      if (newImages.length > 0) updateData.images = newImages;
+    if (categoryId !== undefined || subcategoryId !== undefined) {
+      const targetCat = categoryId !== undefined ? categoryId : current.categoryId;
+      const targetSub = subcategoryId !== undefined ? subcategoryId : current.subcategoryId;
+      const resolvedCat = await resolveCategory(targetCat, targetSub);
+      updateData.categoryId = resolvedCat.categoryId || targetCat;
+      updateData.subcategoryId = resolvedCat.subcategoryId || targetSub || null;
+      updateData.category = resolvedCat.category;
+      updateData.subcategory = resolvedCat.subcategory;
     }
+
+    const numPrice = price !== undefined && price !== null && !isNaN(Number(price)) ? Number(price) : current.price;
+    const numCostPrice = costPrice !== undefined && costPrice !== null && !isNaN(Number(costPrice)) ? Number(costPrice) : current.costPrice;
+    const numDiscountPrice = discountPrice !== undefined && discountPrice !== null && !isNaN(Number(discountPrice)) ? Number(discountPrice) : current.discountPrice;
+    const numStock = stock !== undefined && stock !== null && !isNaN(Number(stock)) ? Number(stock) : current.stock;
+
+    if (price !== undefined) updateData.price = numPrice;
+    if (costPrice !== undefined) updateData.costPrice = numCostPrice;
+    if (discountPrice !== undefined) updateData.discountPrice = numDiscountPrice;
+    if (stock !== undefined) updateData.stock = numStock;
+
+    if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
+    if (imageUrl2 !== undefined) updateData.imageUrl2 = imageUrl2;
+    if (imageUrl3 !== undefined) updateData.imageUrl3 = imageUrl3;
+    if (imageUrl4 !== undefined) updateData.imageUrl4 = imageUrl4;
 
     // Update variants (including per-shade/variant images)
     if (req.body.variants && Array.isArray(req.body.variants)) {
-      const mappedVars = req.body.variants.map((v: any) => ({
-        id: v.id || `var-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      const mappedVars = req.body.variants.map((v: any, idx: number) => ({
+        id: v.id || `var-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
         name: v.name || "Default",
-        price: v.price !== undefined && v.price !== null ? parseFloat(v.price) : (price ? parseFloat(price) : 0),
-        discountPrice: v.discountPrice ? parseFloat(v.discountPrice) : null,
-        costPrice: v.costPrice ? parseFloat(v.costPrice) : null,
-        stock: v.stock !== undefined && v.stock !== null ? parseInt(v.stock) : 50,
+        price: (idx === 0 && price !== undefined) ? numPrice : (v.price !== undefined && v.price !== null && !isNaN(Number(v.price)) ? parseFloat(v.price) : (numPrice || 0)),
+        discountPrice: (idx === 0 && discountPrice !== undefined) ? numDiscountPrice : (v.discountPrice ? parseFloat(v.discountPrice) : null),
+        costPrice: (idx === 0 && costPrice !== undefined) ? numCostPrice : (v.costPrice ? parseFloat(v.costPrice) : null),
+        stock: (idx === 0 && stock !== undefined) ? numStock : (v.stock !== undefined && v.stock !== null && !isNaN(Number(v.stock)) ? parseInt(v.stock) : (numStock || 50)),
         shadeColor: v.shadeColor || null,
         sizeValue: v.sizeValue || null,
         imageUrl: v.imageUrl || null,
@@ -1250,6 +1283,13 @@ router.patch("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin",
       if (primaryUrl) {
         newImagesList.push({ id: `img-primary-${id}`, url: primaryUrl, isPrimary: true });
       }
+      const finalImg2 = imageUrl2 !== undefined ? imageUrl2 : current.imageUrl2;
+      if (finalImg2) newImagesList.push({ id: `img-2-${id}`, url: finalImg2, isPrimary: false });
+      const finalImg3 = imageUrl3 !== undefined ? imageUrl3 : current.imageUrl3;
+      if (finalImg3) newImagesList.push({ id: `img-3-${id}`, url: finalImg3, isPrimary: false });
+      const finalImg4 = imageUrl4 !== undefined ? imageUrl4 : current.imageUrl4;
+      if (finalImg4) newImagesList.push({ id: `img-4-${id}`, url: finalImg4, isPrimary: false });
+
       mappedVars.forEach((v: any, idx: number) => {
         if (v.imageUrl && v.imageUrl.trim() !== "" && !newImagesList.some(img => img.url === v.imageUrl)) {
           newImagesList.push({ id: `img-var-${v.id || idx}`, url: v.imageUrl, isPrimary: false });
@@ -1259,15 +1299,46 @@ router.patch("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin",
     } else if (price !== undefined || discountPrice !== undefined || costPrice !== undefined || stock !== undefined) {
       const variants = current.variants || [];
       if (variants.length > 0) {
-        if (price !== undefined) variants[0].price = parseFloat(price);
-        if (discountPrice !== undefined) variants[0].discountPrice = discountPrice ? parseFloat(discountPrice) : null;
-        if (costPrice !== undefined) variants[0].costPrice = costPrice ? parseFloat(costPrice) : null;
-        if (stock !== undefined) variants[0].stock = parseInt(stock) || 0;
+        if (price !== undefined) variants[0].price = numPrice;
+        if (discountPrice !== undefined) variants[0].discountPrice = numDiscountPrice;
+        if (costPrice !== undefined) variants[0].costPrice = numCostPrice;
+        if (stock !== undefined) variants[0].stock = numStock;
         updateData.variants = variants;
       }
     }
 
     await docRef.update(updateData);
+
+    // Sync with Prisma
+    try {
+      await prisma.product.upsert({
+        where: { id: String(id) },
+        create: {
+          id: String(id),
+          name: updateData.name || current.name,
+          slug: current.slug,
+          description: updateData.description !== undefined ? updateData.description : current.description,
+          price: updateData.price !== undefined ? updateData.price : current.price,
+          discountPrice: updateData.discountPrice !== undefined ? updateData.discountPrice : current.discountPrice,
+          stock: updateData.stock !== undefined ? updateData.stock : current.stock,
+          imageUrl: updateData.imageUrl || current.imageUrl,
+          brandId: updateData.brandId || current.brandId,
+          categoryId: updateData.categoryId || current.categoryId,
+          status: updateData.status || current.status || "Active"
+        },
+        update: {
+          name: updateData.name || current.name,
+          description: updateData.description !== undefined ? updateData.description : current.description,
+          price: updateData.price !== undefined ? updateData.price : current.price,
+          discountPrice: updateData.discountPrice !== undefined ? updateData.discountPrice : current.discountPrice,
+          stock: updateData.stock !== undefined ? updateData.stock : current.stock,
+          imageUrl: updateData.imageUrl || current.imageUrl,
+          brandId: updateData.brandId || current.brandId,
+          categoryId: updateData.categoryId || current.categoryId,
+          status: updateData.status || current.status || "Active"
+        }
+      }).catch(() => null);
+    } catch (_) {}
     clearProductsCache(); // Clear backend in-memory products cache immediately!
     invalidatePrismaCache("products");
     try {

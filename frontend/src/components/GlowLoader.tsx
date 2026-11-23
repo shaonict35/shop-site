@@ -231,8 +231,8 @@ export default function GlowLoader({
         <div
           style={{
             position: "relative",
-            width: "140px",
-            height: "140px",
+            width: "150px",
+            height: "150px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -245,7 +245,7 @@ export default function GlowLoader({
             className="gg-orbit-outer"
             style={{
               position: "absolute",
-              inset: "-12px",
+              inset: "-14px",
               borderRadius: "50%",
               border: "1.5px solid rgba(230, 59, 122, 0.28)",
               boxShadow: "0 0 16px rgba(230, 59, 122, 0.12)",
@@ -273,7 +273,7 @@ export default function GlowLoader({
             className="gg-orbit-inner"
             style={{
               position: "absolute",
-              inset: "-3px",
+              inset: "-4px",
               borderRadius: "50%",
               border: "2px dashed rgba(15, 23, 42, 0.25)",
               borderTopColor: "#e63b7a",
@@ -285,8 +285,8 @@ export default function GlowLoader({
           <div
             className="gg-center-circle"
             style={{
-              width: "100px",
-              height: "100px",
+              width: "120px",
+              height: "120px",
               borderRadius: "50%",
               backgroundColor: "#ffffff",
               border: "2.5px solid rgba(230, 59, 122, 0.35)",
@@ -296,8 +296,8 @@ export default function GlowLoader({
               position: "relative",
               zIndex: 10,
               overflow: "hidden",
-              padding: "12px",
-              backdropFilter: "blur(6px)",
+              padding: "16px",
+              boxShadow: "0 6px 20px rgba(230, 59, 122, 0.18)",
             }}
           >
             {!logoError ? (
@@ -308,9 +308,11 @@ export default function GlowLoader({
                 style={{
                   width: "100%",
                   height: "100%",
+                  maxWidth: "84px",
+                  maxHeight: "84px",
                   objectFit: "contain",
                   display: "block",
-                  filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.08))",
+                  margin: "auto",
                 }}
               />
             ) : (

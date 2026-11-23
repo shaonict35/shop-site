@@ -13,7 +13,7 @@ git config user.email "shaonict35@gmail.com"
 git add .
 
 echo [2/3] Committing changes...
-git commit -m "Fix banners.ts syntax error, fix admin category & subcategory dropdowns, fix shop initialBr error, live banners and real-time sync"
+git commit -m "Update GlowGoodly: Live chat customer name & persistence, damage profit loss tracking, careers delete fix, inventory stock control, and flat solid UI"
 
 echo [3/3] Pushing to GitHub (git push origin main)...
 git push origin main

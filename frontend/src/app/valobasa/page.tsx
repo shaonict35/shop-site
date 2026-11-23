@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useApp } from "../../context/AppContext";
-import { clearAllCache, triggerGlobalDataSync, API_BASE, fetchWithCache, safeImageUrl } from "../../utils/api";
+import { clearAllCache, triggerGlobalDataSync, API_BASE, fetchWithCache, safeImageUrl, idbGet, idbSet, compressBannerImage } from "../../utils/api";
 
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import SocketIoPromoBroadcaster from "../../components/SocketIoPromoBroadcaster";
@@ -24,7 +24,8 @@ const getAuthHeader = (explicitToken?: string | null): Record<string, string> =>
   if (activeToken === "null" || activeToken === "undefined") {
     activeToken = "";
   }
-  return activeToken ? { Authorization: `Bearer ${activeToken}` } : {};
+  const cleanToken = activeToken ? String(activeToken).replace(/^Bearer\s+/i, "").trim() : "";
+  return cleanToken ? { Authorization: `Bearer ${cleanToken}` } : {};
 };
 
 export default function ValobasaAdminPanel() {
@@ -106,11 +107,145 @@ export default function ValobasaAdminPanel() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [editingBanner, setEditingBanner] = useState<any | null>(null);
-  const [cardLinks, setCardLinks] = useState<Record<string, string>>({});
+  const [cardLinks, setCardLinks] = useState<Record<string, string>>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("gg_card_links");
+        if (stored) return JSON.parse(stored);
+      } catch (e) {}
+    }
+    return {};
+  });
   const [savingCardLinkId, setSavingCardLinkId] = useState<string | null>(null);
 
-  // Dynamic Hero Banner State (1920x600 Video / GIF / Images)
-  const [heroBanners, setHeroBanners] = useState<any[]>([]);
+  // Dynamic Hero Banner State & Helpers (1920x600 Video / GIF / Images) - 100% Frontend Persistent
+  const DEFAULT_HERO_BANNERS_LIST = [
+    {
+      id: "hero-slide-1",
+      title: "Nirvana Makeup Grand Glow",
+      subtitle: "Exclusive festival collections with 100% authentic cosmetics",
+      ctaLink: "/shop?brand=nirvana",
+      order: 1,
+      isActive: true,
+      mediaType: "image" as "image" | "video" | "gif",
+      mediaUrl: "/images/sliders/slider-1.png",
+      imageUrl: "/images/sliders/slider-1.png",
+      mobileImageUrl: "/images/sliders/slider-1.png",
+      tabletImageUrl: "/images/sliders/slider-1.png",
+      updatedAt: 1
+    },
+    {
+      id: "hero-slide-2",
+      title: "July Jaw Droppers - Mega Savings",
+      subtitle: "Special deals on top international skincare & cosmetics",
+      ctaLink: "/shop?deal=jaw-droppers",
+      order: 2,
+      isActive: true,
+      mediaType: "image" as "image" | "video" | "gif",
+      mediaUrl: "/images/sliders/slider-2.png",
+      imageUrl: "/images/sliders/slider-2.png",
+      mobileImageUrl: "/images/sliders/slider-2.png",
+      tabletImageUrl: "/images/sliders/slider-2.png",
+      updatedAt: 2
+    },
+    {
+      id: "hero-slide-3",
+      title: "Treasure of Glow - Authentic K-Beauty",
+      subtitle: "Korean glass skin formulas with nationwide cash on delivery",
+      ctaLink: "/shop?deal=treasure-of-glow",
+      order: 3,
+      isActive: true,
+      mediaType: "image" as "image" | "video" | "gif",
+      mediaUrl: "/images/sliders/slider-3.png",
+      imageUrl: "/images/sliders/slider-3.png",
+      mobileImageUrl: "/images/sliders/slider-3.png",
+      tabletImageUrl: "/images/sliders/slider-3.png",
+      updatedAt: 3
+    }
+  ];
+
+  const getFrontendHeroBanners = (): any[] => {
+    if (typeof window === "undefined") return DEFAULT_HERO_BANNERS_LIST;
+    try {
+      const stored = localStorage.getItem("gg_frontend_hero_banners");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return DEFAULT_HERO_BANNERS_LIST;
+  };
+
+  const saveFrontendHeroBanners = (heroList: any[]) => {
+    if (typeof window === "undefined") return;
+    try {
+      idbSet("gg_frontend_hero_banners", heroList);
+      localStorage.removeItem("gg_synced_dynamic_slides");
+      localStorage.setItem("gg_frontend_hero_banners", JSON.stringify(heroList));
+    } catch (e) {
+      console.warn("Failed to save frontend hero banners to localStorage, kept safely in IndexedDB:", e);
+    } finally {
+      window.dispatchEvent(new Event("gg_hero_banners_updated"));
+      window.dispatchEvent(new Event("storage"));
+    }
+  };
+
+  const compressHeroImage = (fileOrDataUrl: File | string): Promise<string> => {
+    return new Promise((resolve) => {
+      try {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = 1920;
+          canvas.height = 600;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            resolve(typeof fileOrDataUrl === "string" ? fileOrDataUrl : "");
+            return;
+          }
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
+          const scale = Math.max(1920 / img.width, 600 / img.height);
+          const w = Math.round(img.width * scale);
+          const h = Math.round(img.height * scale);
+          const x = Math.round((1920 - w) / 2);
+          const y = Math.round((600 - h) / 2);
+          ctx.fillStyle = "#0f172a";
+          ctx.fillRect(0, 0, 1920, 600);
+          ctx.drawImage(img, x, y, w, h);
+          try {
+            const webp = canvas.toDataURL("image/webp", 0.88);
+            if (webp && webp.startsWith("data:image/webp")) {
+              resolve(webp);
+              return;
+            }
+          } catch (_) {}
+          resolve(canvas.toDataURL("image/jpeg", 0.88));
+        };
+        img.onerror = () => {
+          resolve(typeof fileOrDataUrl === "string" ? fileOrDataUrl : "");
+        };
+        if (typeof fileOrDataUrl === "string") {
+          img.src = fileOrDataUrl;
+        } else {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            img.src = (e.target?.result as string) || "";
+          };
+          reader.readAsDataURL(fileOrDataUrl);
+        }
+      } catch (e) {
+        resolve("");
+      }
+    });
+  };
+
+  const [heroBanners, setHeroBanners] = useState<any[]>(() => {
+    if (typeof window !== "undefined") {
+      return getFrontendHeroBanners();
+    }
+    return DEFAULT_HERO_BANNERS_LIST;
+  });
   const [loadingHeroBanners, setLoadingHeroBanners] = useState(false);
   const [heroBannerForm, setHeroBannerForm] = useState({
     title: "",
@@ -128,10 +263,27 @@ export default function ValobasaAdminPanel() {
   // Modals & Damage Log State
   const [selectedOrderDetails, setSelectedOrderDetails] = useState<any | null>(null);
   const [viewingTopProduct, setViewingTopProduct] = useState<any | null>(null);
-  const [damagedProductsLog, setDamagedProductsLog] = useState<any[]>([
-    { id: "dmg-1", productName: "Himalaya Brightening Body Lotion 200ml", qty: 2, type: "Damaged in Shipping", lossAmount: 580, date: "2026-07-28" },
-    { id: "dmg-2", productName: "Differin Restorative Night Moisturizer", qty: 1, type: "Customer Return (Open Seal)", lossAmount: 2600, date: "2026-07-29" },
-  ]);
+  const [damagedProductsLog, setDamagedProductsLog] = useState<any[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("gg_damaged_products_log");
+        if (saved) return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return [
+      { id: "dmg-1", productName: "Himalaya Brightening Body Lotion 200ml", qty: 2, type: "Damaged in Shipping", lossAmount: 580, date: "2026-07-28" },
+      { id: "dmg-2", productName: "Differin Restorative Night Moisturizer", qty: 1, type: "Customer Return (Open Seal)", lossAmount: 2600, date: "2026-07-29" },
+    ];
+  });
+
+  const saveDamagedProductsLog = (logs: any[]) => {
+    setDamagedProductsLog(logs);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("gg_damaged_products_log", JSON.stringify(logs));
+      } catch (e) {}
+    }
+  };
   const [damageForm, setDamageForm] = useState({ productName: "", qty: "1", type: "Damaged in Shipping", lossAmount: "" });
   const [showAddDamageModal, setShowAddDamageModal] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"general" | "delivery" | "payment" | "display">("general");
@@ -160,9 +312,9 @@ export default function ValobasaAdminPanel() {
   // Dashboard Stats
   const [dashboardStats, setDashboardStats] = useState<any>(null);
 
-  // Sidebar Accordion Toggles
-  const [homeSlidesOpen, setHomeSlidesOpen] = useState(true);
-  const [categoryOpen, setCategoryOpen] = useState(true);
+  // Sidebar Accordion Toggles (Default Closed / Off as requested)
+  const [homeSlidesOpen, setHomeSlidesOpen] = useState(false);
+  const [categoryOpen, setCategoryOpen] = useState(false);
   const [blogsOpen, setBlogsOpen] = useState(false);
   const [marketingOpen, setMarketingOpen] = useState(true);
   const [operationsOpen, setOperationsOpen] = useState(true);
@@ -180,6 +332,10 @@ export default function ValobasaAdminPanel() {
   // Blog States
   const [blogList, setBlogList] = useState<any[]>([]);
   const [blogForm, setBlogForm] = useState({ id: "", title: "", description: "", imageUrl: "" });
+
+  // Customer Messages & Product Reviews State
+  const [customerMessagesTab, setCustomerMessagesTab] = useState<"contact" | "reviews">("contact");
+  const [adminReviews, setAdminReviews] = useState<any[]>([]);
 
   // Unified User Management State
   const [dbUsersList, setDbUsersList] = useState<any[]>([]);
@@ -263,21 +419,77 @@ export default function ValobasaAdminPanel() {
   const [couponList, setCouponList] = useState<any[]>([]);
   const [couponForm, setCouponForm] = useState({ id: "", code: "", discountType: "Percentage", discountValue: "", minOrderValue: "0", maxDiscount: "", expiryDate: "", usageLimit: "1", imageUrl: "" });
 
-  // Master Homepage Banners & Card Slots
+  // Master Homepage Banners & Card Slots (35 Total Distinct Slots across Homepage)
   const MASTER_HOMEPAGE_BANNERS = [
-    // Homepage Wide Banner (Original Beauty Must Haves banner)
+    // 🎬 Hero Banner Slider (Default Slides)
+    {
+      id: "hero-slide-1",
+      title: "Hero Slide 1 - Nirvana Makeup Offers",
+      page: "Hero Slides",
+      imageUrl: "/images/sliders/slider-1.png",
+      mobileImageUrl: "/images/sliders/slider-1.png",
+      tabletImageUrl: "/images/sliders/slider-1.png",
+      linkUrl: "/shop?brand=nirvana",
+      isActive: true,
+      sortOrder: 1,
+      section: "🎬 Hero Slides",
+      desktopSize: "1920 x 600 px (3.2:1)"
+    },
+    {
+      id: "hero-slide-2",
+      title: "Hero Slide 2 - July Jaw Droppers",
+      page: "Hero Slides",
+      imageUrl: "/images/sliders/slider-2.png",
+      mobileImageUrl: "/images/sliders/slider-2.png",
+      tabletImageUrl: "/images/sliders/slider-2.png",
+      linkUrl: "/shop?deal=jaw-droppers",
+      isActive: true,
+      sortOrder: 2,
+      section: "🎬 Hero Slides",
+      desktopSize: "1920 x 600 px (3.2:1)"
+    },
+    {
+      id: "hero-slide-3",
+      title: "Hero Slide 3 - Treasure of Glow",
+      page: "Hero Slides",
+      imageUrl: "/images/sliders/slider-3.png",
+      mobileImageUrl: "/images/sliders/slider-3.png",
+      tabletImageUrl: "/images/sliders/slider-3.png",
+      linkUrl: "/shop?deal=treasure-of-glow",
+      isActive: true,
+      sortOrder: 3,
+      section: "🎬 Hero Slides",
+      desktopSize: "1920 x 600 px (3.2:1)"
+    },
+    // 📢 Homepage Wide Panoramic Banner
     {
       id: "homepage-wide-banner",
-      title: "Beauty Must Haves Exclusive Savings",
+      title: "Homepage Wide Banner - Beauty Must Haves",
       page: "Homepage Wide Banner",
       imageUrl: "/hero-slide-1.png",
       mobileImageUrl: "/hero-slide-1.png",
       tabletImageUrl: "/hero-slide-1.png",
       linkUrl: "/shop",
       isActive: true,
-      sortOrder: 4
+      sortOrder: 4,
+      section: "📢 Wide Banner",
+      desktopSize: "1200 x 300 px (4:1)"
     },
-    // Deals You Cannot Miss (4 Cards)
+    // 💎 Promotional Banner (Lux Royale Promo)
+    {
+      id: "promo-banner-lux",
+      title: "Promotional Banner (Lux Royale Campaign)",
+      page: "Promo Banner",
+      imageUrl: "/banners/lux-royale-promo.jpg",
+      mobileImageUrl: "/banners/lux-royale-promo.jpg",
+      tabletImageUrl: "/banners/lux-royale-promo.jpg",
+      linkUrl: "/shop",
+      isActive: true,
+      sortOrder: 5,
+      section: "💎 Promo Banner",
+      desktopSize: "1200 x 140 px (8.5:1)"
+    },
+    // 🔥 Deals You Cannot Miss (4 Cards)
     {
       id: "deal-card-1",
       title: "Deal Card 1 - Ombre 30% Off",
@@ -287,7 +499,9 @@ export default function ValobasaAdminPanel() {
       tabletImageUrl: "/images/deals/deal-1.png",
       linkUrl: "/shop?deal=ombre",
       isActive: true,
-      sortOrder: 2
+      sortOrder: 6,
+      section: "🔥 Deals You Cannot Miss",
+      desktopSize: "600 x 600 px (1:1 Square)"
     },
     {
       id: "deal-card-2",
@@ -298,7 +512,9 @@ export default function ValobasaAdminPanel() {
       tabletImageUrl: "/images/deals/deal-2.png",
       linkUrl: "/shop?deal=marico",
       isActive: true,
-      sortOrder: 3
+      sortOrder: 7,
+      section: "🔥 Deals You Cannot Miss",
+      desktopSize: "600 x 600 px (1:1 Square)"
     },
     {
       id: "deal-card-3",
@@ -309,7 +525,9 @@ export default function ValobasaAdminPanel() {
       tabletImageUrl: "/images/deals/deal-3.gif",
       linkUrl: "/shop?deal=pns",
       isActive: true,
-      sortOrder: 4
+      sortOrder: 8,
+      section: "🔥 Deals You Cannot Miss",
+      desktopSize: "600 x 600 px (1:1 Square)"
     },
     {
       id: "deal-card-4",
@@ -320,9 +538,11 @@ export default function ValobasaAdminPanel() {
       tabletImageUrl: "/images/deals/deal-4.jpg",
       linkUrl: "/shop?deal=senora",
       isActive: true,
-      sortOrder: 5
+      sortOrder: 9,
+      section: "🔥 Deals You Cannot Miss",
+      desktopSize: "600 x 600 px (1:1 Square)"
     },
-    // Top Brands & Offers (4 Cards)
+    // 🏷️ Top Brands & Offers (4 Cards)
     {
       id: "brand-offer-1",
       title: "Brand Offer 1 - The Ordinary",
@@ -332,7 +552,9 @@ export default function ValobasaAdminPanel() {
       tabletImageUrl: "/images/brands/brand-offer-1.png",
       linkUrl: "/shop?brand=the-ordinary",
       isActive: true,
-      sortOrder: 6
+      sortOrder: 10,
+      section: "🏷️ Top Brands & Offers",
+      desktopSize: "600 x 600 px (1:1 Square)"
     },
     {
       id: "brand-offer-2",
@@ -343,7 +565,9 @@ export default function ValobasaAdminPanel() {
       tabletImageUrl: "/images/brands/brand-offer-2.gif",
       linkUrl: "/shop?brand=skin-cafe",
       isActive: true,
-      sortOrder: 7
+      sortOrder: 11,
+      section: "🏷️ Top Brands & Offers",
+      desktopSize: "600 x 600 px (1:1 Square)"
     },
     {
       id: "brand-offer-5",
@@ -354,7 +578,9 @@ export default function ValobasaAdminPanel() {
       tabletImageUrl: "/images/brands/brand-offer-5.png",
       linkUrl: "/shop?brand=treasure-of-glow",
       isActive: true,
-      sortOrder: 8
+      sortOrder: 12,
+      section: "🏷️ Top Brands & Offers",
+      desktopSize: "600 x 600 px (1:1 Square)"
     },
     {
       id: "brand-offer-6",
@@ -365,54 +591,64 @@ export default function ValobasaAdminPanel() {
       tabletImageUrl: "/images/brands/brand-offer-6.gif",
       linkUrl: "/shop?category=trimmer",
       isActive: true,
-      sortOrder: 9
+      sortOrder: 13,
+      section: "🏷️ Top Brands & Offers",
+      desktopSize: "600 x 600 px (1:1 Square)"
     },
-    // Limited Time Offers (4 Cards)
+    // ⚡ Limited Time Offers (4 Cards)
     {
       id: "limited-bogo",
-      title: "BOGO Offer",
+      title: "Limited Offer 1 - BOGO",
       page: "BOGO",
       imageUrl: "/images/deals/deal-1.png",
       mobileImageUrl: "/images/deals/deal-1.png",
       tabletImageUrl: "/images/deals/deal-1.png",
       linkUrl: "/shop?campaign=BOGO",
       isActive: true,
-      sortOrder: 10
+      sortOrder: 14,
+      section: "⚡ Limited Time Offers",
+      desktopSize: "600 x 600 px (1:1 Square)"
     },
     {
       id: "limited-combo",
-      title: "COMBO Offer",
+      title: "Limited Offer 2 - COMBO",
       page: "COMBO",
       imageUrl: "/images/deals/deal-2.png",
       mobileImageUrl: "/images/deals/deal-2.png",
       tabletImageUrl: "/images/deals/deal-2.png",
       linkUrl: "/shop?campaign=COMBO",
       isActive: true,
-      sortOrder: 11
+      sortOrder: 15,
+      section: "⚡ Limited Time Offers",
+      desktopSize: "600 x 600 px (1:1 Square)"
     },
     {
       id: "limited-offers",
-      title: "OFFERS Mega Savings",
+      title: "Limited Offer 3 - OFFERS",
       page: "OFFERS",
       imageUrl: "/images/deals/deal-3.gif",
       mobileImageUrl: "/images/deals/deal-3.gif",
       tabletImageUrl: "/images/deals/deal-3.gif",
       linkUrl: "/shop?campaign=OFFERS",
       isActive: true,
-      sortOrder: 12
+      sortOrder: 16,
+      section: "⚡ Limited Time Offers",
+      desktopSize: "600 x 600 px (1:1 Square)"
     },
     {
       id: "limited-clearance",
-      title: "Clearance SALE Deals",
+      title: "Limited Offer 4 - Clearance SALE",
       page: "Clearance SALE",
       imageUrl: "/images/deals/deal-4.jpg",
       mobileImageUrl: "/images/deals/deal-4.jpg",
       tabletImageUrl: "/images/deals/deal-4.jpg",
       linkUrl: "/shop?campaign=Clearance%20SALE",
       isActive: true,
-      sortOrder: 13
+      sortOrder: 17,
+      section: "⚡ Limited Time Offers",
+      desktopSize: "600 x 600 px (1:1 Square)"
     },
-    // Category Cards (8 Cards)
+    // 🛍️ Category Cards (8 Cards)
     {
       id: "cat-card-makeup",
       title: "Category Card: Makeup",
@@ -420,25 +656,31 @@ export default function ValobasaAdminPanel() {
       imageUrl: "",
       linkUrl: "/shop?category=makeup",
       isActive: true,
-      sortOrder: 14
+      sortOrder: 18,
+      section: "🛍️ Category Cards",
+      desktopSize: "400 x 400 px (1:1 Square)"
     },
     {
       id: "cat-card-skin",
-      title: "Category Card: Skin",
+      title: "Category Card: Skin Care",
       page: "Category: Skin",
       imageUrl: "",
       linkUrl: "/shop?category=skincare",
       isActive: true,
-      sortOrder: 15
+      sortOrder: 19,
+      section: "🛍️ Category Cards",
+      desktopSize: "400 x 400 px (1:1 Square)"
     },
     {
       id: "cat-card-hair",
-      title: "Category Card: Hair",
+      title: "Category Card: Hair Care",
       page: "Category: Hair",
       imageUrl: "",
       linkUrl: "/shop?category=haircare",
       isActive: true,
-      sortOrder: 16
+      sortOrder: 20,
+      section: "🛍️ Category Cards",
+      desktopSize: "400 x 400 px (1:1 Square)"
     },
     {
       id: "cat-card-personal-care",
@@ -447,7 +689,9 @@ export default function ValobasaAdminPanel() {
       imageUrl: "",
       linkUrl: "/shop?category=personal-care",
       isActive: true,
-      sortOrder: 17
+      sortOrder: 21,
+      section: "🛍️ Category Cards",
+      desktopSize: "400 x 400 px (1:1 Square)"
     },
     {
       id: "cat-card-mom-baby",
@@ -456,7 +700,9 @@ export default function ValobasaAdminPanel() {
       imageUrl: "",
       linkUrl: "/shop?category=mom-baby",
       isActive: true,
-      sortOrder: 18
+      sortOrder: 22,
+      section: "🛍️ Category Cards",
+      desktopSize: "400 x 400 px (1:1 Square)"
     },
     {
       id: "cat-card-fragrance",
@@ -465,7 +711,9 @@ export default function ValobasaAdminPanel() {
       imageUrl: "",
       linkUrl: "/shop?category=fragrance",
       isActive: true,
-      sortOrder: 19
+      sortOrder: 23,
+      section: "🛍️ Category Cards",
+      desktopSize: "400 x 400 px (1:1 Square)"
     },
     {
       id: "cat-card-undergarments",
@@ -474,7 +722,9 @@ export default function ValobasaAdminPanel() {
       imageUrl: "",
       linkUrl: "/shop?category=undergarments",
       isActive: true,
-      sortOrder: 20
+      sortOrder: 24,
+      section: "🛍️ Category Cards",
+      desktopSize: "400 x 400 px (1:1 Square)"
     },
     {
       id: "cat-card-combo",
@@ -483,9 +733,11 @@ export default function ValobasaAdminPanel() {
       imageUrl: "",
       linkUrl: "/shop?category=combo",
       isActive: true,
-      sortOrder: 21
+      sortOrder: 25,
+      section: "🛍️ Category Cards",
+      desktopSize: "400 x 400 px (1:1 Square)"
     },
-    // Shop By Concern Cards (10 Cards)
+    // 🌿 Shop By Concern Cards (10 Cards)
     {
       id: "concern-card-acne",
       title: "Concern Card: Acne Treatment",
@@ -493,7 +745,9 @@ export default function ValobasaAdminPanel() {
       imageUrl: "",
       linkUrl: "/shop?category=skincare&sub=Acne%20Treatment",
       isActive: true,
-      sortOrder: 22
+      sortOrder: 26,
+      section: "🌿 Concern Cards",
+      desktopSize: "400 x 400 px (1:1 Square)"
     },
     {
       id: "concern-card-anti-aging",
@@ -502,7 +756,9 @@ export default function ValobasaAdminPanel() {
       imageUrl: "",
       linkUrl: "/shop?category=skincare&sub=Anti%20Aging",
       isActive: true,
-      sortOrder: 23
+      sortOrder: 27,
+      section: "🌿 Concern Cards",
+      desktopSize: "400 x 400 px (1:1 Square)"
     },
     {
       id: "concern-card-dandruff",
@@ -511,7 +767,9 @@ export default function ValobasaAdminPanel() {
       imageUrl: "",
       linkUrl: "/shop?category=haircare&sub=Dandruff",
       isActive: true,
-      sortOrder: 24
+      sortOrder: 28,
+      section: "🌿 Concern Cards",
+      desktopSize: "400 x 400 px (1:1 Square)"
     },
     {
       id: "concern-card-dry-skin",
@@ -520,7 +778,9 @@ export default function ValobasaAdminPanel() {
       imageUrl: "",
       linkUrl: "/shop?category=skincare&sub=Dry%20Skin",
       isActive: true,
-      sortOrder: 25
+      sortOrder: 29,
+      section: "🌿 Concern Cards",
+      desktopSize: "400 x 400 px (1:1 Square)"
     },
     {
       id: "concern-card-hair-fall",
@@ -529,7 +789,9 @@ export default function ValobasaAdminPanel() {
       imageUrl: "",
       linkUrl: "/shop?category=haircare&sub=Hair%20Fall",
       isActive: true,
-      sortOrder: 26
+      sortOrder: 30,
+      section: "🌿 Concern Cards",
+      desktopSize: "400 x 400 px (1:1 Square)"
     },
     {
       id: "concern-card-oil-control",
@@ -538,7 +800,9 @@ export default function ValobasaAdminPanel() {
       imageUrl: "",
       linkUrl: "/shop?category=skincare",
       isActive: true,
-      sortOrder: 27
+      sortOrder: 31,
+      section: "🌿 Concern Cards",
+      desktopSize: "400 x 400 px (1:1 Square)"
     },
     {
       id: "concern-card-pore-care",
@@ -547,7 +811,9 @@ export default function ValobasaAdminPanel() {
       imageUrl: "",
       linkUrl: "/shop?category=skincare&sub=Pore%20Care",
       isActive: true,
-      sortOrder: 28
+      sortOrder: 32,
+      section: "🌿 Concern Cards",
+      desktopSize: "400 x 400 px (1:1 Square)"
     },
     {
       id: "concern-card-spot-treatment",
@@ -556,7 +822,9 @@ export default function ValobasaAdminPanel() {
       imageUrl: "",
       linkUrl: "/shop?category=skincare",
       isActive: true,
-      sortOrder: 29
+      sortOrder: 33,
+      section: "🌿 Concern Cards",
+      desktopSize: "400 x 400 px (1:1 Square)"
     },
     {
       id: "concern-card-hair-thinning",
@@ -565,7 +833,9 @@ export default function ValobasaAdminPanel() {
       imageUrl: "",
       linkUrl: "/shop?category=haircare",
       isActive: true,
-      sortOrder: 30
+      sortOrder: 34,
+      section: "🌿 Concern Cards",
+      desktopSize: "400 x 400 px (1:1 Square)"
     },
     {
       id: "concern-card-sun-burn",
@@ -574,9 +844,34 @@ export default function ValobasaAdminPanel() {
       imageUrl: "",
       linkUrl: "/shop?category=skincare",
       isActive: true,
-      sortOrder: 31
+      sortOrder: 35,
+      section: "🌿 Concern Cards",
+      desktopSize: "400 x 400 px (1:1 Square)"
     }
   ];
+
+  const getRecommendedSizeForBanner = (b: any): string => {
+    const p = (b?.page || "").toLowerCase();
+    const id = (b?.id || "").toLowerCase();
+    const t = (b?.title || "").toLowerCase();
+
+    if (p.includes("hero") || id.includes("hero") || t.includes("hero")) {
+      return "1920 x 600 px (3.2:1 Ratio)";
+    }
+    if (p.includes("wide") || id.includes("wide") || t.includes("wide")) {
+      return "1200 x 300 px (4:1 Ratio)";
+    }
+    if (p.includes("promo") || id.includes("promo") || t.includes("lux")) {
+      return "1200 x 140 px (8.5:1 Ratio)";
+    }
+    if (p.includes("category") || id.startsWith("cat-") || id.startsWith("catcard")) {
+      return "400 x 400 px (1:1 Square)";
+    }
+    if (p.includes("concern") || id.startsWith("concern")) {
+      return "400 x 400 px (1:1 Square)";
+    }
+    return "600 x 600 px (1:1 Square)";
+  };
 
   const getDeletedBannerIds = (): string[] => {
     if (typeof window === "undefined") return [];
@@ -588,43 +883,165 @@ export default function ValobasaAdminPanel() {
     }
   };
 
-  const mergeBannersWithMaster = (dbBanners: any[] = []) => {
+  const getFrontendHomeBanners = (): any[] => {
+    if (typeof window === "undefined") return [];
+    try {
+      const stored = localStorage.getItem("gg_frontend_home_banners");
+      return stored ? JSON.parse(stored) : [];
+    } catch (e) {
+      return [];
+    }
+  };
+
+  const saveFrontendHomeBanners = (bannersList: any[]) => {
+    if (typeof window === "undefined") return;
+    try {
+      // 1. Unlimited persistent client storage in IndexedDB
+      idbSet("gg_frontend_home_banners", bannersList);
+
+      // 2. Clear old duplicate cache keys to keep localStorage healthy
+      localStorage.removeItem("gg_admin_banners_cache");
+      localStorage.removeItem("gg_synced_homepage_banners");
+
+      // 3. Save to localStorage
+      localStorage.setItem("gg_frontend_home_banners", JSON.stringify(bannersList));
+    } catch (e) {
+      console.warn("LocalStorage full, saved safely in IndexedDB:", e);
+      try {
+        Object.keys(localStorage).forEach(k => {
+          if (k.startsWith("gg_cache_")) localStorage.removeItem(k);
+        });
+        localStorage.setItem("gg_frontend_home_banners", JSON.stringify(bannersList));
+      } catch (_) {}
+    } finally {
+      window.dispatchEvent(new Event("gg_home_banners_updated"));
+      window.dispatchEvent(new Event("storage"));
+    }
+  };
+
+  const mergeBannersWithMaster = (userBanners: any[] = []) => {
     const deletedIds = getDeletedBannerIds();
-    const map = new Map();
+    const frontendBanners = userBanners.length > 0 ? userBanners : getFrontendHomeBanners();
+    const frontendHeroBanners = getFrontendHeroBanners();
+    const map = new Map<string, any>();
+
+    // 1. Initial slots from master (all 35 canonical slots) - Always keep all slots visible in admin
     MASTER_HOMEPAGE_BANNERS.forEach((item) => {
-      if (deletedIds.includes(item.id) || deletedIds.includes(item.page)) return;
-      const key = item.page === "Hero Slides" ? item.id : item.page.toLowerCase().trim();
-      map.set(key, { ...item });
+      const isDeleted = deletedIds.includes(item.id) || deletedIds.includes(item.page);
+      map.set(item.id, {
+        ...item,
+        imageUrl: isDeleted ? "" : item.imageUrl,
+        mobileImageUrl: isDeleted ? "" : item.mobileImageUrl,
+        tabletImageUrl: isDeleted ? "" : item.tabletImageUrl,
+      });
     });
-    dbBanners.forEach((b: any) => {
-      if (!b) return;
-      if (deletedIds.includes(b.id) || deletedIds.includes(b.page)) return;
-      const pageKey = (b.page || "").toLowerCase().trim();
-      const heroKey = b.page === "Hero Slides" ? b.id : null;
-      if (heroKey && map.has(heroKey)) {
-        map.set(heroKey, { ...map.get(heroKey), ...b });
-      } else if (pageKey && map.has(pageKey)) {
-        map.set(pageKey, { ...map.get(pageKey), ...b });
-      } else if (b.id) {
+
+    // 2. Overlay any frontend hero banners (uploaded in Hero section)
+    frontendHeroBanners.forEach((hb: any, idx: number) => {
+      if (!hb) return;
+      const heroId = hb.id || `hero-slide-${idx + 1}`;
+      const isDeleted = deletedIds.includes(heroId);
+      const existing = map.get(heroId) || {};
+      map.set(heroId, {
+        ...existing,
+        id: heroId,
+        title: hb.title || existing.title || `Hero Slide ${idx + 1}`,
+        page: "Hero Slides",
+        imageUrl: isDeleted ? "" : (hb.mediaUrl || hb.imageUrl || hb.img || existing.imageUrl || ""),
+        mobileImageUrl: isDeleted ? "" : (hb.mobileImageUrl || hb.mediaUrl || hb.imageUrl || hb.img || existing.mobileImageUrl || ""),
+        tabletImageUrl: isDeleted ? "" : (hb.tabletImageUrl || hb.mediaUrl || hb.imageUrl || hb.img || existing.tabletImageUrl || ""),
+        linkUrl: hb.ctaLink || hb.linkUrl || hb.link || existing.linkUrl || "/shop",
+        isActive: hb.isActive !== false,
+        sortOrder: hb.order || idx + 1,
+        mediaType: hb.mediaType || "image",
+        section: "🎬 Hero Slides",
+        desktopSize: "1920 x 600 px (3.2:1)"
+      });
+    });
+
+    // 3. Overlay frontend home banners (by EXACT slot ID or page matching)
+    frontendBanners.forEach((b: any) => {
+      if (!b || !b.id) return;
+      const isDeleted = deletedIds.includes(b.id) || (b.page && deletedIds.includes(b.page));
+
+      if (map.has(b.id)) {
+        const existing = map.get(b.id);
+        map.set(b.id, {
+          ...existing,
+          ...b,
+          id: b.id,
+          imageUrl: isDeleted ? "" : (b.imageUrl ?? existing.imageUrl),
+          mobileImageUrl: isDeleted ? "" : (b.mobileImageUrl ?? existing.mobileImageUrl),
+          tabletImageUrl: isDeleted ? "" : (b.tabletImageUrl ?? existing.tabletImageUrl),
+        });
+        return;
+      }
+
+      const matchedMaster = MASTER_HOMEPAGE_BANNERS.find(
+        (m) => m.page.toLowerCase().trim() === (b.page || "").toLowerCase().trim()
+      );
+      if (matchedMaster) {
+        const existing = map.get(matchedMaster.id) || matchedMaster;
+        map.set(matchedMaster.id, {
+          ...existing,
+          ...b,
+          id: matchedMaster.id,
+          imageUrl: isDeleted ? "" : (b.imageUrl ?? existing.imageUrl),
+          mobileImageUrl: isDeleted ? "" : (b.mobileImageUrl ?? existing.mobileImageUrl),
+          tabletImageUrl: isDeleted ? "" : (b.tabletImageUrl ?? existing.tabletImageUrl),
+        });
+        return;
+      }
+
+      if (!isDeleted) {
         map.set(b.id, b);
       }
     });
-    return Array.from(map.values()).filter((item: any) => !deletedIds.includes(item.id) && !deletedIds.includes(item.page));
+
+    return Array.from(map.values());
   };
 
-  // Banners (Desktop, Mobile, Tablet)
+  // Banners (Desktop, Mobile, Tablet) - 100% Frontend Persistent
   const [banners, setBanners] = useState<any[]>(() => {
     if (typeof window !== "undefined") {
       try {
+        const frontendStored = localStorage.getItem("gg_frontend_home_banners");
+        if (frontendStored) {
+          const parsed = JSON.parse(frontendStored);
+          if (Array.isArray(parsed) && parsed.length > 0) return mergeBannersWithMaster(parsed);
+        }
         const cached = localStorage.getItem("gg_admin_banners_cache");
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          if (Array.isArray(parsed) && parsed.length > 0) return mergeBannersWithMaster(parsed);
         }
       } catch (e) {}
     }
-    return [];
+    return mergeBannersWithMaster([]);
   });
+
+  // State for detected image dimensions (Actual Image Size display)
+  const [loadedDimensions, setLoadedDimensions] = useState<Record<string, { width: number; height: number }>>({});
+
+  // Auto-detect and display actual dimensions for every banner image loaded
+  useEffect(() => {
+    if (typeof window === "undefined" || !banners || banners.length === 0) return;
+    banners.forEach((b: any) => {
+      if (!b || !b.id) return;
+      const src = safeImageUrl(b.imageUrl || b.mediaUrl);
+      if (!src || src.length < 5) return;
+      const img = new Image();
+      img.onload = () => {
+        if (img.naturalWidth && img.naturalHeight) {
+          setLoadedDimensions((prev) => {
+            if (prev[b.id]?.width === img.naturalWidth && prev[b.id]?.height === img.naturalHeight) return prev;
+            return { ...prev, [b.id]: { width: img.naturalWidth, height: img.naturalHeight } };
+          });
+        }
+      };
+      img.src = src;
+    });
+  }, [banners]);
   const [bannerCategoryFilter, setBannerCategoryFilter] = useState<string>("All");
   const [bannerForm, setBannerForm] = useState({
     id: "", title: "", imageUrl: "", mobileImageUrl: "", tabletImageUrl: "",
@@ -1330,71 +1747,38 @@ export default function ValobasaAdminPanel() {
 
   const fetchAdminBanners = async (bypass: boolean = false) => {
     try {
-      const timestamp = Date.now();
-      const [backendRes, localRes] = await Promise.all([
-        fetchWithCache(`${API_BASE}/banners?t=${timestamp}`, true).catch(() => null),
-        fetch(`/api/local-banners?t=${timestamp}`, { cache: "no-store" }).then(r => r.ok ? r.json() : null).catch(() => null)
-      ]);
-
-      let backendList: any[] = Array.isArray(backendRes) ? backendRes : [];
-      if (backendList.length === 0) {
-        const directRes = await fetch(`${API_BASE}/admin/banners?t=${timestamp}`).catch(() => null);
-        if (directRes && directRes.ok) backendList = await directRes.json().catch(() => []);
-      }
-
-      const flattenedLocal: any[] = [];
-      if (localRes) {
-        Object.entries(localRes).forEach(([secKey, items]: [string, any]) => {
-          if (Array.isArray(items)) {
-            items.forEach((item: any) => {
-              if (!item) return;
-              let page = item.page;
-              if (!page) {
-                if (secKey === "shopByCategory") page = item.title?.includes("Category:") ? item.title : `Category: ${item.title?.replace(" Card", "")}`;
-                else if (secKey === "shopByConcern") page = item.title?.includes("Concern:") ? item.title : `Concern: ${item.title?.replace(" Card", "").replace(" Treatment", "").replace(" Solution", "")}`;
-                else if (secKey === "heroBanners") page = "Hero Slides";
-                else if (secKey === "dealsYouCannotMiss") page = item.title;
-                else if (secKey === "topBrandsOffers") page = item.title;
-                else if (secKey === "limitedTimeOffers") page = item.title;
-                else if (secKey === "promoBanner") page = "Homepage Wide Banner";
-                else page = "Homepage";
-              }
-              flattenedLocal.push({
-                ...item,
-                page,
-                sectionKey: secKey
-              });
-            });
+      const frontendList = getFrontendHomeBanners();
+      const merged = mergeBannersWithMaster(frontendList);
+      setBanners(merged);
+      if (typeof window !== "undefined") {
+        idbGet("gg_frontend_home_banners").then((idbList) => {
+          if (Array.isArray(idbList) && idbList.length > 0) {
+            setBanners(mergeBannersWithMaster(idbList));
           }
         });
       }
-
-      const combined = [...flattenedLocal, ...backendList];
-      const merged = mergeBannersWithMaster(combined);
-      setBanners(merged);
-      if (typeof window !== "undefined") {
-        try {
-          localStorage.setItem("gg_admin_banners_cache", JSON.stringify(merged));
-        } catch (_) {}
-      }
     } catch (e) {
-      console.warn("Could not fetch admin banners:", e);
+      console.warn("Could not load admin banners:", e);
+      setBanners(mergeBannersWithMaster(getFrontendHomeBanners()));
     }
   };
 
   const fetchHeroBanners = async (bypass: boolean = false) => {
     try {
       setLoadingHeroBanners(true);
-      const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : "");
-      const res = await fetch(`${API_BASE}/hero-banners?all=true${bypass ? '&bypass=true&t=' + Date.now() : ''}`, {
-        headers: activeToken ? { Authorization: `Bearer ${activeToken}` } : {}
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setHeroBanners(Array.isArray(data) ? data : []);
+      const frontendHeroList = getFrontendHeroBanners();
+      if (frontendHeroList.length > 0) {
+        setHeroBanners(frontendHeroList);
+      }
+      if (typeof window !== "undefined") {
+        idbGet("gg_frontend_hero_banners").then((idbHero) => {
+          if (Array.isArray(idbHero) && idbHero.length > 0) {
+            setHeroBanners(idbHero);
+          }
+        });
       }
     } catch (e) {
-      console.warn("Could not fetch hero banners:", e);
+      console.warn("Could not load hero banners:", e);
     } finally {
       setLoadingHeroBanners(false);
     }
@@ -1497,11 +1881,7 @@ export default function ValobasaAdminPanel() {
         safeJson(careersAppsRes)
       ]);
 
-      if (bnData && Array.isArray(bnData) && bnData.length > 0) {
-        setBanners(mergeBannersWithMaster(bnData));
-      } else {
-        fetchAdminBanners(bypass);
-      }
+      fetchAdminBanners(bypass);
       fetchHeroBanners(bypass);
       if (stfData && Array.isArray(stfData)) setStaffList(stfData);
       if (csData && Array.isArray(csData)) {
@@ -1672,19 +2052,6 @@ export default function ValobasaAdminPanel() {
     });
 
     const list = Array.from(map.values()).sort((a, b) => b.unitsSold - a.unitsSold);
-    if (list.length === 0 && adminProducts.length > 0) {
-      return adminProducts.slice(0, 10).map((p, idx) => ({
-        id: p.id,
-        name: p.name,
-        brandName: p.brand?.name || "GlowGoodly",
-        unitsSold: Math.floor(Math.random() * 80) + 12,
-        totalRevenue: (p.variants?.[0]?.price || 500) * (Math.floor(Math.random() * 80) + 12),
-        image: p.images?.[0]?.url || p.imageUrl || "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=200&q=80",
-        price: p.variants?.[0]?.price || 500,
-        costPrice: p.variants?.[0]?.costPrice || 0,
-        stock: p.variants?.[0]?.stock || 50
-      })).sort((a, b) => b.unitsSold - a.unitsSold);
-    }
     return list;
   }, [orders, adminProducts]);
 
@@ -2087,12 +2454,26 @@ export default function ValobasaAdminPanel() {
 
   const fetchCareersAdmin = async () => {
     try {
-      const res = await safeFetch(`${API_BASE}/careers`);
-      if (res && res.ok) {
-        const data = await res.json().catch(() => ({}));
-        if (data.jobs) setCareersJobsList(data.jobs);
-      }
       const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : "");
+      let fetched = false;
+      if (activeToken) {
+        const adminRes = await safeFetch(`${API_BASE}/careers/admin/jobs`, { headers: getAuthHeader(activeToken) });
+        if (adminRes && adminRes.ok) {
+          const aJobs = await adminRes.json().catch(() => null);
+          if (Array.isArray(aJobs)) {
+            setCareersJobsList(aJobs);
+            fetched = true;
+          }
+        }
+      }
+      if (!fetched) {
+        const res = await safeFetch(`${API_BASE}/careers`);
+        if (res && res.ok) {
+          const data = await res.json().catch(() => ({}));
+          const list = Array.isArray(data) ? data : (Array.isArray(data?.jobs) ? data.jobs : []);
+          setCareersJobsList(list);
+        }
+      }
       if (activeToken) {
         const aRes = await safeFetch(`${API_BASE}/careers/applications`, { headers: getAuthHeader(activeToken) });
         if (aRes && aRes.ok) {
@@ -2102,6 +2483,31 @@ export default function ValobasaAdminPanel() {
       }
     } catch (e) {
       console.warn("Could not fetch careers data:", e);
+    }
+  };
+
+  const handleDeleteAllJobOpenings = async () => {
+    if (careersJobsList.length === 0) {
+      alert("No active job postings to delete.");
+      return;
+    }
+    if (!confirm(`Are you sure you want to delete ALL (${careersJobsList.length}) job openings? This cannot be undone.`)) return;
+    setCareersJobsList([]);
+    const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : "");
+    try {
+      const res = await fetch(`${API_BASE}/careers/jobs/delete-all`, {
+        method: "POST",
+        headers: getAuthHeader(activeToken)
+      });
+      if (res.ok) {
+        alert("All job openings have been deleted successfully.");
+        fetchCareersAdmin();
+      } else {
+        alert("Failed to delete all jobs on server.");
+        fetchCareersAdmin();
+      }
+    } catch (e) {
+      console.warn("Delete all jobs error:", e);
     }
   };
 
@@ -2122,6 +2528,11 @@ export default function ValobasaAdminPanel() {
         alert(isEdit ? "Job opening updated successfully!" : "Job opening published successfully!");
         setShowJobModal(false);
         setIsEditingJob(false);
+        const savedData = { ...jobFormData, id: jobFormData.id || ("job-" + Date.now()) };
+        setCareersJobsList(prev => {
+          if (isEdit) return prev.map(j => j.id === savedData.id ? savedData : j);
+          return [savedData, ...prev];
+        });
         setJobFormData({ id: "", role: "", department: "RETAIL SALES", type: "Full Time", location: "Dhaka Flagship Outlet", salary: "", experience: "", requirements: "", responsibilities: "", isActive: true });
         fetchCareersAdmin();
       } else {
@@ -2135,6 +2546,7 @@ export default function ValobasaAdminPanel() {
 
   const handleDeleteJobOpening = async (id: string, roleName: string) => {
     if (!confirm(`Are you sure you want to delete job opening for '${roleName}'?`)) return;
+    setCareersJobsList(prev => prev.filter(j => j.id !== id));
     const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : "");
     try {
       const res = await fetch(`${API_BASE}/careers/jobs/${id}`, {
@@ -2144,16 +2556,15 @@ export default function ValobasaAdminPanel() {
       if (res.ok) {
         alert("Job opening deleted successfully.");
         fetchCareersAdmin();
-      } else {
-        alert("Failed to delete job.");
       }
     } catch (e) {
-      alert("Error deleting job opening.");
+      console.warn("Delete job error:", e);
     }
   };
 
   const handleDeleteApplication = async (id: string, applicantName: string) => {
     if (!confirm(`Are you sure you want to delete application from '${applicantName}'?`)) return;
+    setCareersApplicationsList(prev => prev.filter(a => a.id !== id));
     const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : "");
     try {
       const res = await fetch(`${API_BASE}/careers/applications/${id}`, {
@@ -2163,11 +2574,59 @@ export default function ValobasaAdminPanel() {
       if (res.ok) {
         alert("Application deleted successfully.");
         fetchCareersAdmin();
-      } else {
-        alert("Failed to delete application.");
       }
     } catch (e) {
-      alert("Error deleting application.");
+      console.warn("Delete application error:", e);
+    }
+  };
+
+  // Product Reviews Management
+  const fetchAdminReviews = async () => {
+    try {
+      const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : "");
+      const res = await fetch(`${API_BASE}/admin/reviews`, {
+        headers: getAuthHeader(activeToken),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAdminReviews(Array.isArray(data) ? data : []);
+      }
+    } catch (e) {
+      console.warn("Error fetching reviews:", e);
+    }
+  };
+
+  const handleDeleteReview = async (reviewId: string) => {
+    if (!confirm("Are you sure you want to permanently delete this customer review?")) return;
+    setAdminReviews(prev => prev.filter(r => r.id !== reviewId));
+    try {
+      const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : "");
+      const res = await fetch(`${API_BASE}/admin/reviews/${reviewId}`, {
+        method: "DELETE",
+        headers: getAuthHeader(activeToken),
+      });
+      if (res.ok) {
+        alert("Review deleted successfully!");
+        fetchAdminReviews();
+      }
+    } catch (e) {
+      alert("Error deleting review");
+    }
+  };
+
+  const handleApproveReview = async (reviewId: string) => {
+    try {
+      const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : "");
+      const res = await fetch(`${API_BASE}/admin/reviews/${reviewId}/approve`, {
+        method: "PUT",
+        headers: getAuthHeader(activeToken),
+      });
+      if (res.ok) {
+        alert("Review approved!");
+        setAdminReviews(prev => prev.map(r => r.id === reviewId ? { ...r, isApproved: true } : r));
+      }
+    } catch (e) {
+      alert("Error approving review");
     }
   };
 
@@ -2226,105 +2685,18 @@ export default function ValobasaAdminPanel() {
       const pageType = (currentSlotPage || bannerForm.page || "").toLowerCase();
       const titleType = (bannerForm.title || "").toLowerCase();
 
-      // Scale image to exactly targetW wide, canvas height = auto (preserves aspect ratio)
-      // → Zero white space, zero cropping, full image always visible, fills full width
-      const renderCanvas = (img: HTMLImageElement, targetW: number): string => {
-        const scale = targetW / img.width;
-        const scaledW = Math.round(img.width * scale);
-        const scaledH = Math.round(img.height * scale);
-
-        const canvas = document.createElement("canvas");
-        canvas.width = scaledW;
-        canvas.height = scaledH;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return img.src;
-
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(img, 0, 0, scaledW, scaledH);
-
-        // Compress to WebP (or JPEG fallback) — drastically reduces 5MB PNGs to ~60-100KB
-        try {
-          const webpData = canvas.toDataURL("image/webp", 0.85);
-          if (webpData && webpData.startsWith("data:image/webp")) {
-            return webpData;
-          }
-        } catch (_) {}
-        return canvas.toDataURL("image/jpeg", 0.88);
-      };
-
-      const processSrc = (src: string) => {
-        return new Promise<{ desktop: string; mobile: string; tablet: string }>((resolve) => {
-          const img = new Image();
-          if (src.startsWith("http")) {
-            img.crossOrigin = "anonymous";
-          }
-          img.onload = () => {
-            try {
-              const isHero = pageType.includes("hero") || pageType.includes("slide") || titleType.includes("hero") || titleType.includes("slide");
-              const isWide = pageType.includes("wide") || pageType.includes("panoramic") || titleType.includes("wide");
-              const isCategoryOrConcern = pageType.includes("category") || pageType.includes("concern") || titleType.includes("category") || titleType.includes("concern");
-
-              let desktop = src;
-              let tablet = src;
-              let mobile = src;
-
-              if (isHero) {
-                // Each version scaled to target width, height auto — no white space, no crop
-                desktop = renderCanvas(img, 1920);
-                tablet  = renderCanvas(img, 1024);
-                mobile  = renderCanvas(img, 750);
-              } else if (isWide) {
-                desktop = renderCanvas(img, 1200);
-                tablet  = renderCanvas(img, 1024);
-                mobile  = renderCanvas(img, 750);
-              } else if (isCategoryOrConcern) {
-                desktop = renderCanvas(img, 400);
-                tablet  = renderCanvas(img, 400);
-                mobile  = renderCanvas(img, 400);
-              } else {
-                // Square 1:1 cards (deals, brand offers, bogo, combos, offers, clearance)
-                desktop = renderCanvas(img, 600);
-                tablet  = renderCanvas(img, 600);
-                mobile  = renderCanvas(img, 600);
-              }
-
-              resolve({ desktop, mobile, tablet });
-            } catch (err) {
-              console.warn("Canvas crop fallback:", err);
-              resolve({ desktop: src, mobile: src, tablet: src });
-            }
-          };
-          img.onerror = () => {
-            resolve({ desktop: src, mobile: src, tablet: src });
-          };
-          img.src = src;
-        });
-      };
-
-      let baseSrc = "";
-      if (typeof fileOrUrl === "string") {
-        baseSrc = fileOrUrl;
-      } else {
-        baseSrc = await new Promise<string>((res) => {
-          const reader = new FileReader();
-          reader.onload = (e) => res((e.target?.result as string) || "");
-          reader.onerror = () => res("");
-          reader.readAsDataURL(fileOrUrl);
-        });
-      }
-
-      if (baseSrc) {
-        const sizes = await processSrc(baseSrc);
+      const slot = currentSlotPage || bannerForm.page || "hero";
+      const optimized = await compressBannerImage(fileOrUrl, slot);
+      if (optimized) {
         setBannerForm((prev) => ({
           ...prev,
-          imageUrl: sizes.desktop,
-          mobileImageUrl: sizes.mobile,
-          tabletImageUrl: sizes.tablet
+          imageUrl: optimized,
+          mobileImageUrl: optimized,
+          tabletImageUrl: optimized
         }));
-        setAutoResizeStatus("✓ Successfully auto-resized & optimized Desktop, Tablet & Mobile images!");
-        setTimeout(() => setAutoResizeStatus(""), 6000);
-        return sizes;
+        setAutoResizeStatus("✓ Image optimized & ready to save!");
+        setTimeout(() => setAutoResizeStatus(""), 4000);
+        return { desktop: optimized, mobile: optimized, tablet: optimized };
       }
     } catch (err) {
       console.error("Auto-resize error:", err);
@@ -2372,279 +2744,738 @@ export default function ValobasaAdminPanel() {
     }
     try {
       setIsUploadingHero(true);
-      const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : "");
-      
-      const formData = new FormData();
-      formData.append("title", heroBannerForm.title || "GlowGoodly Hero Banner");
-      formData.append("subtitle", heroBannerForm.subtitle || "");
-      formData.append("ctaLink", heroBannerForm.ctaLink || "/shop");
-      formData.append("order", String(heroBannerForm.order || 1));
-      formData.append("isActive", String(heroBannerForm.isActive));
-      formData.append("mediaType", heroBannerForm.mediaType || "image");
-
-      if (heroBannerForm.mediaFile) {
-        formData.append("mediaFile", heroBannerForm.mediaFile);
-      }
-      if (heroBannerForm.mediaPreview && heroBannerForm.mediaPreview.startsWith("data:")) {
-        formData.append("mediaBase64", heroBannerForm.mediaPreview);
-        formData.append("originalFilename", heroBannerForm.mediaFile?.name || "hero-media");
+      let finalMediaUrl = heroBannerForm.mediaPreview;
+      if (heroBannerForm.mediaType === "image" && (heroBannerForm.mediaFile || heroBannerForm.mediaPreview)) {
+        const compressed = await compressHeroImage(heroBannerForm.mediaFile || heroBannerForm.mediaPreview);
+        if (compressed) finalMediaUrl = compressed;
       }
 
-      const res = await fetch(`${API_BASE}/hero-banners`, {
-        method: "POST",
-        headers: activeToken ? { Authorization: `Bearer ${activeToken}` } : {},
-        body: formData
+      const newSlide = {
+        id: `hero-slide-${Date.now()}`,
+        title: heroBannerForm.title || "GlowGoodly Hero Banner",
+        subtitle: heroBannerForm.subtitle || "",
+        ctaLink: heroBannerForm.ctaLink || "/shop",
+        order: Number(heroBannerForm.order) || (heroBanners.length + 1),
+        isActive: heroBannerForm.isActive !== false,
+        mediaType: heroBannerForm.mediaType || "image",
+        mediaUrl: finalMediaUrl,
+        imageUrl: finalMediaUrl,
+        mobileImageUrl: finalMediaUrl,
+        tabletImageUrl: finalMediaUrl,
+        updatedAt: Date.now()
+      };
+
+      // 1. Remove from deleted IDs
+      if (typeof window !== "undefined") {
+        try {
+          const stored = localStorage.getItem("gg_deleted_banner_ids");
+          if (stored) {
+            const arr: string[] = JSON.parse(stored);
+            localStorage.setItem("gg_deleted_banner_ids", JSON.stringify(arr.filter(x => x !== newSlide.id && x !== newSlide.title)));
+          }
+        } catch (_) {}
+      }
+
+      // 2. Save directly in frontend hero banners store
+      const currentHeroList = getFrontendHeroBanners();
+      const updatedHeroList = [newSlide, ...currentHeroList.filter((b: any) => b && b.id !== newSlide.id)];
+      saveFrontendHeroBanners(updatedHeroList);
+      setHeroBanners(updatedHeroList);
+
+      // 3. Also mirror into frontend home banners store
+      const currentHomeBanners = getFrontendHomeBanners();
+      const heroMasterItem = {
+        id: newSlide.id,
+        title: newSlide.title,
+        imageUrl: newSlide.imageUrl,
+        mobileImageUrl: newSlide.imageUrl,
+        tabletImageUrl: newSlide.imageUrl,
+        linkUrl: newSlide.ctaLink,
+        page: "Hero Slides",
+        isActive: newSlide.isActive,
+        sortOrder: newSlide.order,
+        updatedAt: Date.now()
+      };
+      const updatedHomeBanners = [heroMasterItem, ...currentHomeBanners.filter((b: any) => b && b.id !== newSlide.id)];
+      saveFrontendHomeBanners(updatedHomeBanners);
+      setBanners(mergeBannersWithMaster(updatedHomeBanners));
+
+      setHeroBannerForm({
+        title: "",
+        subtitle: "",
+        ctaLink: "/shop",
+        order: updatedHeroList.length + 1,
+        isActive: true,
+        mediaFile: null,
+        mediaPreview: "",
+        mediaType: "image"
       });
 
-      if (res.ok) {
-        alert("🎉 Hero Banner media uploaded & published successfully!");
-        setHeroBannerForm({
-          title: "",
-          subtitle: "",
-          ctaLink: "/shop",
-          order: heroBanners.length + 2,
-          isActive: true,
-          mediaFile: null,
-          mediaPreview: "",
-          mediaType: "image"
-        });
-        clearAllCache();
-        triggerGlobalDataSync();
-        fetchHeroBanners(true);
-      } else {
-        const d = await res.json().catch(() => ({}));
-        alert(d.error || "Failed to upload hero banner.");
-      }
-    } catch (err) {
-      alert("Error uploading hero banner media.");
+      clearAllCache();
+      triggerGlobalDataSync();
+      alert(`🎉 Hero Banner "${newSlide.title}" uploaded & saved in frontend successfully!\n\nHomepage Hero slider will display this slide immediately.`);
+    } catch (err: any) {
+      alert(`Error uploading hero banner: ${err?.message || err}`);
     } finally {
       setIsUploadingHero(false);
     }
   };
 
-  const handleToggleHeroBanner = async (banner: any) => {
+  const handleToggleHeroBanner = (banner: any) => {
+    if (!banner) return;
     try {
-      const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : "");
-      const newStatus = !banner.isActive;
-      const res = await fetch(`${API_BASE}/hero-banners/${banner.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {})
-        },
-        body: JSON.stringify({ isActive: newStatus })
-      });
-      if (res.ok) {
-        setHeroBanners(prev => prev.map(b => b.id === banner.id ? { ...b, isActive: newStatus } : b));
-        clearAllCache();
-        triggerGlobalDataSync();
-      }
+      const currentStatus = banner.isActive !== false;
+      const newStatus = !currentStatus;
+      const currentList = getFrontendHeroBanners();
+      const updatedList = currentList.map((b: any) => (b && b.id === banner.id) ? { ...b, isActive: newStatus, updatedAt: Date.now() } : b);
+      saveFrontendHeroBanners(updatedList);
+      setHeroBanners(updatedList);
+
+      // Also update home banners master list
+      const currentBanners = getFrontendHomeBanners();
+      const updatedBanners = currentBanners.map((b: any) => (b && b.id === banner.id) ? { ...b, isActive: newStatus, updatedAt: Date.now() } : b);
+      saveFrontendHomeBanners(updatedBanners);
+      setBanners(mergeBannersWithMaster(updatedBanners));
+
+      clearAllCache();
+      triggerGlobalDataSync();
     } catch (e) {
-      alert("Error updating hero banner status.");
+      console.error("Error updating hero banner status:", e);
     }
   };
 
-  const handleDeleteHeroBanner = async (banner: any) => {
-    if (!confirm(`Are you sure you want to permanently delete Hero Banner "${banner.title || 'Untitled'}" and delete its media file from server disk?`)) return;
+  const handleDeleteHeroBanner = (banner: any) => {
+    if (!banner) return;
+    if (!confirm(`Are you sure you want to delete Hero Banner "${banner.title || 'Untitled'}" from frontend?`)) return;
     try {
-      setHeroBanners(prev => prev.filter(b => b.id !== banner.id));
-      const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : "");
-      
-      // Delete across backend and local stores
-      const [res] = await Promise.all([
-        fetch(`${API_BASE}/hero-banners/${banner.id}`, {
-          method: "DELETE",
-          headers: activeToken ? { Authorization: `Bearer ${activeToken}` } : {}
-        }).catch(() => null),
-        fetch(`/api/hero-banners-local?id=${banner.id}`, { method: "DELETE" }).catch(() => null),
-        fetch(`/api/local-banners?sectionKey=heroBanners&id=${banner.id}`, { method: "DELETE" }).catch(() => null)
-      ]);
+      const currentList = getFrontendHeroBanners();
+      const updatedList = currentList.filter((b: any) => b && b.id !== banner.id && b.title !== banner.title);
+      saveFrontendHeroBanners(updatedList);
+      setHeroBanners(updatedList);
 
+      // Save deleted ID to gg_deleted_banner_ids
       if (typeof window !== "undefined") {
-        try { localStorage.removeItem("gg_synced_dynamic_slides"); } catch (_) {}
+        try {
+          const stored = localStorage.getItem("gg_deleted_banner_ids");
+          const arr: string[] = stored ? JSON.parse(stored) : [];
+          if (!arr.includes(banner.id)) arr.push(banner.id);
+          localStorage.setItem("gg_deleted_banner_ids", JSON.stringify(arr));
+        } catch (_) {}
       }
 
-      if (res && res.ok) {
-        alert("Hero banner and media file permanently deleted!");
-        clearAllCache();
-        triggerGlobalDataSync();
-        fetchHeroBanners(true);
-      } else {
-        fetchHeroBanners(true);
-      }
+      // Also remove from gg_frontend_home_banners & banners
+      const currentBanners = getFrontendHomeBanners();
+      const updatedBanners = currentBanners.filter((b: any) => b && b.id !== banner.id && b.title !== banner.title);
+      saveFrontendHomeBanners(updatedBanners);
+      setBanners(mergeBannersWithMaster(updatedBanners));
+
+      clearAllCache();
+      triggerGlobalDataSync();
+      alert(`✓ Hero Banner "${banner.title || 'Untitled'}" deleted successfully from frontend!`);
     } catch (e) {
       alert("Error deleting hero banner.");
-      fetchHeroBanners(true);
     }
   };
 
-  // Banner
-  const handleSaveBanner = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bannerForm.title || !bannerForm.imageUrl) {
-      alert("Title and Desktop Banner Image are required.");
-      return;
-    }
+  const handleHeroChangePicture = async (banner: any, file: File) => {
+    if (!banner || !file) return;
     try {
-      let method = bannerForm.id ? "PATCH" : "POST";
-      let url = bannerForm.id ? `${API_BASE}/banners/${bannerForm.id}` : `${API_BASE}/banners`;
-      
-      let res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json", ...getAuthHeader() },
-        body: JSON.stringify(bannerForm)
-      });
+      const mime = file.type ? file.type.toLowerCase() : "";
+      const isVideo = mime.startsWith("video/") || file.name.endsWith(".mp4") || file.name.endsWith(".webm");
+      const isGif = mime === "image/gif" || file.name.endsWith(".gif");
+      const mediaType: "image" | "video" | "gif" = isVideo ? "video" : isGif ? "gif" : "image";
 
-      if (!res.ok && bannerForm.id) {
-        // Fallback to PUT alias endpoint
-        res = await fetch(`${API_BASE}/admin/banners/${bannerForm.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", ...getAuthHeader() },
-          body: JSON.stringify(bannerForm)
+      let finalMedia = "";
+      if (mediaType === "image") {
+        finalMedia = await compressHeroImage(file);
+      } else {
+        finalMedia = await new Promise<string>((res) => {
+          const reader = new FileReader();
+          reader.onload = (e) => res((e.target?.result as string) || "");
+          reader.readAsDataURL(file);
         });
       }
 
-      if (res.ok) {
-        // Also update /api/local-banners so frontend homepage-banners.json is immediately updated
-        try {
-          const p = (bannerForm.page || "").toLowerCase();
-          const idLower = (bannerForm.id || "").toLowerCase();
-          let targetSection = "heroBanners";
-          if (p.includes("category") || idLower.startsWith("cat-card-") || idLower.startsWith("cat-")) {
-            targetSection = "shopByCategory";
-          } else if (p.includes("concern") || idLower.startsWith("concern-card-") || idLower.startsWith("concern-")) {
-            targetSection = "shopByConcern";
-          } else if (p.includes("deal") || idLower.startsWith("deal-")) {
-            targetSection = "dealsYouCannotMiss";
-          } else if (p.includes("brand offer") || idLower.startsWith("brand-offer-")) {
-            targetSection = "topBrandsOffers";
-          } else if (p.includes("bogo") || p.includes("combo") || p.includes("offers") || p.includes("clearance") || idLower.startsWith("lto-") || idLower.startsWith("limited-")) {
-            targetSection = "limitedTimeOffers";
-          } else if (p.includes("wide") || p.includes("promo") || idLower.includes("wide") || idLower.startsWith("promo-")) {
-            targetSection = "promoBanner";
-          }
+      if (!finalMedia) return;
 
-          let localId = bannerForm.id;
-          if (!localId) {
-            if (targetSection === "shopByCategory") {
-              const cleanTitle = bannerForm.title.toLowerCase().replace(/[^a-z0-9]/g, "");
-              localId = `cat-${cleanTitle.replace("categorycard", "").replace("category", "")}`;
-            } else if (targetSection === "shopByConcern") {
-              const cleanTitle = bannerForm.title.toLowerCase().replace(/[^a-z0-9]/g, "");
-              localId = `concern-card-${cleanTitle.replace("concerncard", "").replace("concern", "")}`;
-            } else {
-              localId = `banner-${Date.now()}`;
-            }
-          }
+      const currentList = getFrontendHeroBanners();
+      const idx = currentList.findIndex((b: any) => b && b.id === banner.id);
+      const updatedSlide = {
+        ...(idx >= 0 ? currentList[idx] : banner),
+        id: banner.id,
+        mediaType,
+        mediaUrl: finalMedia,
+        imageUrl: finalMedia,
+        mobileImageUrl: finalMedia,
+        tabletImageUrl: finalMedia,
+        updatedAt: Date.now()
+      };
+      const updatedList = currentList.map((b: any) => (b && b.id === banner.id) ? updatedSlide : b);
+      if (idx < 0) updatedList.unshift(updatedSlide);
 
-          await fetch("/api/local-banners", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              sectionKey: targetSection,
-              item: {
-                id: localId,
-                title: bannerForm.title,
-                imageUrl: bannerForm.imageUrl,
-                mobileImageUrl: bannerForm.mobileImageUrl || bannerForm.imageUrl,
-                tabletImageUrl: bannerForm.tabletImageUrl || bannerForm.imageUrl,
-                linkUrl: bannerForm.linkUrl || "/shop",
-                page: bannerForm.page,
-                isActive: bannerForm.isActive !== false,
-                sortOrder: Number(bannerForm.sortOrder) || 1,
-                updatedAt: Date.now()
-              }
-            })
-          }).catch(() => {});
-        } catch (_) {}
+      saveFrontendHeroBanners(updatedList);
+      setHeroBanners(updatedList);
 
-        if (typeof window !== "undefined") {
-          try {
-            const stored = localStorage.getItem("gg_deleted_banner_ids");
-            if (stored) {
-              const arr: string[] = JSON.parse(stored);
-              const filtered = arr.filter(x => x !== bannerForm.id && x !== bannerForm.page);
-              localStorage.setItem("gg_deleted_banner_ids", JSON.stringify(filtered));
-            }
-          } catch (e) {}
+      // Also update home banners master list
+      const currentBanners = getFrontendHomeBanners();
+      const updatedBanners = currentBanners.map((b: any) => (b && b.id === banner.id) ? { ...b, imageUrl: finalMedia, mobileImageUrl: finalMedia, tabletImageUrl: finalMedia, updatedAt: Date.now() } : b);
+      saveFrontendHomeBanners(updatedBanners);
+      setBanners(mergeBannersWithMaster(updatedBanners));
+
+      clearAllCache();
+      triggerGlobalDataSync();
+      alert(`✓ Picture updated for Hero Banner "${banner.title}" in frontend!\nHomepage hero slider will show new image immediately.`);
+    } catch (err: any) {
+      alert(`Error changing hero picture: ${err?.message || err}`);
+    }
+  };
+
+  const handleHeroChangeLink = (banner: any) => {
+    if (!banner) return;
+    const newL = prompt(`Enter new destination URL / link for Hero Banner "${banner.title}":`, banner.ctaLink || banner.linkUrl || "/shop");
+    if (newL !== null && newL.trim()) {
+      const updatedUrl = newL.trim();
+      const currentList = getFrontendHeroBanners();
+      const updatedList = currentList.map((b: any) => (b && b.id === banner.id) ? { ...b, ctaLink: updatedUrl, linkUrl: updatedUrl, updatedAt: Date.now() } : b);
+      saveFrontendHeroBanners(updatedList);
+      setHeroBanners(updatedList);
+
+      const currentBanners = getFrontendHomeBanners();
+      const updatedBanners = currentBanners.map((b: any) => (b && b.id === banner.id) ? { ...b, linkUrl: updatedUrl, updatedAt: Date.now() } : b);
+      saveFrontendHomeBanners(updatedBanners);
+      setBanners(mergeBannersWithMaster(updatedBanners));
+
+      clearAllCache();
+      triggerGlobalDataSync();
+      alert(`✓ Link updated for Hero Banner "${banner.title}" in frontend!\n🔗 New URL: ${updatedUrl}`);
+    }
+  };
+
+  const renderHeroBannerSection = () => {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: "24px", marginBottom: "10px" }}>
+        {/* Header Box with Recommended Dimensions */}
+        <div style={{ backgroundColor: "#ffffff", padding: "24px", borderRadius: "12px", border: "1px solid #e2e8f0", boxShadow: "0 2px 10px rgba(0,0,0,0.04)", borderLeft: "5px solid #8b5cf6" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "24px" }}>🎬</span>
+                <h1 style={{ fontSize: "22px", fontWeight: "900", color: "#0f172a", margin: 0 }}>
+                  Homepage Hero Banner (1920×600) — Upload & Manage Slides
+                </h1>
+                <span style={{ backgroundColor: "#ede9fe", color: "#7c3aed", fontSize: "11.5px", fontWeight: "800", padding: "3px 10px", borderRadius: "12px" }}>
+                  1920 × 600 px
+                </span>
+                <span style={{ backgroundColor: "#dcfce7", color: "#166534", fontSize: "11px", fontWeight: "800", padding: "3px 8px", borderRadius: "6px" }}>
+                  ⚡ 100% Frontend Persistent
+                </span>
+              </div>
+              <p style={{ color: "#64748b", fontSize: "13.5px", margin: "6px 0 0 0", maxWidth: "840px" }}>
+                Upload, replace, and change pictures for Homepage Hero slides. Supports <strong>High-Resolution Images (.jpg, .png, .webp)</strong>, <strong>Animated GIFs (.gif)</strong>, and <strong>HD Videos (.mp4, .webm)</strong>. Changes take effect immediately on the homepage without server network errors.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const refreshed = getFrontendHeroBanners();
+                setHeroBanners(refreshed);
+                alert("✓ Hero banners reloaded from frontend storage!");
+              }}
+              style={{ backgroundColor: "#f8fafc", color: "#475569", border: "1.5px solid #cbd5e1", padding: "8px 16px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
+            >
+              🔄 Refresh Hero Slides
+            </button>
+          </div>
+
+          {/* Dimension Badges */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px", marginTop: "18px" }}>
+            <div style={{ backgroundColor: "#f5f3ff", border: "1px solid #ddd6fe", padding: "12px 16px", borderRadius: "8px" }}>
+              <div style={{ fontSize: "11px", fontWeight: "800", color: "#7c3aed", textTransform: "uppercase" }}>📐 Recommended Dimensions</div>
+              <div style={{ fontSize: "15px", fontWeight: "900", color: "#4c1d95", marginTop: "3px" }}>1920 × 600 px (16:5)</div>
+              <div style={{ fontSize: "11.5px", color: "#6d28d9", marginTop: "2px" }}>Auto-centers on Mobile (750x750) & Tablets</div>
+            </div>
+            <div style={{ backgroundColor: "#eff6ff", border: "1px solid #bfdbfe", padding: "12px 16px", borderRadius: "8px" }}>
+              <div style={{ fontSize: "11px", fontWeight: "800", color: "#2563eb", textTransform: "uppercase" }}>🎥 Video Specifications</div>
+              <div style={{ fontSize: "15px", fontWeight: "900", color: "#1e3a8a", marginTop: "3px" }}>MP4 / WEBM (AutoPlay)</div>
+              <div style={{ fontSize: "11.5px", color: "#1d4ed8", marginTop: "2px" }}>Seamless muted video loop on homepage</div>
+            </div>
+            <div style={{ backgroundColor: "#ecfdf5", border: "1px solid #a7f3d0", padding: "12px 16px", borderRadius: "8px" }}>
+              <div style={{ fontSize: "11px", fontWeight: "800", color: "#059669", textTransform: "uppercase" }}>🖼️ Images & Animated GIFs</div>
+              <div style={{ fontSize: "15px", fontWeight: "900", color: "#064e3b", marginTop: "3px" }}>JPG / PNG / WEBP / GIF</div>
+              <div style={{ fontSize: "11.5px", color: "#047857", marginTop: "2px" }}>Instant auto-crop & compression</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Upload New Hero Banner Form */}
+        <div style={{ backgroundColor: "#ffffff", padding: "24px", borderRadius: "12px", border: "1px solid #e2e8f0", boxShadow: "0 2px 10px rgba(0,0,0,0.04)" }}>
+          <h2 style={{ fontSize: "17px", fontWeight: "800", color: "#0f172a", margin: "0 0 16px 0", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span>➕</span> Upload New Hero Banner Media
+          </h2>
+
+          <form onSubmit={handleUploadHeroBanner} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+            {/* File Dropzone & Live Preview */}
+            <div style={{ border: "2px dashed #cbd5e1", borderRadius: "12px", padding: "24px", backgroundColor: "#f8fafc", textAlign: "center" }}>
+              {heroBannerForm.mediaPreview ? (
+                <div>
+                  <div style={{ width: "100%", maxWidth: "800px", margin: "0 auto", borderRadius: "10px", overflow: "hidden", boxShadow: "0 4px 15px rgba(0,0,0,0.15)", backgroundColor: "#0f172a", position: "relative" }}>
+                    {heroBannerForm.mediaType === "video" ? (
+                      <video
+                        src={heroBannerForm.mediaPreview}
+                        controls
+                        autoPlay
+                        muted
+                        loop
+                        playsInline
+                        style={{ width: "100%", height: "250px", objectFit: "cover", display: "block" }}
+                      />
+                    ) : (
+                      <img
+                        src={heroBannerForm.mediaPreview}
+                        alt="Live Preview"
+                        style={{ width: "100%", height: "250px", objectFit: "cover", display: "block" }}
+                      />
+                    )}
+                    <div style={{ position: "absolute", top: "12px", right: "12px", backgroundColor: "rgba(0,0,0,0.75)", color: "#ffffff", fontSize: "11.5px", fontWeight: "800", padding: "4px 10px", borderRadius: "6px", backdropFilter: "blur(4px)" }}>
+                      {heroBannerForm.mediaType === "video" ? "🎥 VIDEO PREVIEW" : heroBannerForm.mediaType === "gif" ? "⚡ ANIMATED GIF" : "🖼️ IMAGE PREVIEW"}
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "center", gap: "12px", marginTop: "14px" }}>
+                    <label style={{ backgroundColor: "#8b5cf6", color: "#ffffff", padding: "8px 16px", borderRadius: "6px", fontSize: "12.5px", fontWeight: "700", cursor: "pointer" }}>
+                      Change File
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"
+                        onChange={handleHeroFileChange}
+                        style={{ display: "none" }}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setHeroBannerForm(prev => ({ ...prev, mediaFile: null, mediaPreview: "", mediaType: "image" }))}
+                      style={{ backgroundColor: "#fee2e2", color: "#dc2626", border: "none", padding: "8px 14px", borderRadius: "6px", fontSize: "12.5px", fontWeight: "700", cursor: "pointer" }}
+                    >
+                      Remove File
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: "36px", marginBottom: "8px" }}>🎬</div>
+                  <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#1e293b", margin: "0 0 6px 0" }}>
+                    Choose or Drag & Drop Hero Banner Media
+                  </h3>
+                  <p style={{ fontSize: "12.5px", color: "#64748b", margin: "0 0 16px 0" }}>
+                    Select an image (1920×600), animated GIF, or MP4/WEBM video file from your computer
+                  </p>
+                  <label style={{ backgroundColor: "#8b5cf6", color: "#ffffff", padding: "10px 22px", borderRadius: "8px", fontWeight: "800", fontSize: "13px", cursor: "pointer", display: "inline-block", boxShadow: "0 4px 12px rgba(139,92,246,0.3)" }}>
+                    📁 Select Media File from Computer
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"
+                      onChange={handleHeroFileChange}
+                      style={{ display: "none" }}
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* Form Details Grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px" }}>
+              <div>
+                <label style={{ fontSize: "12px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "5px" }}>
+                  Hero Banner Title / Alt Text *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={heroBannerForm.title}
+                  onChange={(e) => setHeroBannerForm({ ...heroBannerForm, title: e.target.value })}
+                  placeholder="e.g. Grand Summer Glow Festival 2026"
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1.5px solid #cbd5e1", fontSize: "13.5px" }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: "12px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "5px" }}>
+                  Subtitle / Tagline (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={heroBannerForm.subtitle}
+                  onChange={(e) => setHeroBannerForm({ ...heroBannerForm, subtitle: e.target.value })}
+                  placeholder="e.g. Up to 40% OFF on all 100% Authentic Korean Skincare"
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1.5px solid #cbd5e1", fontSize: "13.5px" }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: "12px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "5px" }}>
+                  Click-through Link URL (CTA) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={heroBannerForm.ctaLink}
+                  onChange={(e) => setHeroBannerForm({ ...heroBannerForm, ctaLink: e.target.value })}
+                  placeholder="e.g. /shop or /shop?deal=summer or https://..."
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1.5px solid #cbd5e1", fontSize: "13.5px" }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: "12px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "5px" }}>
+                  Display Order / Sequence Number
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="99"
+                  value={heroBannerForm.order}
+                  onChange={(e) => setHeroBannerForm({ ...heroBannerForm, order: parseInt(e.target.value, 10) || 1 })}
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1.5px solid #cbd5e1", fontSize: "13.5px" }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "10px", borderTop: "1px solid #f1f5f9" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "13px", fontWeight: "700", color: "#334155" }}>
+                <input
+                  type="checkbox"
+                  checked={heroBannerForm.isActive}
+                  onChange={(e) => setHeroBannerForm({ ...heroBannerForm, isActive: e.target.checked })}
+                  style={{ width: "18px", height: "18px", accentColor: "#8b5cf6" }}
+                />
+                Active (Display immediately in Homepage Hero Slider)
+              </label>
+
+              <button
+                type="submit"
+                disabled={isUploadingHero}
+                style={{
+                  backgroundColor: isUploadingHero ? "#a78bfa" : "#8b5cf6",
+                  color: "#ffffff",
+                  border: "none",
+                  padding: "12px 28px",
+                  borderRadius: "8px",
+                  fontWeight: "800",
+                  fontSize: "14px",
+                  cursor: isUploadingHero ? "not-allowed" : "pointer",
+                  boxShadow: "0 4px 14px rgba(139,92,246,0.35)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px"
+                }}
+              >
+                {isUploadingHero ? "⏳ Uploading & Processing Media..." : "🚀 Upload & Publish Hero Banner"}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* Published Hero Banners Gallery */}
+        <div style={{ backgroundColor: "#ffffff", padding: "24px", borderRadius: "12px", border: "1px solid #e2e8f0", boxShadow: "0 2px 10px rgba(0,0,0,0.04)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+            <div>
+              <h2 style={{ fontSize: "18px", fontWeight: "800", color: "#0f172a", margin: 0 }}>
+                Live Hero Banners Catalog ({heroBanners.filter(Boolean).length})
+              </h2>
+              <p style={{ fontSize: "12.5px", color: "#64748b", margin: "2px 0 0 0" }}>
+                These slides rotate on the homepage at 1920×600 aspect ratio. You can change picture, change redirect link, pause, or delete any slide directly.
+              </p>
+            </div>
+          </div>
+
+          {heroBanners.filter(Boolean).length === 0 ? (
+            <div style={{ padding: "50px 20px", textAlign: "center", border: "1.5px dashed #e2e8f0", borderRadius: "10px", color: "#64748b" }}>
+              <div style={{ fontSize: "36px", marginBottom: "8px" }}>🎬</div>
+              <div style={{ fontWeight: "800", fontSize: "15px", color: "#1e293b" }}>No Hero Banners Published Yet</div>
+              <p style={{ fontSize: "13px", maxWidth: "420px", margin: "6px auto 0 auto" }}>
+                Upload your first 1920×600 video, GIF, or image above to appear on the homepage hero slider.
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "20px" }}>
+              {heroBanners.filter(Boolean).map((banner: any, idx: number) => {
+                const isVid = banner?.mediaType === "video" || banner?.mediaUrl?.includes(".mp4") || banner?.mediaUrl?.includes(".webm");
+                const isGif = banner?.mediaType === "gif" || banner?.mediaUrl?.includes(".gif");
+                const fullMediaUrl = banner?.mediaUrl || banner?.imageUrl || banner?.img || "";
+                const isActive = banner?.isActive !== false;
+
+                return (
+                  <div key={banner?.id || idx} style={{ border: `1.5px solid ${isActive ? "#cbd5e1" : "#fca5a5"}`, borderRadius: "12px", overflow: "hidden", backgroundColor: "#ffffff", boxShadow: "0 2px 8px rgba(0,0,0,0.05)", display: "flex", flexDirection: "column" }}>
+                    {/* Media Header */}
+                    <div style={{ position: "relative", width: "100%", height: "160px", backgroundColor: "#0f172a" }}>
+                      {isVid ? (
+                        <video
+                          src={fullMediaUrl}
+                          controls
+                          muted
+                          loop
+                          playsInline
+                          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                        />
+                      ) : (
+                        <img
+                          src={fullMediaUrl}
+                          alt={banner?.title || "Hero Slide"}
+                          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/images/sliders/slider-1.png"; }}
+                        />
+                      )}
+                      <div style={{ position: "absolute", top: "10px", right: "10px", display: "flex", gap: "6px" }}>
+                        <span style={{ backgroundColor: isVid ? "#7c3aed" : isGif ? "#d97706" : "#059669", color: "#ffffff", fontSize: "10.5px", fontWeight: "900", padding: "3px 8px", borderRadius: "6px", textTransform: "uppercase" }}>
+                          {isVid ? "🎥 VIDEO" : isGif ? "⚡ GIF" : "🖼️ IMAGE"}
+                        </span>
+                        <span style={{ backgroundColor: isActive ? "#16a34a" : "#dc2626", color: "#ffffff", fontSize: "10.5px", fontWeight: "900", padding: "3px 8px", borderRadius: "6px" }}>
+                          {isActive ? "ACTIVE" : "PAUSED"}
+                        </span>
+                      </div>
+                      <div style={{ position: "absolute", bottom: "10px", left: "10px", backgroundColor: "rgba(0,0,0,0.75)", color: "#ffffff", fontSize: "11px", fontWeight: "800", padding: "2px 8px", borderRadius: "4px" }}>
+                        Order: #{banner?.order || (idx + 1)}
+                      </div>
+                    </div>
+
+                    {/* Content & Action Buttons */}
+                    <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px", flex: 1 }}>
+                      <div style={{ fontWeight: "800", fontSize: "15px", color: "#0f172a" }}>
+                        {banner?.title || "Untitled Hero Slide"}
+                      </div>
+                      {banner?.subtitle && (
+                        <div style={{ fontSize: "12.5px", color: "#64748b" }}>
+                          {banner.subtitle}
+                        </div>
+                      )}
+                      <div style={{ fontSize: "12px", color: "#2563eb", fontWeight: "700", wordBreak: "break-all", marginTop: "auto" }}>
+                        🔗 Redirect Link: {banner?.ctaLink || banner?.linkUrl || "/shop"}
+                      </div>
+
+                      {/* Interactive Frontend Actions Toolbar */}
+                      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "10px", borderTop: "1px solid #f1f5f9", paddingTop: "12px" }}>
+                        <label style={{ backgroundColor: "#fdf2f8", color: "#be185d", border: "1px solid #fbcfe8", padding: "6px 10px", borderRadius: "6px", fontWeight: "800", fontSize: "11.5px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                          📷 Change Picture
+                          <input
+                            type="file"
+                            accept="image/*,video/mp4,video/webm"
+                            style={{ display: "none" }}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleHeroChangePicture(banner, file);
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => handleHeroChangeLink(banner)}
+                          style={{ backgroundColor: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe", padding: "6px 10px", borderRadius: "6px", fontWeight: "800", fontSize: "11.5px", cursor: "pointer" }}
+                        >
+                          🔗 Change Link
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleHeroBanner(banner)}
+                          style={{
+                            backgroundColor: isActive ? "#fef3c7" : "#dcfce7",
+                            color: isActive ? "#92400e" : "#166534",
+                            border: "none",
+                            padding: "6px 10px",
+                            borderRadius: "6px",
+                            fontSize: "11.5px",
+                            fontWeight: "800",
+                            cursor: "pointer"
+                          }}
+                        >
+                          {isActive ? "⏸️ Pause" : "▶️ Activate"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteHeroBanner(banner)}
+                          style={{
+                            backgroundColor: "#fee2e2",
+                            color: "#dc2626",
+                            border: "none",
+                            padding: "6px 10px",
+                            borderRadius: "6px",
+                            fontSize: "11.5px",
+                            fontWeight: "800",
+                            cursor: "pointer",
+                            marginLeft: "auto"
+                          }}
+                        >
+                          🗑️ Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Banner - 100% Frontend Persistence
+  const handleSaveBanner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bannerForm.title || !bannerForm.imageUrl) {
+      alert("Title and Banner Image are required. Please enter a title and select/paste an image.");
+      return;
+    }
+    try {
+      const pageToSave = bannerForm.page || "Homepage";
+      let idToSave = bannerForm.id;
+      if (!idToSave) {
+        if (pageToSave === "Hero Slides") {
+          idToSave = `hero-slide-${Date.now()}`;
+        } else {
+          const matched = MASTER_HOMEPAGE_BANNERS.find(m => m.page.toLowerCase().trim() === pageToSave.toLowerCase().trim());
+          idToSave = matched ? matched.id : `banner-custom-${Date.now()}`;
         }
-        clearAllCache(); // Force website to reload fresh data
-        triggerGlobalDataSync();
-        alert("Banner saved successfully!");
-        setBannerForm({ id: "", title: "", imageUrl: "", mobileImageUrl: "", tabletImageUrl: "", linkUrl: "", bgColor: "#1a1a2e", page: "Homepage", isActive: true, sortOrder: "0" });
-        navigateTo("home-banner-list");
-        fetchData(true);
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        alert(`Failed to save banner: ${errData.error || "Server response error"}`);
       }
+
+      const newBanner = {
+        id: idToSave,
+        title: bannerForm.title,
+        imageUrl: bannerForm.imageUrl,
+        mobileImageUrl: bannerForm.mobileImageUrl || bannerForm.imageUrl,
+        tabletImageUrl: bannerForm.tabletImageUrl || bannerForm.imageUrl,
+        linkUrl: bannerForm.linkUrl || "/shop",
+        bgColor: bannerForm.bgColor || "#1a1a2e",
+        page: pageToSave,
+        isActive: bannerForm.isActive !== false,
+        sortOrder: Number(bannerForm.sortOrder) || 1,
+        updatedAt: Date.now()
+      };
+
+      // 1. Remove from deleted IDs
+      if (typeof window !== "undefined") {
+        try {
+          const stored = localStorage.getItem("gg_deleted_banner_ids");
+          if (stored) {
+            const arr: string[] = JSON.parse(stored);
+            const filtered = arr.filter(x => x !== idToSave && x !== pageToSave && x !== newBanner.title);
+            localStorage.setItem("gg_deleted_banner_ids", JSON.stringify(filtered));
+          }
+        } catch (e) {}
+      }
+
+      // 2. If it is a Hero slide, also update hero banners storage
+      if (pageToSave === "Hero Slides" || idToSave.startsWith("hero-slide-")) {
+        const heroList = getFrontendHeroBanners();
+        const updatedHero = [newBanner, ...heroList.filter((b: any) => b && b.id !== idToSave)];
+        saveFrontendHeroBanners(updatedHero);
+        setHeroBanners(updatedHero);
+      }
+
+      // 3. Save directly in frontend home banners store (strict ID replacement, no overwriting other slots)
+      const currentList = getFrontendHomeBanners();
+      const updatedList = currentList.filter((b: any) => b.id !== idToSave);
+      updatedList.push(newBanner);
+      saveFrontendHomeBanners(updatedList);
+
+      // 4. Update banners state
+      const merged = mergeBannersWithMaster(updatedList);
+      setBanners(merged);
+
+      clearAllCache();
+      triggerGlobalDataSync();
+      alert(`✓ Banner "${newBanner.title}" saved in frontend!\nHomepage will show this banner immediately.`);
+      setBannerForm({ id: "", title: "", imageUrl: "", mobileImageUrl: "", tabletImageUrl: "", linkUrl: "", bgColor: "#1a1a2e", page: "Homepage", isActive: true, sortOrder: "0" });
+      setEditingBannerModal(false);
+      navigateTo("home-banner-list");
     } catch (e: any) {
-      alert(`Error saving banner: ${e.message || e}`);
+      alert(`Error saving banner in frontend: ${e.message || e}`);
     }
   };
 
   const handleDeleteBanner = async (id: string) => {
-    if (!confirm("Are you sure you want to permanently delete this banner?")) return;
+    if (!confirm("Are you sure you want to delete this banner image?")) return;
     try {
       const bannerToDelete = banners.find((b) => b.id === id);
       const pageKey = bannerToDelete?.page;
+      const isMasterSlot = MASTER_HOMEPAGE_BANNERS.some((m) => m.id === id || m.page === pageKey) || id.startsWith("hero-slide-");
 
       if (typeof window !== "undefined") {
         try {
           const stored = localStorage.getItem("gg_deleted_banner_ids");
           const arr: string[] = stored ? JSON.parse(stored) : [];
           if (!arr.includes(id)) arr.push(id);
-          if (pageKey && !arr.includes(pageKey)) arr.push(pageKey);
+          // Never add multi-item section names like "Hero Slides" to deleted IDs!
+          if (pageKey && pageKey !== "Hero Slides" && !pageKey.includes("Category:") && !pageKey.includes("Concern:") && !arr.includes(pageKey)) {
+            arr.push(pageKey);
+          }
           localStorage.setItem("gg_deleted_banner_ids", JSON.stringify(arr));
         } catch (e) {}
       }
 
-      setBanners((prev) => {
-        const updated = prev.filter((b) => b.id !== id && (pageKey ? b.page !== pageKey : true));
-        if (typeof window !== "undefined") {
-          try {
-            localStorage.setItem("gg_admin_banners_cache", JSON.stringify(updated));
-          } catch (_) {}
+      // If it's a Hero Slide, clear its image from hero banners store
+      if (bannerToDelete?.page === "Hero Slides" || id.startsWith("hero-slide-")) {
+        const heroList = getFrontendHeroBanners();
+        const updatedHero = isMasterSlot
+          ? heroList.map((h: any) => h.id === id ? { ...h, mediaUrl: "", imageUrl: "", mobileImageUrl: "", tabletImageUrl: "" } : h)
+          : heroList.filter((h: any) => h.id !== id);
+        saveFrontendHeroBanners(updatedHero);
+        setHeroBanners(updatedHero);
+      }
+
+      // Update frontend home banners store: if master slot, keep it with empty image; if custom, remove it
+      const currentList = getFrontendHomeBanners();
+      let updatedList: any[];
+      if (isMasterSlot) {
+        const foundIdx = currentList.findIndex((b: any) => b.id === id);
+        if (foundIdx >= 0) {
+          currentList[foundIdx] = { ...currentList[foundIdx], imageUrl: "", mobileImageUrl: "", tabletImageUrl: "" };
+          updatedList = currentList;
+        } else {
+          updatedList = [...currentList, { id, page: pageKey, title: bannerToDelete?.title || id, imageUrl: "", mobileImageUrl: "", tabletImageUrl: "" }];
         }
-        return updated;
+      } else {
+        updatedList = currentList.filter((b: any) => b.id !== id);
+      }
+
+      saveFrontendHomeBanners(updatedList);
+      setBanners(mergeBannersWithMaster(updatedList));
+
+      // Clear loaded dimensions for this id
+      setLoadedDimensions(prev => {
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
       });
-      await fetch(`${API_BASE}/banners/${id}`, { method: "DELETE", headers: getAuthHeader() }).catch(() => {});
-      await fetch(`${API_BASE}/admin/banners/${id}`, { method: "DELETE", headers: getAuthHeader() }).catch(() => {});
-      
-      // Also delete from /api/local-banners across all sections
-      try {
-        const sections = ["heroBanners", "dealsYouCannotMiss", "topBrandsOffers", "limitedTimeOffers", "shopByCategory", "shopByConcern", "promoBanner"];
-        await Promise.all(sections.map(s => 
-          fetch(`/api/local-banners?sectionKey=${s}&id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {})
-        ));
-      } catch (_) {}
 
       clearAllCache();
       triggerGlobalDataSync();
-      fetchData(true);
-      alert("Banner deleted permanently from database!");
-    } catch (e) { alert("Error deleting banner."); }
+      alert(`✓ Banner image deleted for "${bannerToDelete?.title || id}"! Homepage will not show this picture.`);
+    } catch (e) {
+      alert("Error deleting banner.");
+    }
   };
 
   const handleDeleteAllBanners = async () => {
     if (!confirm("Are you sure you want to delete ALL banners? No banner images will remain.")) return;
     try {
       const bannerList = [...banners];
-      setBanners([]);
+      const allIds = bannerList.flatMap((b: any) => [b.id, b.page].filter(Boolean));
       if (typeof window !== "undefined") {
         try {
-          const allIds = bannerList.flatMap((b: any) => [b.id, b.page].filter(Boolean));
           localStorage.setItem("gg_deleted_banner_ids", JSON.stringify(allIds));
+          localStorage.removeItem("gg_frontend_home_banners");
+          localStorage.removeItem("gg_frontend_hero_banners");
+          localStorage.removeItem("gg_admin_banners_cache");
+          window.dispatchEvent(new Event("gg_home_banners_updated"));
+          window.dispatchEvent(new Event("storage"));
         } catch (e) {}
       }
-      await Promise.all(bannerList.map((b: any) => 
-        fetch(`${API_BASE}/admin/banners/${b.id}`, { method: "DELETE", headers: getAuthHeader() }).catch(() => {})
-      ));
-      await fetch(`${API_BASE}/admin/banners/all`, { method: "DELETE", headers: getAuthHeader() }).catch(() => {});
+      setBanners([]);
+      setHeroBanners([]);
       clearAllCache();
       triggerGlobalDataSync();
-      fetchData(true);
-      alert("All banners deleted permanently from database!");
+      alert("✓ All banners deleted from frontend!");
     } catch (e) {
       alert("Error deleting all banners.");
     }
@@ -2707,9 +3538,10 @@ export default function ValobasaAdminPanel() {
       
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
         body: JSON.stringify({
           ...productForm,
+          subcategoryId: productForm.categoryId,
           status: "Active",
           isActive: true,
           inStock: true
@@ -3291,6 +4123,7 @@ export default function ValobasaAdminPanel() {
   const timeframeStats = useMemo(() => {
     const totalAllOrders = orders.reduce((sum: number, o: any) => sum + (o.total || o.totalAmount || 0), 0);
     const orderCountTotal = orders.length;
+    const totalDamageLoss = damagedProductsLog.reduce((sum, item) => sum + (parseFloat(item.lossAmount) || 0), 0);
 
     if (salesTimeframe === "daily") {
       const todayStr = new Date().toISOString().slice(0, 10);
@@ -3320,7 +4153,8 @@ export default function ValobasaAdminPanel() {
         label: "Today's Performance (Daily)",
         ordersCount: countFinal,
         revenue: rev,
-        netProfit: Math.round(rev * 0.3),
+        totalDamageLoss,
+        netProfit: Math.max(0, Math.round(rev * 0.3) - totalDamageLoss),
         profitPercent: countFinal > 0 ? "30.0%" : "0%",
         walletAmount: 0,
         chartData: hourlyData,
@@ -3358,7 +4192,8 @@ export default function ValobasaAdminPanel() {
         label: "Weekly Sales Performance (Last 7 Days)",
         ordersCount: weekOrders.length,
         revenue: rev,
-        netProfit: Math.round(rev * 0.3),
+        totalDamageLoss,
+        netProfit: Math.max(0, Math.round(rev * 0.3) - totalDamageLoss),
         profitPercent: weekOrders.length > 0 ? "30.0%" : "0%",
         walletAmount: 0,
         chartData: weekData,
@@ -3386,7 +4221,8 @@ export default function ValobasaAdminPanel() {
         label: "Monthly Performance (This Month)",
         ordersCount: monthOrders.length,
         revenue: rev,
-        netProfit: Math.round(rev * 0.3),
+        totalDamageLoss,
+        netProfit: Math.max(0, Math.round(rev * 0.3) - totalDamageLoss),
         profitPercent: monthOrders.length > 0 ? "30.0%" : "0%",
         walletAmount: 0,
         chartData: monthData,
@@ -3414,14 +4250,15 @@ export default function ValobasaAdminPanel() {
         label: "Yearly Overview (This Year)",
         ordersCount: yearOrders.length,
         revenue: rev,
-        netProfit: Math.round(rev * 0.3),
+        totalDamageLoss,
+        netProfit: Math.max(0, Math.round(rev * 0.3) - totalDamageLoss),
         profitPercent: yearOrders.length > 0 ? "30.0%" : "0%",
         walletAmount: 0,
         chartData: yearData,
         chartTitle: "Yearly Sales Performance"
       };
     }
-  }, [salesTimeframe, orders]);
+  }, [salesTimeframe, orders, damagedProductsLog]);
 
   const salesChartData = timeframeStats.chartData;
 
@@ -3527,9 +4364,13 @@ export default function ValobasaAdminPanel() {
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", backgroundColor: "#f3f4f6", fontFamily: "'Montserrat', sans-serif" }}>
 
-      {/* Modern Montserrat Font Import */}
+      {/* Modern Montserrat Font Import & Flat Solid UI Styles */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
+        *, *::before, *::after {
+          box-shadow: none !important;
+          text-shadow: none !important;
+        }
         .admin-sidebar { font-family: 'Montserrat', sans-serif; }
         .admin-menu-item {
           transition: all 0.2s ease;
@@ -3544,7 +4385,7 @@ export default function ValobasaAdminPanel() {
           color: #fff !important;
           border-left-color: #ffffff !important;
           font-weight: 700;
-          box-shadow: 0 4px 12px rgba(230, 59, 122, 0.35);
+          box-shadow: none !important;
         }
         @media print {
           body * { visibility: hidden !important; }
@@ -3605,13 +4446,10 @@ export default function ValobasaAdminPanel() {
             <Box size={18} /><span>Inventory</span>
           </div>
 
-          {/* Home Slides Accordion */}
+          {/* Home Slides Accordion (Drawer default closed) */}
           <div>
             <div 
-              onClick={() => {
-                setHomeSlidesOpen(!homeSlidesOpen);
-                navigateTo("home-slides");
-              }} 
+              onClick={() => setHomeSlidesOpen(!homeSlidesOpen)} 
               className={`admin-menu-item ${(activeTab === "home-slides" || activeTab === "home-banner-list" || activeTab === "add-home-banner" || activeTab === "hero-banners") ? "active" : ""}`} 
               style={{ padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", color: (activeTab === "home-slides" || activeTab === "home-banner-list" || activeTab === "add-home-banner" || activeTab === "hero-banners") ? "#fff" : "inherit" }}
             >
@@ -3619,17 +4457,12 @@ export default function ValobasaAdminPanel() {
               <ChevronDown size={14} style={{ transform: homeSlidesOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
             </div>
             {homeSlidesOpen && (
-              <div style={{ backgroundColor: "rgba(0,0,0,0.2)", padding: "5px 0" }}>
+              <div style={{ backgroundColor: "#141422", padding: "5px 0" }}>
                 <div onClick={() => navigateTo("hero-banners")} className={`admin-menu-item ${activeTab === "hero-banners" ? "active" : ""}`} style={{ padding: "8px 20px 8px 50px", fontSize: "13px", cursor: "pointer", color: activeTab === "hero-banners" ? "#e63b7a" : "inherit", fontWeight: activeTab === "hero-banners" ? "bold" : "normal" }}>🎬 Hero Banner (1920x600)</div>
                 <div onClick={() => navigateTo("home-banner-list")} className={`admin-menu-item ${(activeTab === "home-banner-list" || activeTab === "home-slides") ? "active" : ""}`} style={{ padding: "8px 20px 8px 50px", fontSize: "13px", cursor: "pointer", color: (activeTab === "home-banner-list" || activeTab === "home-slides") ? "#fff" : "inherit" }}>Home Banners List</div>
                 <div onClick={() => navigateTo("add-home-banner")} className={`admin-menu-item ${activeTab === "add-home-banner" ? "active" : ""}`} style={{ padding: "8px 20px 8px 50px", fontSize: "13px", cursor: "pointer", color: activeTab === "add-home-banner" ? "#fff" : "inherit" }}>Add Home Banner</div>
               </div>
             )}
-          </div>
-
-          {/* Push Notifications Menu Item */}
-          <div onClick={() => navigateTo("push-notifications")} className={`admin-menu-item ${activeTab === "push-notifications" ? "active" : ""}`} style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", color: activeTab === "push-notifications" ? "#fff" : "inherit" }}>
-            <Bell size={18} /><span>Push Notifications</span>
           </div>
 
           {/* Socket.io Promo Broadcast Menu Item */}
@@ -3674,13 +4507,10 @@ export default function ValobasaAdminPanel() {
             </div>
           )}
 
-          {/* Categories Accordion */}
+          {/* Categories Accordion (Drawer default closed) */}
           <div>
             <div 
-              onClick={() => {
-                setCategoryOpen(!categoryOpen);
-                navigateTo("category-list");
-              }} 
+              onClick={() => setCategoryOpen(!categoryOpen)} 
               className={`admin-menu-item ${(activeTab === "categories" || activeTab === "category-list" || activeTab === "add-category" || activeTab === "sub-category-list" || activeTab === "add-sub-category") ? "active" : ""}`} 
               style={{ padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", color: (activeTab === "categories" || activeTab === "category-list" || activeTab === "add-category" || activeTab === "sub-category-list" || activeTab === "add-sub-category") ? "#fff" : "inherit" }}
             >
@@ -3688,7 +4518,7 @@ export default function ValobasaAdminPanel() {
               <ChevronDown size={14} style={{ transform: categoryOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
             </div>
             {categoryOpen && (
-              <div style={{ backgroundColor: "rgba(0,0,0,0.2)", padding: "5px 0" }}>
+              <div style={{ backgroundColor: "#141422", padding: "5px 0" }}>
                 <div onClick={() => navigateTo("category-list")} className={`admin-menu-item ${(activeTab === "category-list" || activeTab === "categories") ? "active" : ""}`} style={{ padding: "8px 20px 8px 50px", fontSize: "13px", cursor: "pointer", color: (activeTab === "category-list" || activeTab === "categories") ? "#fff" : "inherit" }}>Category List</div>
                 <div onClick={() => navigateTo("add-category")} className={`admin-menu-item ${activeTab === "add-category" ? "active" : ""}`} style={{ padding: "8px 20px 8px 50px", fontSize: "13px", cursor: "pointer", color: activeTab === "add-category" ? "#fff" : "inherit" }}>Add A Category</div>
                 <div onClick={() => navigateTo("sub-category-list")} className={`admin-menu-item ${activeTab === "sub-category-list" ? "active" : ""}`} style={{ padding: "8px 20px 8px 50px", fontSize: "13px", cursor: "pointer", color: activeTab === "sub-category-list" ? "#fff" : "inherit" }}>Sub Category List</div>
@@ -4623,17 +5453,89 @@ export default function ValobasaAdminPanel() {
             </div>
           )}
 
-          {/* 0.3 CUSTOMER MESSAGES & SUPPORT TICKETS */}
+          {/* 0.3 CUSTOMER MESSAGES & PRODUCT REVIEWS */}
           {activeTab === "customer-messages" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-              <div style={{ backgroundColor: "#ffffff", padding: "24px", borderRadius: "12px", boxShadow: "0 2px 10px rgba(0,0,0,0.05)", borderTop: "4px solid #e63b7a" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+              <div style={{ backgroundColor: "#ffffff", padding: "24px", borderRadius: "8px", border: "1px solid #e2e8f0", borderTop: "4px solid #e63b7a" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
                   <div>
-                    <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e293b", margin: 0 }}>Customer Messages & Contact Tickets</h2>
-                    <p style={{ color: "#ffffffff", fontSize: "13px", margin: "2px 0 0 0" }}>View customer inquiries from Contact Us form and send direct support replies.</p>
+                    <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e293b", margin: 0 }}>Customer Inquiries & Product Reviews</h2>
+                    <p style={{ color: "#64748b", fontSize: "13px", margin: "2px 0 0 0" }}>View customer messages from Contact Us and manage or delete product ratings & reviews.</p>
+                  </div>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      onClick={() => setCustomerMessagesTab("contact")}
+                      style={{ padding: "8px 16px", borderRadius: "6px", border: "none", fontWeight: "800", fontSize: "13px", cursor: "pointer", backgroundColor: customerMessagesTab === "contact" ? "#e63b7a" : "#f1f5f9", color: customerMessagesTab === "contact" ? "#fff" : "#475569" }}
+                    >
+                      📩 Contact Messages ({contactMessages.length})
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCustomerMessagesTab("reviews");
+                        fetchAdminReviews();
+                      }}
+                      style={{ padding: "8px 16px", borderRadius: "6px", border: "none", fontWeight: "800", fontSize: "13px", cursor: "pointer", backgroundColor: customerMessagesTab === "reviews" ? "#e63b7a" : "#f1f5f9", color: customerMessagesTab === "reviews" ? "#fff" : "#475569" }}
+                    >
+                      ⭐ Product Reviews ({adminReviews.length})
+                    </button>
                   </div>
                 </div>
 
+                {customerMessagesTab === "reviews" ? (
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                      <span style={{ fontSize: "13px", fontWeight: "700", color: "#475569" }}>All Customer Submitted Reviews</span>
+                      <button onClick={fetchAdminReviews} style={{ padding: "6px 14px", border: "1px solid #cbd5e1", borderRadius: "6px", backgroundColor: "#f8fafc", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>🔄 Refresh Reviews</button>
+                    </div>
+                    {adminReviews.length === 0 ? (
+                      <div style={{ textAlign: "center", padding: "50px 20px", color: "#94a3b8" }}>
+                        <div style={{ fontSize: "36px", marginBottom: "8px" }}>⭐</div>
+                        <div style={{ fontSize: "15px", fontWeight: "700", color: "#1e293b" }}>No Product Reviews Yet</div>
+                        <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "4px" }}>Customer reviews submitted on product pages will appear here for review and deletion.</div>
+                      </div>
+                    ) : (
+                      <table className="admin-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                        <thead>
+                          <tr style={{ backgroundColor: "#f8fafc", textAlign: "left" }}>
+                            <th style={{ padding: "10px" }}>#</th>
+                            <th style={{ padding: "10px" }}>Product</th>
+                            <th style={{ padding: "10px" }}>Customer</th>
+                            <th style={{ padding: "10px", textAlign: "center" }}>Rating</th>
+                            <th style={{ padding: "10px" }}>Review Comment</th>
+                            <th style={{ padding: "10px" }}>Date</th>
+                            <th style={{ padding: "10px", textAlign: "center" }}>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {adminReviews.map((rev, idx) => (
+                            <tr key={rev.id || idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                              <td style={{ padding: "10px", fontWeight: "700", color: "#64748b" }}>{idx + 1}</td>
+                              <td style={{ padding: "10px", fontWeight: "800", color: "#0f172a" }}>{rev.productTitle || rev.productName || rev.productId || "Product"}</td>
+                              <td style={{ padding: "10px", fontWeight: "600", color: "#334155" }}>{rev.customerName || rev.userName || "Verified Customer"}</td>
+                              <td style={{ padding: "10px", textAlign: "center", fontWeight: "800", color: "#f59e0b" }}>
+                                {"★".repeat(Number(rev.rating) || 5)} ({rev.rating || 5}/5)
+                              </td>
+                              <td style={{ padding: "10px", color: "#1e293b", maxWidth: "320px", wordBreak: "break-word" }}>
+                                "{rev.comment || rev.reviewText || rev.message || ""}"
+                              </td>
+                              <td style={{ padding: "10px", fontSize: "11px", color: "#64748b" }}>
+                                {rev.createdAt ? new Date(rev.createdAt).toLocaleDateString() : "Recent"}
+                              </td>
+                              <td style={{ padding: "10px", textAlign: "center" }}>
+                                <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
+                                  {!rev.isApproved && (
+                                    <button onClick={() => handleApproveReview(rev.id)} style={{ backgroundColor: "#dcfce7", color: "#166534", border: "none", padding: "4px 10px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Approve</button>
+                                  )}
+                                  <button onClick={() => handleDeleteReview(rev.id)} style={{ backgroundColor: "#fee2e2", color: "#ef4444", border: "none", padding: "4px 10px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Delete Review</button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: "20px" }}>
                   {/* Left Column: Messages List */}
                   <div style={{ borderRight: "1px solid #e2e8f0", paddingRight: "16px", display: "flex", flexDirection: "column", gap: "10px", maxHeight: "600px", overflowY: "auto" }}>
@@ -4660,7 +5562,7 @@ export default function ValobasaAdminPanel() {
                               {msg.status || "Unread"}
                             </span>
                           </div>
-                          <div style={{ fontSize: "12px", color: "#64748b", fontWeight: "600" }}>📋ž {msg.phone || msg.email || "N/A"}</div>
+                          <div style={{ fontSize: "12px", color: "#64748b", fontWeight: "600" }}>📞 {msg.phone || msg.email || "N/A"}</div>
                           <div style={{ fontSize: "12.5px", color: "#334155", fontWeight: "500", marginTop: "6px", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                             "{msg.message}"
                           </div>
@@ -4679,7 +5581,7 @@ export default function ValobasaAdminPanel() {
                         <div style={{ borderBottom: "1.5px solid #cbd5e1", paddingBottom: "12px" }}>
                           <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#0f172a", margin: "0 0 6px 0" }}>{selectedMessage.name}</h3>
                           <div style={{ fontSize: "12.5px", color: "#475569", fontWeight: "600", display: "flex", gap: "14px" }}>
-                            <span>📋ž {selectedMessage.phone || "N/A"}</span>
+                            <span>📞 {selectedMessage.phone || "N/A"}</span>
                             <span>✉️ {selectedMessage.email || "N/A"}</span>
                           </div>
                           <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "4px" }}>Received: {new Date(selectedMessage.createdAt).toLocaleString()}</div>
@@ -4717,13 +5619,12 @@ export default function ValobasaAdminPanel() {
                             placeholder="Type your response to the customer..."
                             value={ticketReplyText}
                             onChange={(e) => setTicketReplyText(e.target.value)}
-
                             style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13px", outline: "none" }}
                           />
-                  <button
+                          <button
                             type="submit"
                             disabled={replySending}
-                            style={{ backgroundColor: "#e63b7a", color: "#ffffff", border: "none", padding: "10px 20px", borderRadius: "6px", fontWeight: "800", fontSize: "13px", cursor: "pointer", alignSelf: "flex-end", boxShadow: "0 4px 12px rgba(230,59,122,0.3)" }}
+                            style={{ backgroundColor: "#e63b7a", color: "#ffffff", border: "none", padding: "10px 20px", borderRadius: "6px", fontWeight: "800", fontSize: "13px", cursor: "pointer", alignSelf: "flex-end" }}
                           >
                             {replySending ? "Sending..." : "Send Reply Message ✉️"}
                           </button>
@@ -4736,6 +5637,7 @@ export default function ValobasaAdminPanel() {
                     )}
                   </div>
                 </div>
+                )}
               </div>
             </div>
           )}
@@ -4830,7 +5732,7 @@ export default function ValobasaAdminPanel() {
               {
                 id: "Hero Slides",
                 name: "🎬 Hero Slides Carousel (Main Top Slider)",
-                desktopSize: "1920 x 500 px (or 1400 x 380 px)",
+                desktopSize: "1920 x 600 px (3.2:1 Ratio)",
                 mobileSize: "750 x 750 px (Square 1:1)",
                 defaultTitle: "Hero Slide Collection",
                 defaultLink: "/shop",
@@ -4839,11 +5741,20 @@ export default function ValobasaAdminPanel() {
               {
                 id: "Homepage Wide Banner",
                 name: "📢 Homepage Wide Banner (Middle Horizontal Promo)",
-                desktopSize: "1200 x 300 px (Panoramic Wide)",
+                desktopSize: "1200 x 300 px (4:1 Ratio)",
                 mobileSize: "750 x 350 px",
                 defaultTitle: "Homepage Wide Banner",
                 defaultLink: "/shop?tab=offers",
                 hint: "Displays right above the Makeup section across full container width."
+              },
+              {
+                id: "Promo Banner",
+                name: "💎 Promotional Banner (Lux Royale Horizontal Ad)",
+                desktopSize: "1200 x 140 px (8.5:1 Ratio)",
+                mobileSize: "750 x 150 px",
+                defaultTitle: "Promotional Banner (Lux Royale)",
+                defaultLink: "/shop",
+                hint: "Displays right above the Just Arrived section."
               },
               {
                 id: "Deal Card 1",
@@ -5261,7 +6172,6 @@ export default function ValobasaAdminPanel() {
                     <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
                       <input
                         type="text"
-                        required
                         value={bannerForm.imageUrl}
                         onChange={(e) => {
                           const val = e.target.value;
@@ -5468,351 +6378,15 @@ export default function ValobasaAdminPanel() {
             );
           })()}
 
-          {/* DYNAMIC HERO BANNER MEDIA MANAGER (1920x600 Video / GIF / Image) */}
-          {activeTab === "hero-banners" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-              {/* Header Box with Recommended Dimensions */}
-              <div style={{ backgroundColor: "#ffffff", padding: "24px", borderRadius: "12px", border: "1px solid #e2e8f0", boxShadow: "0 2px 10px rgba(0,0,0,0.04)", borderLeft: "5px solid #8b5cf6" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span style={{ fontSize: "24px" }}>🎬</span>
-                      <h1 style={{ fontSize: "22px", fontWeight: "900", color: "#0f172a", margin: 0 }}>
-                        Homepage Hero Banner Manager
-                      </h1>
-                      <span style={{ backgroundColor: "#ede9fe", color: "#7c3aed", fontSize: "11.5px", fontWeight: "800", padding: "3px 10px", borderRadius: "12px" }}>
-                        1920 × 600 px
-                      </span>
-                    </div>
-                    <p style={{ color: "#64748b", fontSize: "13.5px", margin: "6px 0 0 0", maxWidth: "800px" }}>
-                      Upload dynamic hero media files including <strong>HD Videos (.mp4, .webm)</strong>, <strong>Animated GIFs (.gif)</strong>, and <strong>High-Resolution Images (.jpg, .png, .webp)</strong>. 
-                      Every file automatically fits the exact 1920×600 banner size using responsive cover rendering.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => fetchHeroBanners(true)}
-                    style={{ backgroundColor: "#f8fafc", color: "#475569", border: "1.5px solid #cbd5e1", padding: "8px 16px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
-                  >
-                    🔄 Refresh Hero Banners
-                  </button>
-                </div>
-
-                {/* Dimension & Specification Badges */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px", marginTop: "18px" }}>
-                  <div style={{ backgroundColor: "#f5f3ff", border: "1px solid #ddd6fe", padding: "12px 16px", borderRadius: "8px" }}>
-                    <div style={{ fontSize: "11px", fontWeight: "800", color: "#7c3aed", textTransform: "uppercase" }}>📐 Recommended Dimensions</div>
-                    <div style={{ fontSize: "15px", fontWeight: "900", color: "#4c1d95", marginTop: "3px" }}>1920 × 600 px (16:5)</div>
-                    <div style={{ fontSize: "11.5px", color: "#6d28d9", marginTop: "2px" }}>Auto-centers on Mobile & Tablets</div>
-                  </div>
-                  <div style={{ backgroundColor: "#eff6ff", border: "1px solid #bfdbfe", padding: "12px 16px", borderRadius: "8px" }}>
-                    <div style={{ fontSize: "11px", fontWeight: "800", color: "#2563eb", textTransform: "uppercase" }}>🎥 Video Specifications</div>
-                    <div style={{ fontSize: "15px", fontWeight: "900", color: "#1e3a8a", marginTop: "3px" }}>MP4 / WEBM (Max 25MB)</div>
-                    <div style={{ fontSize: "11.5px", color: "#1d4ed8", marginTop: "2px" }}>AutoPlays seamlessly (muted loop)</div>
-                  </div>
-                  <div style={{ backgroundColor: "#ecfdf5", border: "1px solid #a7f3d0", padding: "12px 16px", borderRadius: "8px" }}>
-                    <div style={{ fontSize: "11px", fontWeight: "800", color: "#059669", textTransform: "uppercase" }}>🖼️ Images & Animated Files</div>
-                    <div style={{ fontSize: "15px", fontWeight: "900", color: "#064e3b", marginTop: "3px" }}>JPG / PNG / WEBP / GIF</div>
-                    <div style={{ fontSize: "11.5px", color: "#047857", marginTop: "2px" }}>Images up to 5MB, GIFs up to 25MB</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Upload New Hero Banner Form */}
-              <div style={{ backgroundColor: "#ffffff", padding: "24px", borderRadius: "12px", border: "1px solid #e2e8f0", boxShadow: "0 2px 10px rgba(0,0,0,0.04)" }}>
-                <h2 style={{ fontSize: "17px", fontWeight: "800", color: "#0f172a", margin: "0 0 16px 0", display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span>➕</span> Upload New Hero Banner Media
-                </h2>
-
-                <form onSubmit={handleUploadHeroBanner} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
-                  {/* File Dropzone & Live Preview */}
-                  <div style={{ border: "2px dashed #cbd5e1", borderRadius: "12px", padding: "24px", backgroundColor: "#f8fafc", textAlign: "center" }}>
-                    {heroBannerForm.mediaPreview ? (
-                      <div>
-                        <div style={{ width: "100%", maxWidth: "800px", margin: "0 auto", borderRadius: "10px", overflow: "hidden", boxShadow: "0 4px 15px rgba(0,0,0,0.15)", backgroundColor: "#0f172a", position: "relative" }}>
-                          {heroBannerForm.mediaType === "video" ? (
-                            <video
-                              src={heroBannerForm.mediaPreview}
-                              controls
-                              autoPlay
-                              muted
-                              loop
-                              playsInline
-                              style={{ width: "100%", height: "250px", objectFit: "cover", display: "block" }}
-                            />
-                          ) : (
-                            <img
-                              src={heroBannerForm.mediaPreview}
-                              alt="Live Preview"
-                              style={{ width: "100%", height: "250px", objectFit: "cover", display: "block" }}
-                            />
-                          )}
-                          <div style={{ position: "absolute", top: "12px", right: "12px", backgroundColor: "rgba(0,0,0,0.75)", color: "#ffffff", fontSize: "11.5px", fontWeight: "800", padding: "4px 10px", borderRadius: "6px", backdropFilter: "blur(4px)" }}>
-                            {heroBannerForm.mediaType === "video" ? "🎥 VIDEO PREVIEW" : heroBannerForm.mediaType === "gif" ? "⚡ ANIMATED GIF" : "🖼️ IMAGE PREVIEW"}
-                          </div>
-                        </div>
-
-                        <div style={{ display: "flex", justifyContent: "center", gap: "12px", marginTop: "14px" }}>
-                          <label style={{ backgroundColor: "#8b5cf6", color: "#ffffff", padding: "8px 16px", borderRadius: "6px", fontSize: "12.5px", fontWeight: "700", cursor: "pointer" }}>
-                            Change File
-                            <input
-                              type="file"
-                              accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"
-                              onChange={handleHeroFileChange}
-                              style={{ display: "none" }}
-                            />
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => setHeroBannerForm(prev => ({ ...prev, mediaFile: null, mediaPreview: "", mediaType: "image" }))}
-                            style={{ backgroundColor: "#fee2e2", color: "#dc2626", border: "none", padding: "8px 14px", borderRadius: "6px", fontSize: "12.5px", fontWeight: "700", cursor: "pointer" }}
-                          >
-                            Remove File
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div>
-                        <div style={{ fontSize: "36px", marginBottom: "8px" }}>🎬</div>
-                        <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#1e293b", margin: "0 0 6px 0" }}>
-                          Choose or Drag & Drop Hero Banner Media
-                        </h3>
-                        <p style={{ fontSize: "12.5px", color: "#64748b", margin: "0 0 16px 0" }}>
-                          Select an image (1920×600), animated GIF, or MP4/WEBM video file from your computer
-                        </p>
-                        <label style={{ backgroundColor: "#8b5cf6", color: "#ffffff", padding: "10px 22px", borderRadius: "8px", fontWeight: "800", fontSize: "13px", cursor: "pointer", display: "inline-block", boxShadow: "0 4px 12px rgba(139,92,246,0.3)" }}>
-                          📁 Select Media File from Computer
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"
-                            onChange={handleHeroFileChange}
-                            style={{ display: "none" }}
-                          />
-                        </label>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Form Details Grid */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px" }}>
-                    <div>
-                      <label style={{ fontSize: "12px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "5px" }}>
-                        Hero Banner Title / Alt Text *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={heroBannerForm.title}
-                        onChange={(e) => setHeroBannerForm({ ...heroBannerForm, title: e.target.value })}
-                        placeholder="e.g. Grand Summer Glow Festival 2026"
-                        style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1.5px solid #cbd5e1", fontSize: "13.5px" }}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: "12px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "5px" }}>
-                        Subtitle / Tagline (Optional)
-                      </label>
-                      <input
-                        type="text"
-                        value={heroBannerForm.subtitle}
-                        onChange={(e) => setHeroBannerForm({ ...heroBannerForm, subtitle: e.target.value })}
-                        placeholder="e.g. Up to 40% OFF on all 100% Authentic Korean Skincare"
-                        style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1.5px solid #cbd5e1", fontSize: "13.5px" }}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: "12px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "5px" }}>
-                        Click-through Link URL (CTA) *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={heroBannerForm.ctaLink}
-                        onChange={(e) => setHeroBannerForm({ ...heroBannerForm, ctaLink: e.target.value })}
-                        placeholder="e.g. /shop or /shop?deal=summer or https://..."
-                        style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1.5px solid #cbd5e1", fontSize: "13.5px" }}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: "12px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "5px" }}>
-                        Display Order / Sequence Number
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="99"
-                        value={heroBannerForm.order}
-                        onChange={(e) => setHeroBannerForm({ ...heroBannerForm, order: parseInt(e.target.value, 10) || 1 })}
-                        style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1.5px solid #cbd5e1", fontSize: "13.5px" }}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "10px", borderTop: "1px solid #f1f5f9" }}>
-                    <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "13px", fontWeight: "700", color: "#334155" }}>
-                      <input
-                        type="checkbox"
-                        checked={heroBannerForm.isActive}
-                        onChange={(e) => setHeroBannerForm({ ...heroBannerForm, isActive: e.target.checked })}
-                        style={{ width: "18px", height: "18px", accentColor: "#8b5cf6" }}
-                      />
-                      Active (Display immediately in Homepage Hero Slider)
-                    </label>
-
-                    <button
-                      type="submit"
-                      disabled={isUploadingHero}
-                      style={{
-                        backgroundColor: isUploadingHero ? "#a78bfa" : "#8b5cf6",
-                        color: "#ffffff",
-                        border: "none",
-                        padding: "12px 28px",
-                        borderRadius: "8px",
-                        fontWeight: "800",
-                        fontSize: "14px",
-                        cursor: isUploadingHero ? "not-allowed" : "pointer",
-                        boxShadow: "0 4px 14px rgba(139,92,246,0.35)",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px"
-                      }}
-                    >
-                      {isUploadingHero ? "⏳ Uploading & Processing Media..." : "🚀 Upload & Publish Hero Banner"}
-                    </button>
-                  </div>
-                </form>
-              </div>
-
-              {/* Published Hero Banners Gallery */}
-              <div style={{ backgroundColor: "#ffffff", padding: "24px", borderRadius: "12px", border: "1px solid #e2e8f0", boxShadow: "0 2px 10px rgba(0,0,0,0.04)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                  <div>
-                    <h2 style={{ fontSize: "18px", fontWeight: "800", color: "#0f172a", margin: 0 }}>
-                      Live Hero Banners Catalog ({heroBanners.length})
-                    </h2>
-                    <p style={{ fontSize: "12.5px", color: "#64748b", margin: "2px 0 0 0" }}>
-                      Banners currently active will rotate smoothly on the homepage at 1920×600 aspect ratio.
-                    </p>
-                  </div>
-                </div>
-
-                {loadingHeroBanners ? (
-                  <div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>Loading hero banners...</div>
-                ) : heroBanners.length === 0 ? (
-                  <div style={{ padding: "50px 20px", textAlign: "center", border: "1.5px dashed #e2e8f0", borderRadius: "10px", color: "#64748b" }}>
-                    <div style={{ fontSize: "36px", marginBottom: "8px" }}>🎬</div>
-                    <div style={{ fontWeight: "800", fontSize: "15px", color: "#1e293b" }}>No Dynamic Hero Banners Uploaded Yet</div>
-                    <p style={{ fontSize: "13px", maxWidth: "420px", margin: "6px auto 0 auto" }}>
-                      Upload your first 1920×600 video, GIF, or image above to replace the default hero slides.
-                    </p>
-                  </div>
-                ) : (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "20px" }}>
-                    {heroBanners.map((banner: any, idx: number) => {
-                      const isVid = banner.mediaType === "video" || banner.mediaUrl?.includes(".mp4") || banner.mediaUrl?.includes(".webm");
-                      const isGif = banner.mediaType === "gif" || banner.mediaUrl?.includes(".gif");
-                      const fullMediaUrl = banner.mediaUrl?.startsWith("http") || banner.mediaUrl?.startsWith("data:") 
-                        ? banner.mediaUrl 
-                        : (banner.mediaUrl?.startsWith("/") ? `${API_BASE.replace(/\/api\/?$/, "")}${banner.mediaUrl}` : `${API_BASE.replace(/\/api\/?$/, "")}/${banner.mediaUrl}`);
-
-                      return (
-                        <div key={banner.id || idx} style={{ border: "1px solid #e2e8f0", borderRadius: "12px", overflow: "hidden", backgroundColor: "#ffffff", boxShadow: "0 2px 8px rgba(0,0,0,0.05)", display: "flex", flexDirection: "column" }}>
-                          {/* Media Header */}
-                          <div style={{ position: "relative", width: "100%", height: "160px", backgroundColor: "#0f172a" }}>
-                            {isVid ? (
-                              <video
-                                src={fullMediaUrl}
-                                controls
-                                muted
-                                loop
-                                playsInline
-                                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                              />
-                            ) : (
-                              <img
-                                src={fullMediaUrl}
-                                alt={banner.title}
-                                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                                onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/placeholder-product.svg"; }}
-                              />
-                            )}
-                            <div style={{ position: "absolute", top: "10px", right: "10px", display: "flex", gap: "6px" }}>
-                              <span style={{ backgroundColor: isVid ? "#7c3aed" : isGif ? "#d97706" : "#059669", color: "#ffffff", fontSize: "10.5px", fontWeight: "900", padding: "3px 8px", borderRadius: "6px", textTransform: "uppercase" }}>
-                                {isVid ? "🎥 VIDEO" : isGif ? "⚡ GIF" : "🖼️ IMAGE"}
-                              </span>
-                              <span style={{ backgroundColor: banner.isActive ? "#16a34a" : "#64748b", color: "#ffffff", fontSize: "10.5px", fontWeight: "900", padding: "3px 8px", borderRadius: "6px" }}>
-                                {banner.isActive ? "ACTIVE" : "INACTIVE"}
-                              </span>
-                            </div>
-                            <div style={{ position: "absolute", bottom: "10px", left: "10px", backgroundColor: "rgba(0,0,0,0.7)", color: "#ffffff", fontSize: "11px", fontWeight: "800", padding: "2px 8px", borderRadius: "4px" }}>
-                              Order: #{banner.order || (idx + 1)}
-                            </div>
-                          </div>
-
-                          {/* Content & Actions */}
-                          <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px", flex: 1 }}>
-                            <div style={{ fontWeight: "800", fontSize: "15px", color: "#0f172a" }}>
-                              {banner.title || "Untitled Banner"}
-                            </div>
-                            {banner.subtitle && (
-                              <div style={{ fontSize: "12.5px", color: "#64748b" }}>
-                                {banner.subtitle}
-                              </div>
-                            )}
-                            <div style={{ fontSize: "11.5px", color: "#2563eb", wordBreak: "break-all", marginTop: "auto" }}>
-                              🔗 {banner.ctaLink || "/shop"}
-                            </div>
-
-                            <div style={{ display: "flex", gap: "8px", marginTop: "12px", borderTop: "1px solid #f1f5f9", paddingTop: "12px" }}>
-                              <button
-                                type="button"
-                                onClick={() => handleToggleHeroBanner(banner)}
-                                style={{
-                                  flex: 1,
-                                  backgroundColor: banner.isActive ? "#f1f5f9" : "#dcfce7",
-                                  color: banner.isActive ? "#475569" : "#166534",
-                                  border: "none",
-                                  padding: "8px 12px",
-                                  borderRadius: "6px",
-                                  fontSize: "12px",
-                                  fontWeight: "700",
-                                  cursor: "pointer"
-                                }}
-                              >
-                                {banner.isActive ? "Pause Banner" : "Activate Banner"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteHeroBanner(banner)}
-                                style={{
-                                  backgroundColor: "#fee2e2",
-                                  color: "#dc2626",
-                                  border: "none",
-                                  padding: "8px 12px",
-                                  borderRadius: "6px",
-                                  fontSize: "12px",
-                                  fontWeight: "700",
-                                  cursor: "pointer"
-                                }}
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          {/* DYNAMIC HERO BANNER SECTION (1920x600 Video / GIF / Image) - 100% Frontend Persistent */}
+          {activeTab === "hero-banners" && renderHeroBannerSection()}
 
           {/* 0.6 HOME BANNERS & CARD IMAGES MASTER LIST SUB-VIEW */}
           {(activeTab === "home-banner-list" || activeTab === "home-slides") && (
             <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+
+              {/* 🎬 Hero Banner Section at Top of Home Banner List */}
+              {renderHeroBannerSection()}
 
               {/* ═══════════ CATEGORY & CONCERN QUICK UPLOAD & LINK MANAGER SECTION ═══════════ */}
               {(() => {
@@ -5873,6 +6447,7 @@ export default function ValobasaAdminPanel() {
                       });
                       const targetLink = (cardLinks[slotId] !== undefined ? cardLinks[slotId] : (existing?.linkUrl || defaultSlotLink || `/shop?category=${encodeURIComponent(slotSlug)}`)).trim();
                       const payload = {
+                        id: slotId,
                         title: slotLabel + " Card",
                         imageUrl: resized,
                         mobileImageUrl: resized,
@@ -5881,47 +6456,34 @@ export default function ValobasaAdminPanel() {
                         page: slotId,
                         isActive: true,
                         sortOrder: existing?.sortOrder || 99,
-                        bgColor: "#ffffff"
+                        bgColor: "#ffffff",
+                        updatedAt: Date.now()
                       };
-                      try {
-                        let res;
-                        if (existing?.id) {
-                          res = await fetch(`${API_BASE}/banners/${existing.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", ...getAuthHeader() }, body: JSON.stringify(payload) });
-                          if (!res.ok) res = await fetch(`${API_BASE}/admin/banners/${existing.id}`, { method: "PUT", headers: { "Content-Type": "application/json", ...getAuthHeader() }, body: JSON.stringify(payload) });
-                        } else {
-                          res = await fetch(`${API_BASE}/banners`, { method: "POST", headers: { "Content-Type": "application/json", ...getAuthHeader() }, body: JSON.stringify(payload) });
-                        }
-                        // Also persist to local-banners for instant decoupled sync
-                        try {
-                          await fetch(`/api/local-banners`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              section: slotId.startsWith("cat-") ? "shopByCategory" : "shopByConcern",
-                              banner: {
-                                id: slotId,
-                                title: slotLabel + " Card",
-                                imageUrl: resized,
-                                mobileImageUrl: resized,
-                                tabletImageUrl: resized,
-                                linkUrl: targetLink,
-                                isActive: true
-                              }
-                            })
-                          });
-                        } catch (_) {}
 
-                        if (res.ok) {
-                          clearAllCache();
-                          triggerGlobalDataSync();
-                          fetchData(true);
-                          alert(`✓ "${slotLabel}" image updated! Homepage will show new image.`);
-                        } else {
-                          alert("❌ Failed to save. Please try again.");
-                        }
-                      } catch (err) {
-                        alert("❌ Network error. Please check connection.");
+                      // 1. Unmark from deleted IDs
+                      if (typeof window !== "undefined") {
+                        try {
+                          const stored = localStorage.getItem("gg_deleted_banner_ids");
+                          if (stored) {
+                            const arr: string[] = JSON.parse(stored);
+                            const filtered = arr.filter(x => x !== slotId && x !== payload.title && x !== slotLabel && x !== existing?.id);
+                            localStorage.setItem("gg_deleted_banner_ids", JSON.stringify(filtered));
+                          }
+                        } catch (e) {}
                       }
+
+                      // 2. Save directly to frontend localStorage
+                      const currentList = getFrontendHomeBanners();
+                      const updatedList = currentList.filter((b: any) => b.id !== slotId && b.page !== slotId);
+                      updatedList.push(payload);
+                      saveFrontendHomeBanners(updatedList);
+
+                      // 3. Update banners state
+                      setBanners(mergeBannersWithMaster(updatedList));
+
+                      clearAllCache();
+                      triggerGlobalDataSync();
+                      alert(`✓ "${slotLabel}" image updated in frontend! Homepage will show new image immediately.`);
                     };
                     img.src = dataUrl;
                   };
@@ -5932,71 +6494,43 @@ export default function ValobasaAdminPanel() {
                   const linkToSave = (targetLink || defaultSlotLink || "/shop").trim();
                   setSavingCardLinkId(slotId);
                   try {
-                    const slotSlug = slotLabel.toLowerCase().replace(/\s+/g, "-");
-                    const cleanSlotSlug = slotSlug.replace(/[^a-z0-9]/g, "");
-                    const slotIdClean = slotId.toLowerCase().replace(/[^a-z0-9]/g, "");
-                    const existing = banners.find((b: any) => {
-                      if (!b) return false;
-                      const p = (b.page || "").toLowerCase().trim();
-                      const id = (b.id || "").toLowerCase().trim();
-                      const s = slotId.toLowerCase().trim();
-                      const cleanId = id.replace(/[^a-z0-9]/g, "");
-                      const cleanTitle = (b.title || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-                      return p === s || id === s || cleanId === slotIdClean || cleanId === cleanSlotSlug ||
-                             cleanId.includes(slotIdClean) || slotIdClean.includes(cleanId) ||
-                             cleanTitle.includes(cleanSlotSlug) || cleanSlotSlug.includes(cleanTitle);
+                    // 1. Save in cardLinks state & localStorage
+                    setCardLinks(prev => {
+                      const updated = { ...prev, [slotId]: linkToSave };
+                      if (typeof window !== "undefined") {
+                        try { localStorage.setItem("gg_card_links", JSON.stringify(updated)); } catch (_) {}
+                      }
+                      return updated;
                     });
 
-                    let res;
-                    if (existing?.id) {
-                      const payload = {
-                        ...existing,
-                        linkUrl: linkToSave
-                      };
-                      res = await fetch(`${API_BASE}/banners/${existing.id}`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json", ...getAuthHeader() },
-                        body: JSON.stringify(payload)
-                      });
-                      if (!res.ok) {
-                        res = await fetch(`${API_BASE}/admin/banners/${existing.id}`, {
-                          method: "PUT",
-                          headers: { "Content-Type": "application/json", ...getAuthHeader() },
-                          body: JSON.stringify(payload)
-                        });
-                      }
+                    // 2. Also update corresponding banner in gg_frontend_home_banners
+                    const currentList = getFrontendHomeBanners();
+                    const idx = currentList.findIndex((b: any) => b.id === slotId || b.page === slotId);
+                    if (idx >= 0) {
+                      currentList[idx] = { ...currentList[idx], linkUrl: linkToSave, updatedAt: Date.now() };
+                      saveFrontendHomeBanners(currentList);
+                      setBanners(mergeBannersWithMaster(currentList));
                     } else {
-                      const targetId = slotId;
-                      const payload = {
-                        id: targetId,
+                      const newCard = {
+                        id: slotId,
                         title: slotLabel + " Card",
                         imageUrl: "",
-                        mobileImageUrl: "",
-                        tabletImageUrl: "",
                         linkUrl: linkToSave,
                         page: slotId,
                         isActive: true,
                         sortOrder: 99,
-                        bgColor: "#ffffff"
+                        updatedAt: Date.now()
                       };
-                      res = await fetch(`${API_BASE}/banners`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json", ...getAuthHeader() },
-                        body: JSON.stringify(payload)
-                      });
+                      currentList.push(newCard);
+                      saveFrontendHomeBanners(currentList);
+                      setBanners(mergeBannersWithMaster(currentList));
                     }
 
-                    if (res.ok) {
-                      clearAllCache();
-                      triggerGlobalDataSync();
-                      await fetchData(true);
-                      alert(`✓ "${slotLabel}" link saved successfully!\n\n🔗 URL: ${linkToSave}\nWebsite visitors clicking this card will now go to this link.`);
-                    } else {
-                      const err = await res.json().catch(() => ({}));
-                      alert(`❌ Failed to update link: ${err.error || "Server error"}`);
-                    }
+                    clearAllCache();
+                    triggerGlobalDataSync();
+                    alert(`✓ "${slotLabel}" link saved successfully in frontend!\n\n🔗 URL: ${linkToSave}\nWebsite visitors clicking this card will now go to this link.`);
                   } catch (err: any) {
-                    alert(`❌ Network error saving link: ${err.message || err}`);
+                    alert(`Error saving link in frontend: ${err.message || err}`);
                   } finally {
                     setSavingCardLinkId(null);
                   }
@@ -6120,10 +6654,30 @@ export default function ValobasaAdminPanel() {
                       </button>
                     )}
                     <button
-                      onClick={() => navigateTo("add-home-banner")}
+                      onClick={() => {
+                        setBannerForm({
+                          id: "",
+                          title: "",
+                          imageUrl: "",
+                          mobileImageUrl: "",
+                          tabletImageUrl: "",
+                          linkUrl: "/shop",
+                          bgColor: "#1a1a2e",
+                          page: "Hero Slides",
+                          isActive: true,
+                          sortOrder: String(banners.length + 1)
+                        });
+                        setEditingBannerModal(true);
+                      }}
                       style={{ backgroundColor: "#e63b7a", color: "#ffffff", border: "none", padding: "10px 18px", borderRadius: "8px", fontWeight: "800", fontSize: "13px", cursor: "pointer", boxShadow: "0 4px 12px rgba(230,59,122,0.3)" }}
                     >
                       + Add New Banner Slide
+                    </button>
+                    <button
+                      onClick={() => navigateTo("add-home-banner")}
+                      style={{ backgroundColor: "#f8fafc", color: "#334155", border: "1px solid #cbd5e1", padding: "10px 16px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", cursor: "pointer" }}
+                    >
+                      Full Page Creator →
                     </button>
                   </div>
                 </div>
@@ -6133,6 +6687,7 @@ export default function ValobasaAdminPanel() {
                   {[
                     { label: "All", key: "All" },
                     { label: "🎬 Hero Slides", key: "Hero Slides" },
+                    { label: "📢 Wide & Promo", key: "Wide & Promo" },
                     { label: "🔥 Deals You Cannot Miss", key: "Deals You Cannot Miss" },
                     { label: "🏷️ Top Brands & Offers", key: "Top Brands & Offers" },
                     { label: "⚡ Limited Time Offers", key: "Limited Time Offers" },
@@ -6177,14 +6732,17 @@ export default function ValobasaAdminPanel() {
                       if (bannerCategoryFilter === "Hero Slides") {
                         return p.includes("hero") || t.includes("hero") || p.includes("slide") || id.includes("hero");
                       }
+                      if (bannerCategoryFilter === "Wide & Promo") {
+                        return p.includes("wide") || p.includes("promo") || id.includes("wide") || id.includes("promo") || t.includes("wide") || t.includes("promo");
+                      }
                       if (bannerCategoryFilter === "Deals You Cannot Miss") {
-                        return p.includes("deal") || p.includes("wide") || t.includes("deal") || id.startsWith("deal-");
+                        return p.includes("deal") || t.includes("deal") || id.startsWith("deal-");
                       }
                       if (bannerCategoryFilter === "Top Brands & Offers") {
                         return p.includes("brand") || t.includes("brand") || id.startsWith("brand-");
                       }
                       if (bannerCategoryFilter === "Limited Time Offers") {
-                        return p.includes("limited") || t.includes("limited") || p.includes("bogo") || p.includes("combo") || p.includes("offers") || p.includes("clearance") || t.includes("bogo") || t.includes("combo") || t.includes("offers") || t.includes("clearance") || id.startsWith("lto-");
+                        return p.includes("limited") || t.includes("limited") || p.includes("bogo") || p.includes("combo") || p.includes("offers") || p.includes("clearance") || t.includes("bogo") || t.includes("combo") || t.includes("offers") || t.includes("clearance") || id.startsWith("limited-") || id.startsWith("lto-");
                       }
                       if (bannerCategoryFilter === "Category Cards") {
                         return p.includes("category") || t.includes("category") || id.startsWith("cat-") || id.startsWith("catcard");
@@ -6200,15 +6758,27 @@ export default function ValobasaAdminPanel() {
                     }
 
                     return filteredList.map((b: any, idx: number) => {
-                      const isHero = b.page === "Hero Slides" || b.title?.includes("Hero");
-                      const isWide = b.page === "Homepage Wide Banner";
+                      const isHero = b.page === "Hero Slides" || b.title?.includes("Hero") || (b.id && b.id.startsWith("hero-slide-"));
                       const bannerImgSrc = safeImageUrl(b.imageUrl);
 
                       return (
                         <div key={b.id ? `${b.id}-${idx}` : idx} style={{ border: "1px solid #e2e8f0", borderRadius: "10px", overflow: "hidden", backgroundColor: "#ffffff", boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
                           <div style={{ height: "140px", width: "100%", backgroundColor: "#f1f5f9", overflow: "hidden", position: "relative" }}>
                             {bannerImgSrc && bannerImgSrc.trim() ? (
-                              <img src={bannerImgSrc} alt={b.title || "Banner"} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                              <img
+                                src={bannerImgSrc}
+                                alt={b.title || "Banner"}
+                                onLoad={(e) => {
+                                  const img = e.currentTarget;
+                                  if (img.naturalWidth && img.naturalHeight) {
+                                    setLoadedDimensions(prev => ({
+                                      ...prev,
+                                      [b.id]: { width: img.naturalWidth, height: img.naturalHeight }
+                                    }));
+                                  }
+                                }}
+                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                              />
                             ) : (
                               <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: "12px", fontWeight: "700" }}>
                                 <span style={{ fontSize: "24px", marginBottom: "4px" }}>🖼️</span>
@@ -6220,28 +6790,35 @@ export default function ValobasaAdminPanel() {
                             </span>
                           </div>
                           <div style={{ padding: "14px", display: "flex", flexDirection: "column", gap: "6px" }}>
-                            <h4 style={{ fontSize: "14px", fontWeight: "800", color: "#0f172a", margin: 0 }}>{b.title}</h4>
-                            
-                            {/* Dynamic Exact Dimensions Badges */}
-                            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", margin: "2px 0" }}>
-                              {isHero ? (
-                                <>
-                                  <span style={{ fontSize: "10.5px", backgroundColor: "#e0f2fe", color: "#0369a1", padding: "2px 6px", borderRadius: "4px", fontWeight: "800" }}>
-                                    🖥️ 1920x500 px
-                                  </span>
-                                  <span style={{ fontSize: "10.5px", backgroundColor: "#fef3c7", color: "#b45309", padding: "2px 6px", borderRadius: "4px", fontWeight: "800" }}>
-                                    📱 750x750 px
-                                  </span>
-                                </>
-                              ) : isWide ? (
-                                <span style={{ fontSize: "10.5px", backgroundColor: "#dcfce7", color: "#15803d", padding: "2px 6px", borderRadius: "4px", fontWeight: "800" }}>
-                                  🖼️ 1200x300 px
-                                </span>
-                              ) : (
-                                <span style={{ fontSize: "10.5px", backgroundColor: "#f3e8ff", color: "#7e22ce", padding: "2px 6px", borderRadius: "4px", fontWeight: "800" }}>
-                                  🔍³ 400x400 px (Square 1:1)
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "6px" }}>
+                              <h4 style={{ fontSize: "14px", fontWeight: "800", color: "#0f172a", margin: 0 }}>{b.title}</h4>
+                              {b.section && (
+                                <span style={{ fontSize: "10px", backgroundColor: "#f1f5f9", color: "#475569", padding: "2px 6px", borderRadius: "4px", fontWeight: "800", whiteSpace: "nowrap" }}>
+                                  {b.section}
                                 </span>
                               )}
+                            </div>
+                            
+                            {/* Prominent Exact Dimensions Box Under Image */}
+                            <div style={{ backgroundColor: "#f8fafc", padding: "8px 10px", borderRadius: "8px", border: "1px solid #e2e8f0", fontSize: "11px", display: "flex", flexDirection: "column", gap: "4px", margin: "2px 0" }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <span style={{ color: "#475569", fontWeight: "700" }}>📐 Recommended Size:</span>
+                                <span style={{ color: "#0284c7", fontWeight: "800", backgroundColor: "#e0f2fe", padding: "2px 6px", borderRadius: "4px" }}>
+                                  {b.desktopSize || getRecommendedSizeForBanner(b)}
+                                </span>
+                              </div>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <span style={{ color: "#475569", fontWeight: "700" }}>🖼️ Actual Image Size:</span>
+                                <span style={{
+                                  color: loadedDimensions[b.id] ? "#166534" : "#64748b",
+                                  fontWeight: "800",
+                                  backgroundColor: loadedDimensions[b.id] ? "#dcfce7" : "#f1f5f9",
+                                  padding: "2px 6px",
+                                  borderRadius: "4px"
+                                }}>
+                                  {loadedDimensions[b.id] ? `${loadedDimensions[b.id].width} × ${loadedDimensions[b.id].height} px` : (bannerImgSrc ? "Detecting size..." : "No image uploaded")}
+                                </span>
+                              </div>
                             </div>
 
                             <div style={{ fontSize: "12px", color: "#2563eb", fontWeight: "700", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
@@ -6249,7 +6826,141 @@ export default function ValobasaAdminPanel() {
                             </div>
 
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px", paddingTop: "10px", borderTop: "1px solid #f1f5f9", gap: "6px", flexWrap: "wrap" }}>
-                              <div style={{ display: "flex", gap: "6px" }}>
+                              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                                <label style={{ backgroundColor: "#fdf2f8", color: "#be185d", border: "1px solid #fbcfe8", padding: "6px 10px", borderRadius: "6px", fontWeight: "800", fontSize: "12px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                  📷 Change Picture
+                                  <input
+                                    type="file"
+                                    accept="image/*,video/mp4,video/webm"
+                                    style={{ display: "none" }}
+                                    onChange={async (e) => {
+                                      const file = e.target.files?.[0];
+                                      if (!file) return;
+
+                                      const isHeroSlide = b.page === "Hero Slides" || (b.id && b.id.startsWith("hero-slide-"));
+                                      const isWideBanner = b.page === "Homepage Wide Banner" || (b.id && b.id.includes("wide"));
+                                      const isPromoBanner = b.page === "Promo Banner" || (b.id && b.id.includes("promo"));
+                                      const targetW = isHeroSlide ? 1920 : isWideBanner ? 1200 : isPromoBanner ? 1200 : 600;
+                                      const targetH = isHeroSlide ? 600 : isWideBanner ? 300 : isPromoBanner ? 140 : 600;
+
+                                      const slotType = isHeroSlide ? "hero" : (b.page || b.id || "square");
+                                      const compressed = await compressBannerImage(file, slotType);
+                                      if (compressed) {
+                                        // 1. Unmark from deleted IDs
+                                        if (typeof window !== "undefined") {
+                                          try {
+                                            const stored = localStorage.getItem("gg_deleted_banner_ids");
+                                            if (stored) {
+                                              const arr: string[] = JSON.parse(stored);
+                                              localStorage.setItem("gg_deleted_banner_ids", JSON.stringify(arr.filter(x => x !== b.id && x !== b.page && x !== b.title)));
+                                            }
+                                          } catch (_) {}
+                                        }
+
+                                        // 2. If it is a Hero slide, also update hero store
+                                        if (isHeroSlide) {
+                                          const heroList = getFrontendHeroBanners();
+                                          const heroIdx = heroList.findIndex((h: any) => h.id === b.id);
+                                          const updatedHero = {
+                                            ...(heroIdx >= 0 ? heroList[heroIdx] : b),
+                                            id: b.id,
+                                            title: b.title,
+                                            mediaUrl: compressed,
+                                            imageUrl: compressed,
+                                            mobileImageUrl: compressed,
+                                            tabletImageUrl: compressed,
+                                            updatedAt: Date.now()
+                                          };
+                                          const newHeroList = heroList.filter((h: any) => h.id !== b.id);
+                                          newHeroList.push(updatedHero);
+                                          saveFrontendHeroBanners(newHeroList);
+                                          setHeroBanners(newHeroList);
+                                        }
+
+                                        // 3. Save directly into frontend home banners store (filter ONLY item.id !== b.id)
+                                        const currentList = getFrontendHomeBanners();
+                                        const updatedBanner = {
+                                          ...b,
+                                          id: b.id,
+                                          page: b.page || "Homepage",
+                                          title: b.title,
+                                          imageUrl: compressed,
+                                          mobileImageUrl: compressed,
+                                          tabletImageUrl: compressed,
+                                          updatedAt: Date.now()
+                                        };
+                                        const updatedList = currentList.filter((item: any) => item.id !== b.id);
+                                        updatedList.push(updatedBanner);
+                                        saveFrontendHomeBanners(updatedList);
+                                        setBanners(mergeBannersWithMaster(updatedList));
+
+                                        const testImg = new Image();
+                                        testImg.onload = () => {
+                                          if (testImg.naturalWidth && testImg.naturalHeight) {
+                                            setLoadedDimensions(prev => ({
+                                              ...prev,
+                                              [b.id]: { width: testImg.naturalWidth, height: testImg.naturalHeight }
+                                            }));
+                                          }
+                                        };
+                                        testImg.src = compressed;
+
+                                        clearAllCache();
+                                        triggerGlobalDataSync();
+                                        alert(`✓ Picture changed for "${b.title}" in frontend!\nHomepage will show the new image immediately.`);
+                                      } else {
+                                        alert("⚠️ Could not process selected image. Please try a different image.");
+                                      }
+                                      e.target.value = "";
+                                    }}
+                                  />
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newL = prompt(`Enter new destination URL / link for "${b.title}":`, b.linkUrl || "/shop");
+                                    if (newL !== null && newL.trim() && newL.trim() !== b.linkUrl) {
+                                      const updatedUrl = newL.trim();
+
+                                      // 1. Save in cardLinks state & localStorage
+                                      setCardLinks(prev => {
+                                        const updated = { ...prev, [b.id]: updatedUrl };
+                                        if (typeof window !== "undefined") {
+                                          try { localStorage.setItem("gg_card_links", JSON.stringify(updated)); } catch (_) {}
+                                        }
+                                        return updated;
+                                      });
+
+                                      // 2. If Hero slide, update hero store
+                                      if (b.page === "Hero Slides" || (b.id && b.id.startsWith("hero-slide-"))) {
+                                        const heroList = getFrontendHeroBanners();
+                                        const updatedHero = heroList.map((h: any) => h.id === b.id ? { ...h, ctaLink: updatedUrl, linkUrl: updatedUrl, updatedAt: Date.now() } : h);
+                                        saveFrontendHeroBanners(updatedHero);
+                                        setHeroBanners(updatedHero);
+                                      }
+
+                                      // 3. Update home banners store
+                                      const currentList = getFrontendHomeBanners();
+                                      const updatedBanner = {
+                                        ...b,
+                                        id: b.id,
+                                        linkUrl: updatedUrl,
+                                        updatedAt: Date.now()
+                                      };
+                                      const updatedList = currentList.filter((item: any) => item.id !== b.id);
+                                      updatedList.push(updatedBanner);
+                                      saveFrontendHomeBanners(updatedList);
+                                      setBanners(mergeBannersWithMaster(updatedList));
+
+                                      clearAllCache();
+                                      triggerGlobalDataSync();
+                                      alert(`✓ Link updated for "${b.title}" in frontend!\n🔗 New URL: ${updatedUrl}`);
+                                    }
+                                  }}
+                                  style={{ backgroundColor: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0", padding: "6px 10px", borderRadius: "6px", fontWeight: "800", fontSize: "12px", cursor: "pointer" }}
+                                >
+                                  🔗 Change Link
+                                </button>
                                 <button
                                   onClick={() => {
                                     setBannerForm({
@@ -6268,30 +6979,7 @@ export default function ValobasaAdminPanel() {
                                   }}
                                   style={{ backgroundColor: "#eff6ff", color: "#2563eb", border: "none", padding: "6px 12px", borderRadius: "6px", fontWeight: "800", fontSize: "12px", cursor: "pointer" }}
                                 >
-                                  ✏️ Edit Slide & Link
-                                </button>
-                                <button
-                                  onClick={async () => {
-                                    const newL = prompt(`Enter new destination URL / link for "${b.title}":`, b.linkUrl || "/shop");
-                                    if (newL !== null && newL.trim() && newL.trim() !== b.linkUrl) {
-                                      const res = await fetch(`${API_BASE}/banners/${b.id}`, {
-                                        method: "PATCH",
-                                        headers: { "Content-Type": "application/json", ...getAuthHeader() },
-                                        body: JSON.stringify({ linkUrl: newL.trim() })
-                                      });
-                                      if (res.ok) {
-                                        clearAllCache();
-                                        triggerGlobalDataSync();
-                                        await fetchData(true);
-                                        alert(`✓ Link updated for "${b.title}"!\n🔗 New URL: ${newL.trim()}`);
-                                      } else {
-                                        alert("❌ Failed to update link.");
-                                      }
-                                    }
-                                  }}
-                                  style={{ backgroundColor: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0", padding: "6px 10px", borderRadius: "6px", fontWeight: "800", fontSize: "12px", cursor: "pointer" }}
-                                >
-                                  🔗 Change Link
+                                  ✏️ Edit Slide
                                 </button>
                               </div>
                               <button
@@ -6476,7 +7164,6 @@ export default function ValobasaAdminPanel() {
                           <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
                             <input
                               type="text"
-                              required
                               value={bannerForm.imageUrl}
                               onChange={(e) => {
                                 const val = e.target.value;
@@ -6674,8 +7361,8 @@ export default function ValobasaAdminPanel() {
 
 
 
-          {/* 0. PUSH NOTIFICATIONS MANAGEMENT */}
-          {activeTab === "push-notifications" && (
+          {/* 0. PUSH NOTIFICATIONS MANAGEMENT (REMOVED) */}
+          {false && (
 
             <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
               <div style={{ backgroundColor: "#ffffff", padding: "24px", borderRadius: "12px", boxShadow: "0 2px 10px rgba(0,0,0,0.05)", borderTop: "4px solid #e63b7a" }}>
@@ -7122,7 +7809,7 @@ export default function ValobasaAdminPanel() {
                     { label: "📦 Inventory", tab: "inventory", desc: "Buy/Sell Prices & Stock", color: "#d97706", bg: "#fffbeb" },
                     { label: "🖼️ Home Banners List", tab: "home-banner-list", desc: "Manage Sliders & Banners", color: "#be185d", bg: "#fdf2f8" },
                     { label: "+ Add Home Banner", tab: "add-home-banner", desc: "Create new banner slide", color: "#e63b7a", bg: "#fff0f5" },
-                    { label: "🔍” Push Notifications", tab: "push-notifications", desc: "Daily Offer Alerts", color: "#0284c7", bg: "#f0f9ff" },
+                    { label: "🎁 Available Offers & Codes", tab: "offers-coupons", desc: "Store Promo & Coupons", color: "#0284c7", bg: "#f0f9ff" },
                     { label: "📢 Socket.io Promo", tab: "socket-promo", desc: "⚡ Realtime Broadcaster", color: "#dc2626", bg: "#fef2f2" },
                     { label: "📋‘ Menu Management", tab: "menu-builder", desc: "Header & Footer Menus", color: "#4f46e5", bg: "#e0e7ff" },
                     { label: "📄 Dynamic Pages (CMS)", tab: "cms-pages", desc: "About, Terms, FAQ Pages", color: "#2563eb", bg: "#eff6ff" },
@@ -7323,7 +8010,14 @@ export default function ValobasaAdminPanel() {
                   <p style={{ fontSize: "13px", color: "#64748b", margin: "4px 0 0 0" }}>Highest selling products ranked by order volume and total sales revenue.</p>
                 </div>
               </div>
-              <table className="admin-table">
+              {topSellingProducts.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "50px 20px", color: "#64748b" }}>
+                  <div style={{ fontSize: "36px", marginBottom: "8px" }}>📊</div>
+                  <div style={{ fontSize: "16px", fontWeight: "700", color: "#1e293b" }}>No Sales Recorded Yet</div>
+                  <p style={{ fontSize: "13px", color: "#64748b", margin: "4px 0 0 0" }}>As customer orders are placed, the highest selling authentic products will automatically appear and rank here.</p>
+                </div>
+              ) : (
+                <table className="admin-table">
                 <thead>
                   <tr>
                     <th style={{ width: "60px" }}>RANK</th>
@@ -7363,6 +8057,7 @@ export default function ValobasaAdminPanel() {
                   ))}
                 </tbody>
               </table>
+              )}
             </div>
           )}
 
@@ -7900,10 +8595,10 @@ export default function ValobasaAdminPanel() {
                   </div>
                 )}
 
-                {/* MANUAL / POS ORDER MODAL */}
+                {/* MANUAL / POS ORDER MODAL (FULL SCREEN) */}
                 {manualOrderModalOpen && (
-                  <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(15, 23, 42, 0.7)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 99999, padding: "20px" }}>
-                    <div style={{ backgroundColor: "#ffffff", borderRadius: "16px", width: "100%", maxWidth: "1020px", maxHeight: "92vh", overflowY: "auto", padding: "28px", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)", position: "relative" }}>
+                  <div style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh", backgroundColor: "#ffffff", zIndex: 999999, overflowY: "auto", padding: "24px 36px" }}>
+                    <div style={{ width: "100%", maxWidth: "1400px", margin: "0 auto", position: "relative" }}>
                       
                       {/* Modal Header */}
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px", borderBottom: "1px solid #e2e8f0", paddingBottom: "16px" }}>
@@ -8329,8 +9024,17 @@ export default function ValobasaAdminPanel() {
                   <tbody>
                     {orders.map((o) => (
                       <tr key={o.id}>
-                        <td onClick={() => setSelectedOrderDetails(o)} style={{ fontWeight: "900", color: "#e63b7a", cursor: "pointer", textDecoration: "underline" }}>
-                          #{o.orderNumber || (o.id ? o.id.slice(0, 8) : "ORD")}
+                        <td onClick={() => setSelectedOrderDetails(o)} style={{ cursor: "pointer" }}>
+                          <span style={{ fontWeight: "900", color: "#e63b7a", textDecoration: "underline" }}>
+                            #{o.orderNumber || (o.id ? o.id.slice(0, 8) : "ORD")}
+                          </span>
+                          {(o.isLandingPage || o.orderType === "Landing Page Order" || o.source === "Landing Page Order" || (o.notes && o.notes.includes("Landing Page")) || (o.sourceUrl && (o.sourceUrl.includes("seasonal-offer") || o.sourceUrl.includes("landing")))) && (
+                            <div style={{ marginTop: "4px" }}>
+                              <span style={{ backgroundColor: "#fef3c7", color: "#92400e", border: "1px solid #fde68a", fontSize: "10px", fontWeight: "800", padding: "2px 6px", borderRadius: "4px", display: "inline-block" }}>
+                                🔥 Landing Page Order
+                              </span>
+                            </div>
+                          )}
                         </td>
                         <td style={{ fontSize: "11.5px", color: "#475569", whiteSpace: "nowrap" }}>
                           {o.createdAt ? (
@@ -8934,30 +9638,58 @@ export default function ValobasaAdminPanel() {
           )}
 
           {/* 7. CATEGORY MANAGEMENT */}
-          {(activeTab === "category-list" || activeTab === "categories") && (
-            <div style={{ backgroundColor: "#ffffff", borderRadius: "10px", border: "1px solid #e5e7eb", padding: "24px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                <h2 style={{ fontSize: "18px", fontWeight: "800", margin: 0 }}>Category List ({adminCategories.filter(c => !c.parentId).length})</h2>
-                <button onClick={() => navigateTo("add-category")} style={{ backgroundColor: "#e63b7a", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "6px", fontWeight: "700", fontSize: "12px", cursor: "pointer" }}>+ Add Category</button>
+          {(activeTab === "category-list" || activeTab === "categories" || activeTab === "sub-category-list") && (
+            <div style={{ backgroundColor: "#ffffff", borderRadius: "8px", border: "1px solid #e2e8f0", padding: "24px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+                <div>
+                  <h2 style={{ fontSize: "18px", fontWeight: "800", margin: 0, color: "#0f172a" }}>
+                    {activeTab === "sub-category-list" ? "Sub Category List" : `Shop Page Category & Subcategory Directory (${adminCategories.filter(c => !c.parentId).length})`}
+                  </h2>
+                  <p style={{ fontSize: "12.5px", color: "#64748b", margin: "4px 0 0 0" }}>All 9 storefront main categories and 70+ subcategories shown on the shop page.</p>
+                </div>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button onClick={() => navigateTo("add-category")} style={{ backgroundColor: "#0f172a", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "6px", fontWeight: "700", fontSize: "12px", cursor: "pointer" }}>+ Add Main Category</button>
+                  <button onClick={() => navigateTo("add-sub-category")} style={{ backgroundColor: "#e63b7a", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "6px", fontWeight: "700", fontSize: "12px", cursor: "pointer" }}>+ Add Sub Category</button>
+                </div>
               </div>
               <table className="admin-table">
-                <thead><tr><th>IMAGE</th><th>CATEGORY NAME</th><th>TYPE</th><th style={{ textAlign: "center" }}>ACTION</th></tr></thead>
+                <thead><tr><th>IMAGE</th><th>CATEGORY & SUBCATEGORIES</th><th>TYPE</th><th style={{ textAlign: "center" }}>TOTAL SUBS</th><th style={{ textAlign: "center" }}>ACTION</th></tr></thead>
                 <tbody>
-                  {adminCategories.filter(c => !c.parentId).map((c) => (
-                    <tr key={c.id}>
-                      <td>
-                        <img src={c.imageUrl || "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=200&q=80"} alt={c.name} style={{ width: "42px", height: "42px", objectFit: "cover", borderRadius: "6px", border: "1px solid #e2e8f0", backgroundColor: "#f8fafc" }} onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=200&q=80"; }} />
-                      </td>
-                      <td style={{ fontWeight: "700", color: "#1e293b" }}>{c.name}</td>
-                      <td><span className="badge badge-info">Top Level</span></td>
-                      <td style={{ textAlign: "center" }}>
-                        <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
-                          <button onClick={() => setEditingCategory({ ...c })} style={{ backgroundColor: "#f1f5f9", color: "#334155", border: "1px solid #cbd5e1", padding: "4px 10px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>✏️ Edit</button>
-                          <button onClick={() => handleDeleteCategory(c.id)} style={{ backgroundColor: "#fee2e2", color: "#ef4444", border: "none", padding: "4px 10px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Delete</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {adminCategories.filter(c => !c.parentId).map((c) => {
+                    const subs = (Array.isArray(c.subCategories) && c.subCategories.length > 0)
+                      ? c.subCategories
+                      : (Array.isArray(c.subs) && c.subs.length > 0)
+                      ? c.subs
+                      : subCategories.filter((s: any) => s.parentId === c.id);
+
+                    return (
+                      <tr key={c.id}>
+                        <td style={{ verticalAlign: "top" }}>
+                          <img src={c.imageUrl || "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=200&q=80"} alt={c.name} style={{ width: "44px", height: "44px", objectFit: "cover", borderRadius: "6px", border: "1px solid #e2e8f0", backgroundColor: "#f8fafc" }} onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=200&q=80"; }} />
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: "800", fontSize: "14px", color: "#0f172a" }}>{c.name}</div>
+                          {subs && subs.length > 0 && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginTop: "8px" }}>
+                              {subs.map((s: any) => (
+                                <span key={s.id || s.name} style={{ backgroundColor: "#f8fafc", color: "#334155", fontSize: "11px", fontWeight: "600", padding: "3px 8px", borderRadius: "4px", border: "1px solid #cbd5e1" }}>
+                                  📂 {s.name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ verticalAlign: "top" }}><span className="badge badge-info">Main Category</span></td>
+                        <td style={{ textAlign: "center", verticalAlign: "top", fontWeight: "800", color: "#e63b7a" }}>{subs ? subs.length : 0} subs</td>
+                        <td style={{ textAlign: "center", verticalAlign: "top" }}>
+                          <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
+                            <button onClick={() => setEditingCategory({ ...c })} style={{ backgroundColor: "#f1f5f9", color: "#334155", border: "1px solid #cbd5e1", padding: "4px 10px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>✏️ Edit</button>
+                            <button onClick={() => handleDeleteCategory(c.id)} style={{ backgroundColor: "#fee2e2", color: "#ef4444", border: "none", padding: "4px 10px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Delete</button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
 
@@ -9563,12 +10295,17 @@ export default function ValobasaAdminPanel() {
                                           metaTitle: p.metaTitle || "",
                                           metaDescription: p.metaDescription || "",
                                           metaKeywords: p.metaKeywords || "",
-                                          price: p.variants?.[0]?.price || p.price || 0,
-                                          stock: p.variants?.[0]?.inventoryQuantity || p.variants?.[0]?.stock || 50,
+                                          price: p.variants?.[0]?.price ?? p.price ?? 0,
+                                          costPrice: p.variants?.[0]?.costPrice ?? p.costPrice ?? "",
+                                          discountPrice: p.variants?.[0]?.discountPrice ?? p.discountPrice ?? "",
+                                          stock: p.variants?.[0]?.stock ?? p.variants?.[0]?.inventoryQuantity ?? p.stock ?? 50,
+                                          categoryId: p.subcategoryId || p.categoryId || p.category?.id || "",
+                                          brandId: p.brandId || p.brand?.id || "",
                                           imageUrl: p.images?.[0]?.url || p.imageUrl || "",
-                                          imageUrl2: p.images?.[1]?.url || "",
-                                          imageUrl3: p.images?.[2]?.url || "",
-                                          imageUrl4: p.images?.[3]?.url || ""
+                                          imageUrl2: p.images?.[1]?.url || p.imageUrl2 || "",
+                                          imageUrl3: p.images?.[2]?.url || p.imageUrl3 || "",
+                                          imageUrl4: p.images?.[3]?.url || p.imageUrl4 || "",
+                                          variants: Array.isArray(p.variants) && p.variants.length > 0 ? p.variants : [{ id: `var-${Date.now()}`, name: "Default", price: p.price || 0, stock: p.stock || 50 }]
                                         })}
                                         style={{ backgroundColor: "#f1f5f9", color: "#334155", border: "1px solid #cbd5e1", padding: "5px 11px", borderRadius: "5px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}
                                       >
@@ -9680,12 +10417,20 @@ export default function ValobasaAdminPanel() {
                           <input value={editingProduct.name || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, name: e.target.value }))} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }} />
                         </div>
                         <div>
-                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Selling Price (BDT)</label>
+                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Selling Price (BDT) *</label>
                           <input type="number" value={editingProduct.price || 0} onChange={e => setEditingProduct((prev: any) => ({ ...prev, price: e.target.value }))} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }} />
                         </div>
                         <div>
-                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Stock Units</label>
+                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Stock Units *</label>
                           <input type="number" value={editingProduct.stock || 0} onChange={e => setEditingProduct((prev: any) => ({ ...prev, stock: e.target.value }))} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Buy Price / Cost (BDT)</label>
+                          <input type="number" value={editingProduct.costPrice || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, costPrice: e.target.value }))} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }} placeholder="Optional cost price" />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Discount Price (BDT)</label>
+                          <input type="number" value={editingProduct.discountPrice || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, discountPrice: e.target.value }))} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }} placeholder="Optional discount offer" />
                         </div>
                         <div>
                           <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Brand</label>
@@ -9915,35 +10660,68 @@ export default function ValobasaAdminPanel() {
                         <button onClick={() => setEditingProduct(null)} style={{ backgroundColor: "#f1f5f9", padding: "8px 16px", border: "none", borderRadius: "6px", fontWeight: "700", cursor: "pointer" }}>Cancel</button>
                         <button onClick={async () => {
                           try {
+                            const numPrice = Number(editingProduct.price) || 0;
+                            const numStock = Number(editingProduct.stock) || 0;
+                            const numCostPrice = editingProduct.costPrice ? Number(editingProduct.costPrice) : null;
+                            const numDiscountPrice = editingProduct.discountPrice ? Number(editingProduct.discountPrice) : null;
+
+                            let syncedVariants = Array.isArray(editingProduct.variants) ? [...editingProduct.variants] : [];
+                            if (syncedVariants.length > 0) {
+                              syncedVariants[0] = {
+                                ...syncedVariants[0],
+                                price: numPrice,
+                                stock: numStock,
+                                costPrice: numCostPrice,
+                                discountPrice: numDiscountPrice
+                              };
+                            } else {
+                              syncedVariants = [{
+                                id: `var-${Date.now()}`,
+                                name: "Default",
+                                price: numPrice,
+                                stock: numStock,
+                                costPrice: numCostPrice,
+                                discountPrice: numDiscountPrice
+                              }];
+                            }
+
+                            const payload = {
+                              name: editingProduct.name,
+                              description: editingProduct.description,
+                              brandId: editingProduct.brandId || editingProduct.brand?.id,
+                              categoryId: editingProduct.categoryId || editingProduct.category?.id,
+                              subcategoryId: editingProduct.categoryId || editingProduct.category?.id,
+                              metaTitle: editingProduct.metaTitle,
+                              metaDescription: editingProduct.metaDescription,
+                              metaKeywords: editingProduct.metaKeywords,
+                              price: numPrice,
+                              costPrice: numCostPrice,
+                              discountPrice: numDiscountPrice,
+                              stock: numStock,
+                              imageUrl: editingProduct.imageUrl,
+                              imageUrl2: editingProduct.imageUrl2,
+                              imageUrl3: editingProduct.imageUrl3,
+                              imageUrl4: editingProduct.imageUrl4,
+                              variants: syncedVariants
+                            };
+
                             const res = await fetch(`${API_BASE}/admin/products/${editingProduct.id}`, {
                               method: "PATCH",
                               headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
-                              body: JSON.stringify({
-                                name: editingProduct.name,
-                                description: editingProduct.description,
-                                brandId: editingProduct.brandId || editingProduct.brand?.id,
-                                categoryId: editingProduct.categoryId || editingProduct.category?.id,
-                                metaTitle: editingProduct.metaTitle,
-                                metaDescription: editingProduct.metaDescription,
-                                metaKeywords: editingProduct.metaKeywords,
-                                price: Number(editingProduct.price),
-                                stock: Number(editingProduct.stock),
-                                imageUrl: editingProduct.imageUrl,
-                                imageUrl2: editingProduct.imageUrl2,
-                                imageUrl3: editingProduct.imageUrl3,
-                                imageUrl4: editingProduct.imageUrl4,
-                                variants: editingProduct.variants
-                              })
+                              body: JSON.stringify(payload)
                             });
                             if (res.ok) {
                               clearAllCache(); // Force website to reload fresh data
                               triggerGlobalDataSync();
-                              alert("Product, Shades & SEO details updated successfully!");
+                              alert("Product, Price, Stock & Categories updated successfully!");
                               setEditingProduct(null);
                               fetchData(true);
-                              fetchAdminProducts();
+                              fetchAdminProducts(true);
+                            } else {
+                              const errData = await res.json().catch(() => ({}));
+                              alert(errData.error || `Failed to update product (Status: ${res.status})`);
                             }
-                          } catch (e) { alert("Error updating product"); }
+                          } catch (e: any) { alert(`Error updating product: ${e.message || e}`); }
                         }} style={{ backgroundColor: "#e63b7a", color: "#fff", padding: "8px 16px", border: "none", borderRadius: "6px", fontWeight: "700", cursor: "pointer" }}>SAVE CHANGES</button>
                       </div>
                     </div>
@@ -11248,6 +12026,15 @@ export default function ValobasaAdminPanel() {
                   >
                     🔄 Refresh
                   </button>
+                  {careersJobsList.length > 0 && (
+                    <button
+                      onClick={handleDeleteAllJobOpenings}
+                      style={{ backgroundColor: "#fee2e2", color: "#dc2626", border: "1px solid #fecaca", padding: "8px 14px", borderRadius: "6px", fontWeight: "700", fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
+                      title="Delete all active job postings"
+                    >
+                      🗑️ Delete All Jobs ({careersJobsList.length})
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       setIsEditingJob(false);
@@ -12129,25 +12916,43 @@ export default function ValobasaAdminPanel() {
 // LIVE CHAT PANEL (separate component to keep state isolated)
 // ═══════════════════════════════════════════
 function LiveChatPanel({ token, staffList }: { token: string | null; staffList?: any[] }) {
-  const [threads, setThreads] = useState<any[]>([]);
+  const [threads, setThreads] = useState<any[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("gg_admin_chat_threads");
+        if (saved) return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return [];
+  });
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [assignedAgents, setAssignedAgents] = useState<Record<string, string>>({});
   const [chatHistory, setChatHistory] = useState<any[]>([]);
   const [replyText, setReplyText] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
-  // Fetch thread list every 5s
+  // Fetch thread list every 4s and keep persisted in localStorage
   useEffect(() => {
     const fetchThreads = async () => {
       try {
+        const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : "");
         const res = await fetch(`${API_BASE}/chat/admin/threads`, {
-          headers: getAuthHeader(token),
+          headers: getAuthHeader(activeToken),
         });
         if (res.ok) {
           const data = await res.json();
-          setThreads(data);
+          if (Array.isArray(data)) {
+            // Sort newest messages strictly on top
+            data.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+            setThreads(data);
+            if (typeof window !== "undefined") {
+              try {
+                localStorage.setItem("gg_admin_chat_threads", JSON.stringify(data));
+              } catch (e) {}
+            }
+          }
           setIsLoading(false);
         }
       } catch (e) {
@@ -12155,11 +12960,11 @@ function LiveChatPanel({ token, staffList }: { token: string | null; staffList?:
       }
     };
     fetchThreads();
-    const interval = setInterval(fetchThreads, 5000);
+    const interval = setInterval(fetchThreads, 4000);
     return () => clearInterval(interval);
   }, [token]);
 
-  // Fetch conversation when a thread is selected, poll every 3s
+  // Fetch conversation when a thread is selected, poll every 2.5s
   useEffect(() => {
     if (!selectedChatId) return;
     const fetchHistory = async () => {
@@ -12167,12 +12972,14 @@ function LiveChatPanel({ token, staffList }: { token: string | null; staffList?:
         const res = await fetch(`${API_BASE}/chat/history/${selectedChatId}`);
         if (res.ok) {
           const data = await res.json();
-          setChatHistory(data);
+          if (Array.isArray(data)) {
+            setChatHistory(data);
+          }
         }
       } catch (e) {}
     };
     fetchHistory();
-    const interval = setInterval(fetchHistory, 3000);
+    const interval = setInterval(fetchHistory, 2500);
     return () => clearInterval(interval);
   }, [selectedChatId]);
 
@@ -12187,12 +12994,25 @@ function LiveChatPanel({ token, staffList }: { token: string | null; staffList?:
     setIsSending(true);
     const text = replyText.trim();
     setReplyText("");
-    // Optimistic
-    setChatHistory(prev => [...prev, { id: "tmp_" + Date.now(), chatId: selectedChatId, sender: "Admin", message: text, createdAt: new Date().toISOString() }]);
+    const newMsg = { id: "tmp_" + Date.now(), chatId: selectedChatId, sender: "Admin", message: text, createdAt: new Date().toISOString() };
+    setChatHistory(prev => [...prev, newMsg]);
+
+    // Update thread snippet optimistically
+    setThreads(prev => {
+      const idx = prev.findIndex(t => t.chatId === selectedChatId);
+      if (idx !== -1) {
+        const updated = [...prev];
+        updated[idx] = { ...updated[idx], lastMessage: text, lastSender: "Admin", updatedAt: newMsg.createdAt };
+        return updated.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      }
+      return prev;
+    });
+
     try {
+      const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : "");
       await fetch(`${API_BASE}/chat/admin/reply`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
+        headers: { "Content-Type": "application/json", ...getAuthHeader(activeToken) },
         body: JSON.stringify({ chatId: selectedChatId, message: text }),
       });
     } catch (e) {}
@@ -12213,67 +13033,73 @@ function LiveChatPanel({ token, staffList }: { token: string | null; staffList?:
   const selectedThread = threads.find(t => t.chatId === selectedChatId);
 
   return (
-    <div style={{ display: "flex", height: "calc(100vh - 132px)", gap: "0", backgroundColor: "#fff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden" }}>
+    <div style={{ display: "flex", height: "calc(100vh - 132px)", gap: "0", backgroundColor: "#fff", borderRadius: "8px", border: "1px solid #e2e8f0", overflow: "hidden" }}>
 
       {/* Left: Thread List */}
-      <div style={{ width: "300px", flexShrink: 0, borderRight: "1px solid #e2e8f0", display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid #e2e8f0", background: "linear-gradient(135deg, #e63b7a 0%, #ff758c 100%)" }}>
+      <div style={{ width: "320px", flexShrink: 0, borderRight: "1px solid #e2e8f0", display: "flex", flexDirection: "column" }}>
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid #e2e8f0", backgroundColor: "#e63b7a" }}>
           <h2 style={{ margin: 0, fontSize: "15px", fontWeight: "800", color: "#fff", display: "flex", alignItems: "center", gap: "8px" }}>
-            <MessageSquare size={18} /> Live Chat Support
+            <MessageSquare size={18} /> Live Customer Chat
           </h2>
-          <p style={{ margin: "4px 0 0 0", fontSize: "11px", color: "rgba(255,255,255,0.85)", fontWeight: "600" }}>
-            {threads.length} active conversation{threads.length !== 1 ? "s" : ""}
+          <p style={{ margin: "4px 0 0 0", fontSize: "11.5px", color: "#ffffff", fontWeight: "600" }}>
+            {threads.length} active customer conversation{threads.length !== 1 ? "s" : ""}
           </p>
         </div>
         <div style={{ flex: 1, overflowY: "auto" }}>
-          {isLoading ? (
-            <div style={{ padding: "40px 20px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>Loading threads...</div>
+          {isLoading && threads.length === 0 ? (
+            <div style={{ padding: "40px 20px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>Loading conversations...</div>
           ) : threads.length === 0 ? (
             <div style={{ padding: "60px 20px", textAlign: "center" }}>
               <div style={{ fontSize: "36px", marginBottom: "10px" }}>💬</div>
-              <div style={{ color: "#94a3b8", fontSize: "13px", fontWeight: "600" }}>No conversations yet</div>
-              <div style={{ color: "#cbd5e1", fontSize: "11px", marginTop: "4px" }}>Customer messages will appear here</div>
+              <div style={{ color: "#475569", fontSize: "13px", fontWeight: "700" }}>No conversations yet</div>
+              <div style={{ color: "#94a3b8", fontSize: "11px", marginTop: "4px" }}>Customer live chats will appear here with customer names</div>
             </div>
           ) : (
-            threads.map((thread) => (
-              <div
-                key={thread.chatId}
-                onClick={() => setSelectedChatId(thread.chatId)}
-                style={{
-                  padding: "14px 16px",
-                  cursor: "pointer",
-                  backgroundColor: selectedChatId === thread.chatId ? "#fdf2f8" : "transparent",
-                  borderLeft: selectedChatId === thread.chatId ? "3px solid #e63b7a" : "3px solid transparent",
-                  borderBottom: "1px solid #f1f5f9",
-                  transition: "background 0.15s",
-                }}
-                onMouseEnter={e => { if (selectedChatId !== thread.chatId) e.currentTarget.style.backgroundColor = "#f8fafc"; }}
-                onMouseLeave={e => { if (selectedChatId !== thread.chatId) e.currentTarget.style.backgroundColor = "transparent"; }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "linear-gradient(135deg, #e63b7a, #ff758c)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "800", flexShrink: 0 }}>
-                    {thread.chatId.charAt(5).toUpperCase()}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: "700", fontSize: "12.5px", color: "#1e293b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {thread.chatId}
+            threads.map((thread) => {
+              const custName = thread.customerName || thread.displayName || ("Customer #" + (thread.customerPhone || thread.chatId.replace(/^chat_/, "").slice(-5).toUpperCase()));
+              const initial = (thread.customerName ? thread.customerName.trim().charAt(0) : "C").toUpperCase();
+              const isSelected = selectedChatId === thread.chatId;
+
+              return (
+                <div
+                  key={thread.chatId}
+                  onClick={() => setSelectedChatId(thread.chatId)}
+                  style={{
+                    padding: "14px 16px",
+                    cursor: "pointer",
+                    backgroundColor: isSelected ? "#fff0f5" : "#ffffff",
+                    borderLeft: isSelected ? "4px solid #e63b7a" : "4px solid transparent",
+                    borderBottom: "1px solid #f1f5f9",
+                    transition: "background-color 0.1s ease",
+                  }}
+                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.backgroundColor = "#f8fafc"; }}
+                  onMouseLeave={e => { if (!isSelected) e.currentTarget.style.backgroundColor = "#ffffff"; }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <div style={{ width: "36px", height: "36px", borderRadius: "50%", backgroundColor: isSelected ? "#e63b7a" : "#0f172a", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "800", flexShrink: 0 }}>
+                      {initial}
                     </div>
-                    <div style={{ fontSize: "11px", color: thread.lastSender === "Customer" ? "#475569" : "#059669", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: "2px" }}>
-                      {thread.lastSender === "Admin" ? "You: " : ""}
-                      {thread.lastMessage?.startsWith("data:image") ? "📷 Image" : thread.lastMessage?.substring(0, 40)}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: "800", fontSize: "13px", color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {custName}
+                      </div>
+                      <div style={{ fontSize: "11px", color: thread.lastSender === "Customer" ? "#334155" : "#059669", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: "2px" }}>
+                        {thread.lastSender === "Admin" ? "You: " : ""}
+                        {thread.lastMessage?.startsWith("data:image") ? "📷 Image" : thread.lastMessage?.substring(0, 40)}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: "10px", color: "#64748b", fontWeight: "600", flexShrink: 0 }}>
+                      {formatDate(thread.updatedAt)}
                     </div>
                   </div>
-                  <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: "600", flexShrink: 0 }}>
-                    {formatDate(thread.updatedAt)}
-                  </div>
+                  {thread.lastSender === "Customer" && (
+                    <div style={{ marginTop: "6px", marginLeft: "46px" }}>
+                      <span style={{ backgroundColor: "#e63b7a", color: "#fff", fontSize: "9px", fontWeight: "800", padding: "2px 7px", borderRadius: "4px" }}>NEW</span>
+                    </div>
+                  )}
                 </div>
-                {thread.lastSender === "Customer" && (
-                  <div style={{ marginTop: "6px", marginLeft: "46px" }}>
-                    <span style={{ backgroundColor: "#e63b7a", color: "#fff", fontSize: "9px", fontWeight: "800", padding: "2px 7px", borderRadius: "10px" }}>NEW</span>
-                  </div>
-                )}
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
@@ -12283,31 +13109,33 @@ function LiveChatPanel({ token, staffList }: { token: string | null; staffList?:
         {!selectedChatId ? (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px" }}>
             <div style={{ fontSize: "56px" }}>💬</div>
-            <div style={{ fontSize: "16px", fontWeight: "800", color: "#1e293b" }}>Select a conversation</div>
-            <div style={{ fontSize: "13px", color: "#94a3b8", fontWeight: "600" }}>Click on a customer thread on the left to start replying</div>
+            <div style={{ fontSize: "16px", fontWeight: "800", color: "#1e293b" }}>Select a customer conversation</div>
+            <div style={{ fontSize: "13px", color: "#64748b", fontWeight: "600" }}>Click on a customer thread on the left to start live messaging</div>
           </div>
         ) : (
           <>
             {/* Chat Header */}
             <div style={{ padding: "14px 20px", backgroundColor: "#fff", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", gap: "12px" }}>
-              <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "linear-gradient(135deg, #e63b7a, #ff758c)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "800" }}>
-                {selectedChatId.charAt(5).toUpperCase()}
+              <div style={{ width: "38px", height: "38px", borderRadius: "50%", backgroundColor: "#e63b7a", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: "800" }}>
+                {(selectedThread?.customerName ? selectedThread.customerName.trim().charAt(0) : "C").toUpperCase()}
               </div>
               <div>
-                <div style={{ fontWeight: "800", fontSize: "13px", color: "#1e293b" }}>{selectedChatId}</div>
-                <div style={{ fontSize: "11px", color: "#059669", fontWeight: "600", display: "flex", alignItems: "center", gap: "4px" }}>
-                  <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "#059669", display: "inline-block" }} />
-                  Customer
+                <div style={{ fontWeight: "800", fontSize: "14px", color: "#0f172a" }}>
+                  {selectedThread?.customerName || selectedThread?.displayName || "Customer"}
+                </div>
+                <div style={{ fontSize: "11px", color: "#059669", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ width: "7px", height: "7px", borderRadius: "50%", backgroundColor: "#059669", display: "inline-block" }} />
+                  {selectedThread?.customerPhone ? `Mobile: ${selectedThread.customerPhone}` : "Customer Online"}
                 </div>
               </div>
               <div style={{ marginLeft: "auto", display: "flex", gap: "10px", alignItems: "center" }}>
                 <select
                   value={assignedAgents[selectedChatId || ""] || ""}
-                  style={{ padding: "6px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", fontWeight: "700" }}
+                  style={{ padding: "6px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", fontWeight: "700", backgroundColor: "#fff" }}
                   onChange={(e) => {
                     if (e.target.value && selectedChatId) {
                       setAssignedAgents(prev => ({ ...prev, [selectedChatId]: e.target.value }));
-                      alert(`Chat thread ${selectedChatId} assigned to staff member: ${e.target.value}`);
+                      alert(`Chat assigned to staff member: ${e.target.value}`);
                     }
                   }}
                 >
@@ -12326,7 +13154,7 @@ function LiveChatPanel({ token, staffList }: { token: string | null; staffList?:
                 </select>
                 <button
                   onClick={() => setSelectedChatId(null)}
-                  style={{ background: "#f1f5f9", border: "none", padding: "6px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer", color: "#475569" }}
+                  style={{ background: "#f1f5f9", border: "1px solid #cbd5e1", padding: "6px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer", color: "#475569" }}
                 >
                   ✕ Close
                 </button>
@@ -12334,7 +13162,7 @@ function LiveChatPanel({ token, staffList }: { token: string | null; staffList?:
             </div>
 
             {/* Messages */}
-            <div style={{ flex: 1, overflowY: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
               {chatHistory.length === 0 ? (
                 <div style={{ textAlign: "center", marginTop: "60px", color: "#94a3b8", fontSize: "13px", fontWeight: "600" }}>No messages yet in this conversation</div>
               ) : (
@@ -12343,23 +13171,23 @@ function LiveChatPanel({ token, staffList }: { token: string | null; staffList?:
                   const isImg = msg.message?.startsWith("data:image/");
                   return (
                     <div key={msg.id || idx} style={{ display: "flex", flexDirection: "column", alignItems: isAdmin ? "flex-end" : "flex-start" }}>
-                      <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: "700", marginBottom: "3px", padding: "0 4px" }}>
-                        {isAdmin ? "You (Admin)" : "Customer"} • {formatTime(msg.createdAt)}
+                      <div style={{ fontSize: "10px", color: "#64748b", fontWeight: "700", marginBottom: "3px", padding: "0 4px" }}>
+                        {isAdmin ? "You (Admin)" : (selectedThread?.customerName || "Customer")} • {formatTime(msg.createdAt)}
                       </div>
                       <div style={{
                         backgroundColor: isAdmin ? "#e63b7a" : "#ffffff",
-                        color: isAdmin ? "#fff" : "#1e293b",
-                        padding: isImg ? "6px" : "10px 15px",
-                        borderRadius: isAdmin ? "16px 4px 16px 16px" : "4px 16px 16px 16px",
+                        color: isAdmin ? "#ffffff" : "#1e293b",
+                        padding: isImg ? "6px" : "10px 14px",
+                        borderRadius: isAdmin ? "12px 2px 12px 12px" : "2px 12px 12px 12px",
                         maxWidth: "70%",
                         fontSize: "13px",
                         fontWeight: "500",
                         lineHeight: "1.5",
-                        boxShadow: isAdmin ? "0 2px 8px rgba(230,59,122,0.25)" : "0 1px 4px rgba(0,0,0,0.07)",
+                        border: isAdmin ? "none" : "1px solid #e2e8f0",
                         wordBreak: "break-word",
                       }}>
                         {isImg ? (
-                          <img src={msg.message} alt="Attachment" style={{ maxWidth: "200px", maxHeight: "200px", borderRadius: "8px", display: "block", objectFit: "cover" }} />
+                          <img src={msg.message} alt="Attachment" style={{ maxWidth: "200px", maxHeight: "200px", borderRadius: "6px", display: "block", objectFit: "cover" }} />
                         ) : msg.message}
                       </div>
                     </div>
@@ -12373,19 +13201,17 @@ function LiveChatPanel({ token, staffList }: { token: string | null; staffList?:
             <form onSubmit={handleSendReply} style={{ padding: "12px 16px", backgroundColor: "#fff", borderTop: "1px solid #e2e8f0", display: "flex", gap: "10px", alignItems: "center" }}>
               <input
                 type="text"
-                placeholder="Type your reply..."
+                placeholder="Type your reply to customer..."
                 value={replyText}
                 onChange={e => setReplyText(e.target.value)}
-                style={{ flex: 1, padding: "10px 16px", borderRadius: "24px", border: "1.5px solid #e2e8f0", fontSize: "13px", fontWeight: "500", outline: "none", backgroundColor: "#f8fafc", color: "#1e293b", transition: "border-color 0.2s" }}
-                onFocus={e => (e.currentTarget.style.borderColor = "#e63b7a")}
-                onBlur={e => (e.currentTarget.style.borderColor = "#e2e8f0")}
+                style={{ flex: 1, padding: "10px 16px", borderRadius: "6px", border: "1.5px solid #cbd5e1", fontSize: "13px", fontWeight: "500", outline: "none", backgroundColor: "#ffffff", color: "#1e293b" }}
               />
               <button
                 type="submit"
                 disabled={isSending || !replyText.trim()}
-                style={{ width: "40px", height: "40px", borderRadius: "50%", background: replyText.trim() ? "linear-gradient(135deg, #e63b7a, #ff758c)" : "#e2e8f0", color: replyText.trim() ? "#fff" : "#94a3b8", border: "none", cursor: replyText.trim() ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s", flexShrink: 0 }}
+                style={{ height: "40px", padding: "0 18px", borderRadius: "6px", backgroundColor: replyText.trim() ? "#e63b7a" : "#e2e8f0", color: replyText.trim() ? "#ffffff" : "#94a3b8", border: "none", cursor: replyText.trim() ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontWeight: "700", fontSize: "13px" }}
               >
-                <Send size={16} />
+                <Send size={15} /> Send
               </button>
             </form>
           </>
@@ -12641,28 +13467,33 @@ function InfluencersPanel({ token }: { token: string | null }) {
 // TOP CUSTOMERS LEADERBOARD PANEL
 // ═══════════════════════════════════════════
 function TopCustomersPanel({ customerList, orders }: { customerList: any[]; orders: any[] }) {
-  const topList = useMemo(() => {
-    if (customerList && customerList.length > 0) {
-      return customerList.map((c) => {
-        const custOrders = orders.filter(o => (o.customerEmail && o.customerEmail === c.email) || (o.customerPhone && o.customerPhone === c.phone));
-        const totalSpend = custOrders.reduce((sum, o) => sum + (parseFloat(o.total || o.totalAmount) || 0), 0);
-        const orderCount = custOrders.length;
-        return { ...c, totalSpend, orderCount };
-      }).sort((a, b) => b.totalSpend - a.totalSpend);
+  const [availableOffers, setAvailableOffers] = useState<any[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("glowgoodly_available_offers");
+        if (saved) return JSON.parse(saved);
+      } catch (e) {}
     }
+    return [];
+  });
 
-    // Fallback: Aggregate directly from real orders!
+  const topList = useMemo(() => {
+    // Group and aggregate real customer purchase history strictly from orders!
     const custMap = new Map<string, { id: string; name: string; phone: string; email: string; orderCount: number; totalSpend: number }>();
+    
     orders.forEach((o, idx) => {
-      const key = o.customerPhone || o.customerEmail || o.customerName || `cust-${idx}`;
-      const name = o.customerName || o.name || "Valued Customer";
       const phone = o.customerPhone || o.phone || "";
       const email = o.customerEmail || o.email || "";
+      const name = o.customerName || o.name || (phone ? `Customer (${phone})` : "Valued Customer");
+      const key = (phone || email || name || `cust-${idx}`).toLowerCase().trim();
       const spend = parseFloat(o.total || o.totalAmount || 0) || 0;
 
       const existing = custMap.get(key) || { id: key, name, phone, email, orderCount: 0, totalSpend: 0 };
       existing.orderCount += 1;
       existing.totalSpend += spend;
+      if (!existing.phone && phone) existing.phone = phone;
+      if (!existing.email && email) existing.email = email;
+      if ((!existing.name || existing.name === "Valued Customer") && name) existing.name = name;
       custMap.set(key, existing);
     });
 
@@ -12670,55 +13501,79 @@ function TopCustomersPanel({ customerList, orders }: { customerList: any[]; orde
       return Array.from(custMap.values()).sort((a, b) => b.totalSpend - a.totalSpend);
     }
 
-    return [
-      { id: "cust-1", name: "Sadia Rahman", phone: "01711223344", email: "sadia@gmail.com", orderCount: 8, totalSpend: 18450 },
-      { id: "cust-2", name: "Tania Akter", phone: "01822334455", email: "tania@gmail.com", orderCount: 6, totalSpend: 14200 },
-      { id: "cust-3", name: "Farhana Islam", phone: "01933445566", email: "farhana@gmail.com", orderCount: 5, totalSpend: 11800 },
-      { id: "cust-4", name: "Nusrat Jahan", phone: "01644556677", email: "nusrat@gmail.com", orderCount: 4, totalSpend: 9500 },
-      { id: "cust-5", name: "Mehnaz Chowdhury", phone: "01555667788", email: "mehnaz@gmail.com", orderCount: 3, totalSpend: 7200 }
-    ];
-  }, [customerList, orders]);
+    return [];
+  }, [orders]);
+
+  const handleSendOfferEmail = (c: any) => {
+    const offerSummary = availableOffers.length > 0
+      ? availableOffers.map(o => `• ${o.title}: Coupon Code "${o.code}" (${o.discountAmount}${o.discountType === 'percentage' ? '%' : ' Tk'} OFF${o.minOrderAmount ? `, Min Order Tk ${o.minOrderAmount}` : ''})`).join('\n')
+      : "• VIP Exclusive: Coupon Code 'GLOWVIP15' for 15% OFF your next order!";
+
+    const emailSubject = `Special VIP Gift for ${c.name} 🌸 Exclusive GlowGoodly Offers`;
+    const emailBody = `Dear ${c.name},\n\nThank you for being one of our most valued customers at GlowGoodly!\n\nAs a token of our appreciation, here are our current exclusive offers and discount codes just for you:\n\n${offerSummary}\n\nVisit our online store to enjoy 100% authentic Korean & international beauty essentials:\nhttps://glowgoodly.com\n\nWarm regards,\nGlowGoodly Customer Care`;
+
+    if (c.email && c.email.includes("@") && !c.email.includes("@glowgoodly.customer")) {
+      window.open(`mailto:${c.email}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`);
+    } else {
+      const msg = `Dispatching offer to ${c.name} (${c.phone || "VIP"}):\n\n${offerSummary}`;
+      alert(msg);
+    }
+  };
 
   return (
-    <div style={{ backgroundColor: "#fff", borderRadius: "10px", border: "1px solid #e2e8f0", padding: "24px" }}>
-      <h2 style={{ fontSize: "18px", fontWeight: "800", marginBottom: "16px" }}>🏆 Top Loyal Customer Leaderboard</h2>
-      <table className="admin-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-        <thead>
-          <tr style={{ backgroundColor: "#f8fafc", textAlign: "left" }}>
-            <th style={{ padding: "10px" }}>Rank</th>
-            <th style={{ padding: "10px" }}>Customer Name</th>
-            <th style={{ padding: "10px" }}>Contact</th>
-            <th style={{ padding: "10px", textAlign: "center" }}>Total Orders</th>
-            <th style={{ padding: "10px", textAlign: "right" }}>Lifetime Spend</th>
-            <th style={{ padding: "10px", textAlign: "center" }}>Loyalty Tier</th>
-            <th style={{ padding: "10px", textAlign: "center" }}>Send Offer</th>
-          </tr>
-        </thead>
-        <tbody>
-          {topList.map((c, idx) => (
-            <tr key={c.id || idx} style={{ borderBottom: "1px solid #edf2f7" }}>
-              <td style={{ padding: "10px", fontWeight: "900" }}>#{idx + 1}</td>
-              <td style={{ padding: "10px", fontWeight: "700" }}>{c.name}</td>
-              <td style={{ padding: "10px" }}>{c.phone || c.email}</td>
-              <td style={{ padding: "10px", textAlign: "center", fontWeight: "700" }}>{c.orderCount} orders</td>
-              <td style={{ padding: "10px", textAlign: "right", fontWeight: "900", color: "#e63b7a" }}>Tk {c.totalSpend.toLocaleString()}</td>
-              <td style={{ padding: "10px", textAlign: "center" }}>
-                <span className={`badge ${idx === 0 ? "badge-danger" : idx < 3 ? "badge-warning" : "badge-info"}`}>
-                  {idx === 0 ? "VIP Platinum 👑" : idx < 3 ? "Gold Member ⭐" : "Silver Customer"}
-                </span>
-              </td>
-              <td style={{ padding: "10px", textAlign: "center" }}>
-                <button onClick={() => {
-                  const promo = prompt(`Send VIP Exclusive Offer SMS/Email to ${c.name} (${c.phone || c.email}):`, "Get 15% OFF with VIP Coupon: GLOWVIP15");
-                  if (promo) alert(`Offer dispatched to ${c.name} via Host API Gateway!`);
-                }} style={{ backgroundColor: "#e63b7a", color: "#fff", border: "none", padding: "4px 10px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>
-                  🎁 Send Offer
-                </button>
-              </td>
+    <div style={{ backgroundColor: "#fff", borderRadius: "8px", border: "1px solid #e2e8f0", padding: "24px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+        <div>
+          <h2 style={{ fontSize: "18px", fontWeight: "800", margin: 0, color: "#0f172a" }}>🏆 Top Loyal Customer Leaderboard</h2>
+          <p style={{ fontSize: "12.5px", color: "#64748b", margin: "4px 0 0 0" }}>Ranked strictly by total purchase volume in BDT from real completed customer orders.</p>
+        </div>
+      </div>
+
+      {topList.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "#64748b" }}>
+          <div style={{ fontSize: "36px", marginBottom: "8px" }}>👑</div>
+          <div style={{ fontSize: "15px", fontWeight: "700", color: "#0f172a" }}>No Customer Purchases Recorded Yet</div>
+          <p style={{ fontSize: "13px", color: "#94a3b8", margin: "4px 0 0 0" }}>As real customer orders are placed, the top purchasers will automatically rank here without any mock data.</p>
+        </div>
+      ) : (
+        <table className="admin-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+          <thead>
+            <tr style={{ backgroundColor: "#f8fafc", textAlign: "left" }}>
+              <th style={{ padding: "10px" }}>Rank</th>
+              <th style={{ padding: "10px" }}>Customer Name</th>
+              <th style={{ padding: "10px" }}>Contact</th>
+              <th style={{ padding: "10px", textAlign: "center" }}>Total Orders</th>
+              <th style={{ padding: "10px", textAlign: "right" }}>Lifetime Spend</th>
+              <th style={{ padding: "10px", textAlign: "center" }}>Loyalty Tier</th>
+              <th style={{ padding: "10px", textAlign: "center" }}>Send Offer</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {topList.map((c, idx) => (
+              <tr key={c.id || idx} style={{ borderBottom: "1px solid #edf2f7" }}>
+                <td style={{ padding: "10px", fontWeight: "900" }}>#{idx + 1}</td>
+                <td style={{ padding: "10px", fontWeight: "700", color: "#0f172a" }}>{c.name}</td>
+                <td style={{ padding: "10px", color: "#475569" }}>{c.phone || c.email || "N/A"}</td>
+                <td style={{ padding: "10px", textAlign: "center", fontWeight: "700" }}>{c.orderCount} orders</td>
+                <td style={{ padding: "10px", textAlign: "right", fontWeight: "900", color: "#e63b7a" }}>Tk {c.totalSpend.toLocaleString()}</td>
+                <td style={{ padding: "10px", textAlign: "center" }}>
+                  <span className={`badge ${idx === 0 ? "badge-danger" : idx < 3 ? "badge-warning" : "badge-info"}`}>
+                    {idx === 0 ? "VIP Platinum 👑" : idx < 3 ? "Gold Member ⭐" : "Silver Customer"}
+                  </span>
+                </td>
+                <td style={{ padding: "10px", textAlign: "center" }}>
+                  <button
+                    onClick={() => handleSendOfferEmail(c)}
+                    style={{ backgroundColor: "#e63b7a", color: "#fff", border: "none", padding: "6px 14px", borderRadius: "4px", fontSize: "11.5px", fontWeight: "700", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "4px" }}
+                  >
+                    ✉️ Send Offer
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
@@ -12743,10 +13598,27 @@ function DamageProductsPanel({ logs, setLogs }: { logs: Array<any>; setLogs: Rea
       lossAmount: parseFloat(form.lossAmount) || 0,
       date: new Date().toISOString().slice(0, 10)
     };
-    setLogs(prev => [newItem, ...prev]);
+    const updated = [newItem, ...logs];
+    setLogs(updated);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("gg_damaged_products_log", JSON.stringify(updated));
+      } catch (e) {}
+    }
     setForm({ productName: "", qty: "1", type: "Damaged in Shipping", lossAmount: "" });
     setShowModal(false);
-    alert("Damage & Return entry logged successfully!");
+    alert(`Damaged item logged! Tk ${newItem.lossAmount} has been deducted from your store net profit calculations.`);
+  };
+
+  const handleDelete = (id: string) => {
+    if (!confirm("Are you sure you want to delete this damage log? The financial deduction will be removed and restored to your calculation.")) return;
+    const updated = logs.filter(x => x.id !== id);
+    setLogs(updated);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("gg_damaged_products_log", JSON.stringify(updated));
+      } catch (e) {}
+    }
   };
 
   return (
@@ -12798,7 +13670,7 @@ function DamageProductsPanel({ logs, setLogs }: { logs: Array<any>; setLogs: Rea
               <td>{item.date}</td>
               <td style={{ fontWeight: "900", color: "#dc2626" }}>Tk {item.lossAmount}</td>
               <td style={{ textAlign: "center" }}>
-                <button onClick={() => setLogs(logs.filter(x => x.id !== item.id))} style={{ backgroundColor: "#fee2e2", color: "#ef4444", border: "none", padding: "4px 10px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Delete</button>
+                <button onClick={() => handleDelete(item.id)} style={{ backgroundColor: "#fee2e2", color: "#ef4444", border: "none", padding: "6px 14px", borderRadius: "4px", fontSize: "11.5px", fontWeight: "700", cursor: "pointer" }}>Delete</button>
               </td>
             </tr>
           ))}

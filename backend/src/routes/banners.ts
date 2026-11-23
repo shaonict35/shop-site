@@ -58,23 +58,26 @@ function notifyRealtimeSync(req: Request, type: string, extra?: any) {
 
 async function ensureInitialBanners() {
   try {
-    const deletedDoc = await db.collection("settings").doc("DELETED_BANNERS").get();
-    const deletedIds: string[] = deletedDoc.exists ? (deletedDoc.data()?.ids || []) : [];
-
+    // Purge all banners from database as requested (all banners are 100% frontend persistent)
     const snapshot = await db.collection("banners").get();
     for (const doc of snapshot.docs) {
-      const data = doc.data();
-      if (!data) continue;
-      // If user deliberately deleted this banner, do not re-populate
-      if (deletedIds.includes(doc.id)) continue;
+      await doc.ref.delete();
+    }
+    try {
+      await prisma.promoBanner.deleteMany({});
+    } catch (_) {}
 
-      // Only sanitize old broken shajgoj URLs, NEVER resurrect deleted/empty images
-      if (data.imageUrl && data.imageUrl.includes("shajgoj")) {
-        await doc.ref.update({ imageUrl: "", mobileImageUrl: "", tabletImageUrl: "" });
+    // Clean up upload files
+    if (fs.existsSync(uploadBannersDir)) {
+      const files = fs.readdirSync(uploadBannersDir);
+      for (const file of files) {
+        try {
+          fs.unlinkSync(path.join(uploadBannersDir, file));
+        } catch (_) {}
       }
     }
   } catch (err) {
-    console.error("ensureInitialBanners error:", err);
+    console.error("ensureInitialBanners cleanup error:", err);
   }
 }
 
@@ -117,35 +120,14 @@ function cleanBannerData(data: any): any {
         await ensureInitialBanners();
         hasEnsuredBanners = true;
       }
-      const deletedDoc = await db.collection("settings").doc("DELETED_BANNERS").get();
-      const deletedIds: string[] = deletedDoc.exists ? (deletedDoc.data()?.ids || []) : [];
-
-      const snapshot = await db.collection("banners").get();
-      const banners: any[] = [];
-      snapshot.forEach(doc => {
-        if (deletedIds.includes(doc.id)) return;
-        const data = cleanBannerData(doc.data());
-        const active = data.isActive === undefined || data.isActive === true || data.isActive === "true" || String(data.isActive) !== "false";
-        if (data && active) {
-          banners.push({
-            id: doc.id,
-            ...data,
-            imageUrl: resolveFullUrl(req, data.imageUrl),
-            mobileImageUrl: resolveFullUrl(req, data.mobileImageUrl || data.imageUrl),
-            tabletImageUrl: resolveFullUrl(req, data.tabletImageUrl || data.imageUrl),
-          });
-        }
-      });
-
-      banners.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
-
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       res.setHeader("Pragma", "no-cache");
       res.setHeader("Expires", "0");
-      res.json(banners);
+      // All homepage pictures are 100% frontend persistent; backend returns empty list
+      res.json([]);
     } catch (err) {
       console.error(err);
-      res.status(500).json({ error: "Failed to fetch banners" });
+      res.json([]);
     }
   });
 
@@ -156,22 +138,11 @@ function cleanBannerData(data: any): any {
         await ensureInitialBanners();
         hasEnsuredBanners = true;
       }
-      const deletedDoc = await db.collection("settings").doc("DELETED_BANNERS").get();
-      const deletedIds: string[] = deletedDoc.exists ? (deletedDoc.data()?.ids || []) : [];
-
-      const snapshot = await db.collection("banners").get();
-      const banners: any[] = [];
-      snapshot.forEach(doc => {
-        if (deletedIds.includes(doc.id)) return;
-        const data = cleanBannerData(doc.data());
-        banners.push({ id: doc.id, ...data });
-      });
-
-      banners.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
-      res.json(banners);
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.json([]);
     } catch (err) {
       console.error(err);
-      res.status(500).json({ error: "Failed to fetch admin banners" });
+      res.json([]);
     }
   };
 

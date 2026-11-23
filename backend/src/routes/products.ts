@@ -57,6 +57,384 @@ export function generateSlug(text: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+// Master Preloaded Store Categories Hierarchy
+export const MASTER_CATEGORIES_DATA = [
+  {
+    id: "cat-makeup",
+    name: "Makeup",
+    slug: "makeup",
+    subCategories: [
+      { id: "sub-mu-1", name: "Face Primer", slug: "face-primer" },
+      { id: "sub-mu-2", name: "Foundation", slug: "foundation" },
+      { id: "sub-mu-3", name: "Concealer", slug: "concealer" },
+      { id: "sub-mu-4", name: "Compact Powder", slug: "compact-powder" },
+      { id: "sub-mu-5", name: "Loose Powder & Contour", slug: "loose-powder-contour" },
+      { id: "sub-mu-6", name: "Blush & Highlighter", slug: "blush-highlighter" },
+      { id: "sub-mu-7", name: "Lipstick", slug: "lipstick" },
+      { id: "sub-mu-8", name: "Liquid Lipstick", slug: "liquid-lipstick" },
+      { id: "sub-mu-9", name: "Lip Balm & Gloss", slug: "lip-balm-gloss" },
+      { id: "sub-mu-10", name: "Kajal & Eyeliner", slug: "kajal-eyeliner" },
+      { id: "sub-mu-11", name: "Mascara", slug: "mascara" },
+      { id: "sub-mu-12", name: "Eye Shadow", slug: "eye-shadow" },
+      { id: "sub-mu-13", name: "Nail Polish", slug: "nail-polish" },
+      { id: "sub-mu-14", name: "Makeup Remover", slug: "makeup-remover" },
+      { id: "sub-mu-15", name: "Brushes & Tools", slug: "brushes-tools" }
+    ]
+  },
+  {
+    id: "cat-skin",
+    name: "Skin Care",
+    slug: "skincare",
+    subCategories: [
+      { id: "sub-sk-1", name: "Face Wash", slug: "face-wash" },
+      { id: "sub-sk-2", name: "Cleansing Balm & Oil", slug: "cleansing-balm-oil" },
+      { id: "sub-sk-3", name: "Face Serum", slug: "face-serum" },
+      { id: "sub-sk-4", name: "Face Toner & Mist", slug: "face-toner-mist" },
+      { id: "sub-sk-5", name: "Sunscreen", slug: "sunscreen" },
+      { id: "sub-sk-6", name: "Day Cream", slug: "day-cream" },
+      { id: "sub-sk-7", name: "Night Cream", slug: "night-cream" },
+      { id: "sub-sk-8", name: "Body Lotion", slug: "body-lotion" },
+      { id: "sub-sk-9", name: "Sheet Mask", slug: "sheet-mask" },
+      { id: "sub-sk-10", name: "Acne Treatment", slug: "acne-treatment" },
+      { id: "sub-sk-11", name: "Eye Cream", slug: "eye-cream" }
+    ]
+  },
+  {
+    id: "cat-hair",
+    name: "Hair Care",
+    slug: "haircare",
+    subCategories: [
+      { id: "sub-hr-1", name: "Shampoo", slug: "shampoo" },
+      { id: "sub-hr-2", name: "Conditioner", slug: "conditioner" },
+      { id: "sub-hr-3", name: "Hair Oil", slug: "hair-oil" },
+      { id: "sub-hr-4", name: "Hair Serum", slug: "hair-serum" },
+      { id: "sub-hr-5", name: "Hair Mask", slug: "hair-mask" },
+      { id: "sub-hr-6", name: "Hair Fall Defense", slug: "hair-fall-defense" },
+      { id: "sub-hr-7", name: "Dandruff Solution", slug: "dandruff-solution" }
+    ]
+  },
+  {
+    id: "cat-personal",
+    name: "Personal Care",
+    slug: "personal-care",
+    subCategories: [
+      { id: "sub-pc-1", name: "Body Wash", slug: "body-wash" },
+      { id: "sub-pc-2", name: "Shower Gel", slug: "shower-gel" },
+      { id: "sub-pc-3", name: "Deodorant & Roll-on", slug: "deodorant-roll-on" },
+      { id: "sub-pc-4", name: "Body Mist", slug: "body-mist" },
+      { id: "sub-pc-5", name: "Hand & Foot Care", slug: "hand-foot-care" },
+      { id: "sub-pc-6", name: "Feminine Hygiene", slug: "feminine-hygiene" }
+    ]
+  },
+  {
+    id: "cat-mom-baby",
+    name: "Mom & Baby",
+    slug: "mom-baby",
+    subCategories: [
+      { id: "sub-mb-1", name: "Baby Lotion", slug: "baby-lotion" },
+      { id: "sub-mb-2", name: "Baby Wash & Shampoo", slug: "baby-wash-shampoo" },
+      { id: "sub-mb-3", name: "Baby Oil", slug: "baby-oil" },
+      { id: "sub-mb-4", name: "Diapers & Wipes", slug: "diapers-wipes" },
+      { id: "sub-mb-5", name: "Stretch Mark Cream", slug: "stretch-mark-cream" }
+    ]
+  },
+  {
+    id: "cat-fragrance",
+    name: "Fragrance",
+    slug: "fragrance",
+    subCategories: [
+      { id: "sub-fr-1", name: "Womens Perfume", slug: "womens-perfume" },
+      { id: "sub-fr-2", name: "Mens Cologne", slug: "mens-cologne" },
+      { id: "sub-fr-3", name: "Body Mist", slug: "body-mist" },
+      { id: "sub-fr-4", name: "Attar & Oud", slug: "attar-oud" }
+    ]
+  },
+  {
+    id: "cat-undergarments",
+    name: "Undergarments",
+    slug: "undergarments",
+    subCategories: [
+      { id: "sub-ug-1", name: "Bras", slug: "bras" },
+      { id: "sub-ug-2", name: "Panties", slug: "panties" },
+      { id: "sub-ug-3", name: "Shapewear", slug: "shapewear" }
+    ]
+  },
+  {
+    id: "cat-combo",
+    name: "Combo Deals",
+    slug: "combo",
+    subCategories: [
+      { id: "sub-cb-1", name: "Skin Combos", slug: "skin-combos" },
+      { id: "sub-cb-2", name: "Makeup Combos", slug: "makeup-combos" },
+      { id: "sub-cb-3", name: "Hair Combos", slug: "hair-combos" }
+    ]
+  },
+  {
+    id: "cat-clearance",
+    name: "Clearance Sale",
+    slug: "clearance-sale",
+    subCategories: [
+      { id: "sub-cs-1", name: "Makeup Deals", slug: "makeup-deals" },
+      { id: "sub-cs-2", name: "Skincare Deals", slug: "skincare-deals" },
+      { id: "sub-cs-3", name: "Haircare Deals", slug: "haircare-deals" }
+    ]
+  }
+];
+
+export const MASTER_BRANDS_DATA = [
+  { id: "brand-the-ordinary", name: "The Ordinary", slug: "the-ordinary" },
+  { id: "brand-cerave", name: "CeraVe", slug: "cerave" },
+  { id: "brand-cosrx", name: "COSRX", slug: "cosrx" },
+  { id: "brand-beauty-of-joseon", name: "Beauty of Joseon", slug: "beauty-of-joseon" },
+  { id: "brand-la-roche-posay", name: "La Roche-Posay", slug: "la-roche-posay" },
+  { id: "brand-loreal", name: "L'Oreal Paris", slug: "loreal-paris" },
+  { id: "brand-neutrogena", name: "Neutrogena", slug: "neutrogena" },
+  { id: "brand-innisfree", name: "Innisfree", slug: "innisfree" },
+  { id: "brand-axis-y", name: "AXIS-Y", slug: "axis-y" },
+  { id: "brand-some-by-mi", name: "Some By Mi", slug: "some-by-mi" },
+  { id: "brand-garnier", name: "Garnier", slug: "garnier" },
+  { id: "brand-nivea", name: "Nivea", slug: "nivea" },
+  { id: "brand-dove", name: "Dove", slug: "dove" },
+  { id: "brand-simple", name: "Simple", slug: "simple" },
+  { id: "brand-nirvana", name: "Nirvana Color", slug: "nirvana-color" },
+  { id: "brand-mac", name: "MAC", slug: "mac" },
+  { id: "brand-maybelline", name: "Maybelline", slug: "maybelline" }
+];
+
+export async function resolveCategory(catIdentifier?: string, subIdentifier?: string) {
+  if (!catIdentifier && !subIdentifier) {
+    return {
+      categoryId: "cat-skin",
+      subcategoryId: null,
+      category: { id: "cat-skin", name: "Skin Care", displayName: "Skin Care", slug: "skincare" },
+      subcategory: null
+    };
+  }
+
+  const target = String(catIdentifier || subIdentifier || "").trim();
+  const targetLower = target.toLowerCase();
+
+  // 1. Search in MASTER_CATEGORIES_DATA
+  for (const parent of MASTER_CATEGORIES_DATA) {
+    // Check if target is this parent
+    if (parent.id.toLowerCase() === targetLower || parent.name.toLowerCase() === targetLower || parent.slug.toLowerCase() === targetLower) {
+      if (subIdentifier) {
+        const subLower = String(subIdentifier).toLowerCase().trim();
+        const foundSub = parent.subCategories.find(s => s.id.toLowerCase() === subLower || s.name.toLowerCase() === subLower || s.slug.toLowerCase() === subLower);
+        if (foundSub) {
+          return {
+            categoryId: parent.id,
+            subcategoryId: foundSub.id,
+            category: {
+              id: foundSub.id,
+              name: `${parent.name} › ${foundSub.name}`,
+              displayName: `${parent.name} › ${foundSub.name}`,
+              slug: parent.slug,
+              parentId: parent.id,
+              parentName: parent.name,
+              parent: { id: parent.id, name: parent.name, slug: parent.slug },
+              subCategory: foundSub
+            },
+            subcategory: foundSub
+          };
+        }
+      }
+      return {
+        categoryId: parent.id,
+        subcategoryId: null,
+        category: {
+          id: parent.id,
+          name: parent.name,
+          displayName: parent.name,
+          slug: parent.slug,
+          parentId: null,
+          parent: { id: parent.id, name: parent.name, slug: parent.slug }
+        },
+        subcategory: null
+      };
+    }
+
+    // Check if target matches one of the subcategories in this parent
+    const foundSub = parent.subCategories.find(s =>
+      s.id.toLowerCase() === targetLower ||
+      s.name.toLowerCase() === targetLower ||
+      s.slug.toLowerCase() === targetLower ||
+      targetLower.includes(s.name.toLowerCase()) ||
+      s.name.toLowerCase().includes(targetLower)
+    );
+    if (foundSub) {
+      return {
+        categoryId: parent.id,
+        subcategoryId: foundSub.id,
+        category: {
+          id: foundSub.id,
+          name: `${parent.name} › ${foundSub.name}`,
+          displayName: `${parent.name} › ${foundSub.name}`,
+          slug: parent.slug,
+          parentId: parent.id,
+          parentName: parent.name,
+          parent: { id: parent.id, name: parent.name, slug: parent.slug },
+          subCategory: foundSub
+        },
+        subcategory: foundSub
+      };
+    }
+  }
+
+  // 2. Check Firestore "categories" collection
+  try {
+    const docRef = db.collection("categories").doc(target);
+    const snap = await docRef.get();
+    if (snap.exists) {
+      const data = snap.data() as any;
+      if (data.parentId) {
+        const parentDoc = await db.collection("categories").doc(data.parentId).get();
+        const parentData = parentDoc.exists ? (parentDoc.data() as any) : null;
+        const parentName = parentData?.name || "Category";
+        return {
+          categoryId: data.parentId,
+          subcategoryId: snap.id,
+          category: {
+            id: snap.id,
+            name: `${parentName} › ${data.name}`,
+            displayName: `${parentName} › ${data.name}`,
+            slug: data.slug || generateSlug(data.name || snap.id),
+            parentId: data.parentId,
+            parentName,
+            parent: parentData ? { id: parentDoc.id, ...parentData } : null,
+            subCategory: { id: snap.id, ...data }
+          },
+          subcategory: { id: snap.id, ...data }
+        };
+      }
+      return {
+        categoryId: snap.id,
+        subcategoryId: null,
+        category: { id: snap.id, ...data, name: data.name || snap.id, slug: data.slug || generateSlug(data.name || snap.id) },
+        subcategory: null
+      };
+    }
+
+    // Query Firestore categories by slug or name
+    const allCategoriesSnap = await db.collection("categories").get();
+    let foundFirestore: any = null;
+    allCategoriesSnap.forEach(d => {
+      const dData = d.data() as any;
+      if (d.id.toLowerCase() === targetLower || (dData.slug && dData.slug.toLowerCase() === targetLower) || (dData.name && dData.name.toLowerCase() === targetLower)) {
+        foundFirestore = { id: d.id, ...dData };
+      }
+    });
+    if (foundFirestore) {
+      if (foundFirestore.parentId) {
+        const pDoc = await db.collection("categories").doc(foundFirestore.parentId).get();
+        const pData = pDoc.exists ? (pDoc.data() as any) : null;
+        const pName = pData?.name || "Category";
+        return {
+          categoryId: foundFirestore.parentId,
+          subcategoryId: foundFirestore.id,
+          category: {
+            id: foundFirestore.id,
+            name: `${pName} › ${foundFirestore.name}`,
+            displayName: `${pName} › ${foundFirestore.name}`,
+            slug: foundFirestore.slug || generateSlug(foundFirestore.name),
+            parentId: foundFirestore.parentId,
+            parentName: pName,
+            parent: pData ? { id: pDoc.id, ...pData } : null,
+            subCategory: foundFirestore
+          },
+          subcategory: foundFirestore
+        };
+      }
+      return {
+        categoryId: foundFirestore.id,
+        subcategoryId: null,
+        category: foundFirestore,
+        subcategory: null
+      };
+    }
+  } catch (err) {
+    console.warn("Firestore category lookup error:", err);
+  }
+
+  // 3. Fallback: Format clean display name
+  const cleanName = target.replace(/^cat-|^sub-/, "").replace(/[-_]+/g, " ");
+  const formattedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+  return {
+    categoryId: target,
+    subcategoryId: null,
+    category: {
+      id: target,
+      name: formattedName,
+      displayName: formattedName,
+      slug: generateSlug(formattedName)
+    },
+    subcategory: null
+  };
+}
+
+export async function resolveBrand(brandIdentifier?: string) {
+  if (!brandIdentifier) {
+    return {
+      brandId: "brand-cerave",
+      brand: { id: "brand-cerave", name: "CeraVe", slug: "cerave" }
+    };
+  }
+
+  const target = String(brandIdentifier).trim();
+  const targetLower = target.toLowerCase();
+
+  // 1. Check MASTER_BRANDS_DATA
+  const foundMaster = MASTER_BRANDS_DATA.find(b =>
+    b.id.toLowerCase() === targetLower ||
+    b.name.toLowerCase() === targetLower ||
+    b.slug.toLowerCase() === targetLower
+  );
+  if (foundMaster) {
+    return {
+      brandId: foundMaster.id,
+      brand: { id: foundMaster.id, name: foundMaster.name, slug: foundMaster.slug }
+    };
+  }
+
+  // 2. Check Firestore "brands" collection
+  try {
+    const docRef = db.collection("brands").doc(target);
+    const snap = await docRef.get();
+    if (snap.exists) {
+      const data = snap.data() as any;
+      return {
+        brandId: snap.id,
+        brand: { id: snap.id, ...data, name: data.name || snap.id, slug: data.slug || generateSlug(data.name || snap.id) }
+      };
+    }
+
+    const allBrandsSnap = await db.collection("brands").get();
+    let foundFirestore: any = null;
+    allBrandsSnap.forEach(d => {
+      const dData = d.data() as any;
+      if (d.id.toLowerCase() === targetLower || (dData.slug && dData.slug.toLowerCase() === targetLower) || (dData.name && dData.name.toLowerCase() === targetLower)) {
+        foundFirestore = { id: d.id, ...dData };
+      }
+    });
+    if (foundFirestore) {
+      return {
+        brandId: foundFirestore.id,
+        brand: foundFirestore
+      };
+    }
+  } catch (err) {
+    console.warn("Firestore brand lookup error:", err);
+  }
+
+  // 3. Fallback
+  const cleanName = target.replace(/^brand-/, "").replace(/[-_]+/g, " ");
+  const formattedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+  return {
+    brandId: target,
+    brand: { id: target, name: formattedName, slug: generateSlug(formattedName) }
+  };
+}
+
 // GET /api/categories
 router.get("/categories", async (req: Request, res: Response) => {
   try {
@@ -79,10 +457,21 @@ router.get("/categories", async (req: Request, res: Response) => {
     const parents = categoriesList.filter(c => !c.parentId);
     const subCategories = categoriesList.filter(c => c.parentId);
 
-    const result = parents.map(parent => ({
+    let result = parents.map(parent => ({
       ...parent,
       subCategories: subCategories.filter(sub => sub.parentId === parent.id)
     }));
+
+    // If Firestore has no categories or missing master categories, merge with MASTER_CATEGORIES_DATA
+    if (result.length === 0) {
+      result = MASTER_CATEGORIES_DATA;
+    } else {
+      MASTER_CATEGORIES_DATA.forEach(mc => {
+        if (!result.some(r => r.id === mc.id || r.slug === mc.slug || r.name.toLowerCase() === mc.name.toLowerCase())) {
+          result.push(mc);
+        }
+      });
+    }
 
     if (!isBypass) {
       categoriesCache.data = result;
@@ -318,6 +707,16 @@ router.get("/brands", async (req: Request, res: Response) => {
       } catch (_) {}
     }
 
+    if (brandsList.length === 0) {
+      brandsList = MASTER_BRANDS_DATA;
+    } else {
+      MASTER_BRANDS_DATA.forEach(mb => {
+        if (!brandsList.some(b => b.id === mb.id || b.slug === mb.slug || b.name.toLowerCase() === mb.name.toLowerCase())) {
+          brandsList.push(mb);
+        }
+      });
+    }
+
     if (!isBypass) {
       brandsCache.data = brandsList;
       brandsCache.expiry = Date.now() + CACHE_DURATION_MS;
@@ -495,9 +894,42 @@ const getProductsHandler = async (req: Request, res: Response) => {
           : [];
         const stockVal = data.stock !== undefined ? Number(data.stock) : (resolvedVariants.reduce((sum: number, v: any) => sum + (v.stock || 0), 0) || 50);
 
+        let finalCat = data.category;
+        let finalSubcat = data.subcategory;
+        if (!finalCat || !finalCat.name || finalCat.name === "Uncategorized") {
+          const autoResolved = MASTER_CATEGORIES_DATA.find(mc => 
+            mc.id === data.categoryId || 
+            mc.slug === data.categoryId ||
+            mc.subCategories.some(sc => sc.id === data.categoryId || sc.id === data.subcategoryId)
+          );
+          if (autoResolved) {
+            const foundSub = autoResolved.subCategories.find(sc => sc.id === data.categoryId || sc.id === data.subcategoryId);
+            finalCat = {
+              id: foundSub ? foundSub.id : autoResolved.id,
+              name: foundSub ? `${autoResolved.name} › ${foundSub.name}` : autoResolved.name,
+              displayName: foundSub ? `${autoResolved.name} › ${foundSub.name}` : autoResolved.name,
+              slug: autoResolved.slug,
+              parent: { id: autoResolved.id, name: autoResolved.name, slug: autoResolved.slug },
+              subCategory: foundSub || null
+            };
+            if (foundSub) finalSubcat = foundSub;
+          }
+        }
+
+        let finalBrand = data.brand;
+        if (!finalBrand || !finalBrand.name) {
+          const autoBrand = MASTER_BRANDS_DATA.find(mb => mb.id === data.brandId || mb.slug === data.brandId);
+          if (autoBrand) {
+            finalBrand = autoBrand;
+          }
+        }
+
         productsList.push({
           id: doc.id,
           ...data,
+          category: finalCat || data.category,
+          subcategory: finalSubcat || data.subcategory,
+          brand: finalBrand || data.brand,
           status: data.status || "Active",
           isActive: data.isActive !== undefined ? Boolean(data.isActive) : (statusLower === "active" || !data.status),
           inStock: data.inStock !== undefined ? Boolean(data.inStock) : (stockVal > 0),
@@ -765,6 +1197,32 @@ router.get("/products/:id", async (req: Request, res: Response) => {
       console.warn("Could not fetch related products for category", productData.categoryId, e);
     }
 
+    if (!productData.category || !productData.category.name || productData.category.name === "Uncategorized") {
+      const autoResolved = MASTER_CATEGORIES_DATA.find(mc =>
+        mc.id === productData.categoryId ||
+        mc.slug === productData.categoryId ||
+        mc.subCategories.some(sc => sc.id === productData.categoryId || sc.id === productData.subcategoryId)
+      );
+      if (autoResolved) {
+        const foundSub = autoResolved.subCategories.find(sc => sc.id === productData.categoryId || sc.id === productData.subcategoryId);
+        productData.category = {
+          id: foundSub ? foundSub.id : autoResolved.id,
+          name: foundSub ? `${autoResolved.name} › ${foundSub.name}` : autoResolved.name,
+          displayName: foundSub ? `${autoResolved.name} › ${foundSub.name}` : autoResolved.name,
+          slug: autoResolved.slug,
+          parent: { id: autoResolved.id, name: autoResolved.name, slug: autoResolved.slug },
+          subCategory: foundSub || null
+        };
+        if (foundSub) productData.subcategory = foundSub;
+      }
+    }
+    if (!productData.brand || !productData.brand.name) {
+      const autoBrand = MASTER_BRANDS_DATA.find(mb => mb.id === productData.brandId || mb.slug === productData.brandId);
+      if (autoBrand) {
+        productData.brand = autoBrand;
+      }
+    }
+
     const payload = { product: productData, relatedProducts };
 
     if (!isBypass) {
@@ -838,64 +1296,62 @@ router.post("/products/:id/reviews", async (req: Request, res: Response) => {
 });
 
 // POST /api/products (Admin only - Create product)
-router.post("/products", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: Request, res: Response) => {
+router.post("/products", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin", "Salesman"]) as any, async (req: Request, res: Response) => {
   try {
-    const { name, description, imageUrl, price, discountPrice, costPrice, stock, metaTitle, metaDescription, metaKeywords, campaignName, variants } = req.body;
+    const { name, description, imageUrl, imageUrl2, imageUrl3, imageUrl4, price, discountPrice, costPrice, stock, metaTitle, metaDescription, metaKeywords, campaignName, variants } = req.body;
     let brandId = req.body.brandId;
     let categoryId = req.body.categoryId;
+    let subcategoryId = req.body.subcategoryId;
     
     if (!name) {
       return res.status(400).json({ error: "Product name is required" });
     }
 
-    if (!brandId) {
-      const brandSnapshot = await db.collection("brands").limit(1).get();
-      if (!brandSnapshot.empty) {
-        brandId = brandSnapshot.docs[0].id;
-      }
-    }
-    if (!categoryId) {
-      const catSnapshot = await db.collection("categories").limit(1).get();
-      if (!catSnapshot.empty) {
-        categoryId = catSnapshot.docs[0].id;
-      }
-    }
+    // Resolve Category & Subcategory robustly
+    const resolvedCat = await resolveCategory(categoryId, subcategoryId);
+    const resolvedBrand = await resolveBrand(brandId);
+
+    const finalCategoryId = resolvedCat.categoryId || categoryId || "cat-skin";
+    const finalSubcategoryId = resolvedCat.subcategoryId || subcategoryId || null;
+    const categoryJson = resolvedCat.category;
+    const subcategoryJson = resolvedCat.subcategory;
+
+    const finalBrandId = resolvedBrand.brandId || brandId || "brand-cerave";
+    const brandJson = resolvedBrand.brand;
+
+    const numPrice = price !== undefined && price !== null && !isNaN(Number(price)) ? Number(price) : 0;
+    const numCostPrice = costPrice !== undefined && costPrice !== null && !isNaN(Number(costPrice)) ? Number(costPrice) : null;
+    const numDiscountPrice = discountPrice !== undefined && discountPrice !== null && !isNaN(Number(discountPrice)) ? Number(discountPrice) : null;
+    const numStock = stock !== undefined && stock !== null && !isNaN(Number(stock)) ? Number(stock) : 50;
 
     let variantCreateList = [];
     if (variants && Array.isArray(variants) && variants.length > 0) {
-      variantCreateList = variants.map((v: any) => ({
-        id: v.id || `var-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      variantCreateList = variants.map((v: any, idx: number) => ({
+        id: v.id || `var-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
         name: v.name || "Default",
-        price: parseFloat(v.price),
-        discountPrice: v.discountPrice ? parseFloat(v.discountPrice) : null,
-        costPrice: v.costPrice ? parseFloat(v.costPrice) : null,
-        stock: parseInt(v.stock) || 0,
+        price: v.price !== undefined && v.price !== null && !isNaN(Number(v.price)) ? parseFloat(v.price) : numPrice,
+        discountPrice: v.discountPrice ? parseFloat(v.discountPrice) : numDiscountPrice,
+        costPrice: v.costPrice ? parseFloat(v.costPrice) : numCostPrice,
+        stock: v.stock !== undefined && v.stock !== null && !isNaN(Number(v.stock)) ? parseInt(v.stock) : numStock,
         shadeColor: v.shadeColor || null,
         sizeValue: v.sizeValue || null,
         imageUrl: v.imageUrl || null,
         sku: v.sku || `SKU-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`
       }));
     } else {
-      if (!price) {
+      if (numPrice <= 0 && (!variants || variants.length === 0)) {
         return res.status(400).json({ error: "Price is required when variants are not specified" });
       }
       variantCreateList = [{
         id: `var-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
         name: "Default",
-        price: parseFloat(price),
-        discountPrice: discountPrice ? parseFloat(discountPrice) : null,
-        costPrice: costPrice ? parseFloat(costPrice) : null,
-        stock: parseInt(stock) || 50,
+        price: numPrice,
+        discountPrice: numDiscountPrice,
+        costPrice: numCostPrice,
+        stock: numStock,
         sku: `SKU-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`
       }];
     }
-
-    // Fetch category and brand denormalized info
-    const categoryDoc = await db.collection("categories").doc(categoryId).get();
-    const brandDoc = await db.collection("brands").doc(brandId).get();
-
-    const categoryJson = categoryDoc.exists ? { id: categoryDoc.id, ...categoryDoc.data() } : null;
-    const brandJson = brandDoc.exists ? { id: brandDoc.id, ...brandDoc.data() } : null;
 
     const docRef = db.collection("products").doc();
     const cleanSlug = req.body.slug ? generateSlug(req.body.slug) : generateSlug(name);
@@ -904,15 +1360,20 @@ router.post("/products", authenticateJWT as any, requireRole(["SuperAdmin", "Man
       name,
       slug: cleanSlug,
       description: description || "",
-      brandId,
+      brandId: finalBrandId,
       brand: brandJson,
-      categoryId,
+      categoryId: finalCategoryId,
+      subcategoryId: finalSubcategoryId,
       category: categoryJson,
-      price: variantCreateList[0]?.price || (price ? parseFloat(price) : 0),
-      discountPrice: variantCreateList[0]?.discountPrice !== undefined ? variantCreateList[0]?.discountPrice : (discountPrice ? parseFloat(discountPrice) : null),
-      costPrice: variantCreateList[0]?.costPrice !== undefined ? variantCreateList[0]?.costPrice : (costPrice ? parseFloat(costPrice) : null),
-      stock: variantCreateList[0]?.stock !== undefined ? variantCreateList[0]?.stock : (stock ? parseInt(stock) : 50),
+      subcategory: subcategoryJson,
+      price: variantCreateList[0]?.price || numPrice,
+      discountPrice: variantCreateList[0]?.discountPrice !== undefined ? variantCreateList[0]?.discountPrice : numDiscountPrice,
+      costPrice: variantCreateList[0]?.costPrice !== undefined ? variantCreateList[0]?.costPrice : numCostPrice,
+      stock: variantCreateList[0]?.stock !== undefined ? variantCreateList[0]?.stock : numStock,
       imageUrl: primaryImgUrl,
+      imageUrl2: imageUrl2 || null,
+      imageUrl3: imageUrl3 || null,
+      imageUrl4: imageUrl4 || null,
       status: "Active",
       isActive: true,
       inStock: true,
@@ -923,9 +1384,9 @@ router.post("/products", authenticateJWT as any, requireRole(["SuperAdmin", "Man
       images: (() => {
         const list: any[] = [];
         if (imageUrl) list.push({ id: `img-${Date.now()}-1`, url: imageUrl, isPrimary: true });
-        if (req.body.imageUrl2) list.push({ id: `img-${Date.now()}-2`, url: req.body.imageUrl2, isPrimary: false });
-        if (req.body.imageUrl3) list.push({ id: `img-${Date.now()}-3`, url: req.body.imageUrl3, isPrimary: false });
-        if (req.body.imageUrl4) list.push({ id: `img-${Date.now()}-4`, url: req.body.imageUrl4, isPrimary: false });
+        if (imageUrl2) list.push({ id: `img-${Date.now()}-2`, url: imageUrl2, isPrimary: false });
+        if (imageUrl3) list.push({ id: `img-${Date.now()}-3`, url: imageUrl3, isPrimary: false });
+        if (imageUrl4) list.push({ id: `img-${Date.now()}-4`, url: imageUrl4, isPrimary: false });
         if (Array.isArray(req.body.images)) {
           req.body.images.forEach((img: any, idx: number) => {
             const url = typeof img === "string" ? img : img?.url;
@@ -950,6 +1411,24 @@ router.post("/products", authenticateJWT as any, requireRole(["SuperAdmin", "Man
     };
 
     await docRef.set(product);
+    try {
+      await prisma.product.create({
+        data: {
+          id: docRef.id,
+          name: product.name,
+          slug: product.slug,
+          description: product.description,
+          price: product.price,
+          discountPrice: product.discountPrice,
+          stock: product.stock,
+          imageUrl: product.imageUrl,
+          brandId: product.brandId,
+          categoryId: product.categoryId,
+          status: product.status || "Active"
+        }
+      }).catch(() => null);
+    } catch (_) {}
+
     clearProductsCache();
     invalidatePrismaCache("products");
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
@@ -964,7 +1443,7 @@ router.post("/products", authenticateJWT as any, requireRole(["SuperAdmin", "Man
 const updateProductHandler = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, description, brandId, categoryId, imageUrl, price, discountPrice, costPrice, stock, metaTitle, metaDescription, metaKeywords, campaignName, variants } = req.body;
+    const { name, description, brandId, categoryId, subcategoryId, imageUrl, imageUrl2, imageUrl3, imageUrl4, price, discountPrice, costPrice, stock, metaTitle, metaDescription, metaKeywords, campaignName, variants } = req.body;
 
     const productDoc = await db.collection("products").doc(id as string).get();
     if (!productDoc.exists) {
@@ -974,16 +1453,31 @@ const updateProductHandler = async (req: Request, res: Response) => {
     const currentProduct = productDoc.data() as any;
 
     let brandJson = currentProduct.brand;
-    if (brandId && brandId !== currentProduct.brandId) {
-      const brandDoc = await db.collection("brands").doc(brandId).get();
-      brandJson = brandDoc.exists ? { id: brandDoc.id, ...brandDoc.data() } : null;
+    let finalBrandId = currentProduct.brandId;
+    if (brandId !== undefined) {
+      const resolvedBrand = await resolveBrand(brandId);
+      brandJson = resolvedBrand.brand;
+      finalBrandId = resolvedBrand.brandId || brandId;
     }
 
     let categoryJson = currentProduct.category;
-    if (categoryId && categoryId !== currentProduct.categoryId) {
-      const categoryDoc = await db.collection("categories").doc(categoryId).get();
-      categoryJson = categoryDoc.exists ? { id: categoryDoc.id, ...categoryDoc.data() } : null;
+    let subcategoryJson = currentProduct.subcategory;
+    let finalCategoryId = currentProduct.categoryId;
+    let finalSubcategoryId = currentProduct.subcategoryId;
+    if (categoryId !== undefined || subcategoryId !== undefined) {
+      const targetCatId = categoryId !== undefined ? categoryId : currentProduct.categoryId;
+      const targetSubId = subcategoryId !== undefined ? subcategoryId : currentProduct.subcategoryId;
+      const resolvedCat = await resolveCategory(targetCatId, targetSubId);
+      categoryJson = resolvedCat.category;
+      subcategoryJson = resolvedCat.subcategory;
+      finalCategoryId = resolvedCat.categoryId || targetCatId;
+      finalSubcategoryId = resolvedCat.subcategoryId || targetSubId || null;
     }
+
+    const numPrice = price !== undefined && price !== null && !isNaN(Number(price)) ? Number(price) : (currentProduct.price || 0);
+    const numCostPrice = costPrice !== undefined && costPrice !== null && !isNaN(Number(costPrice)) ? Number(costPrice) : (currentProduct.costPrice || null);
+    const numDiscountPrice = discountPrice !== undefined && discountPrice !== null && !isNaN(Number(discountPrice)) ? Number(discountPrice) : (currentProduct.discountPrice || null);
+    const numStock = stock !== undefined && stock !== null && !isNaN(Number(stock)) ? Number(stock) : (currentProduct.stock || 50);
 
     let updatedVariants = currentProduct.variants || [];
     if (variants && Array.isArray(variants)) {
@@ -991,44 +1485,61 @@ const updateProductHandler = async (req: Request, res: Response) => {
         updatedVariants = [{
           id: currentProduct.variants?.[0]?.id || `var-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
           name: "Default",
-          price: price !== undefined ? parseFloat(price) : (currentProduct.price || 0),
-          discountPrice: discountPrice !== undefined ? (discountPrice ? parseFloat(discountPrice) : null) : (currentProduct.discountPrice || null),
-          costPrice: costPrice !== undefined ? (costPrice ? parseFloat(costPrice) : null) : (currentProduct.costPrice || null),
-          stock: stock !== undefined ? parseInt(stock) : (currentProduct.stock || 50),
+          price: numPrice,
+          discountPrice: numDiscountPrice,
+          costPrice: numCostPrice,
+          stock: numStock,
           shadeColor: null,
           sizeValue: null,
           imageUrl: imageUrl || currentProduct.imageUrl || null,
           sku: currentProduct.variants?.[0]?.sku || `SKU-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`
         }];
       } else {
-        updatedVariants = variants.map((v: any) => ({
-          id: v.id || `var-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        updatedVariants = variants.map((v: any, idx: number) => ({
+          id: v.id || `var-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
           name: v.name || "Default",
-          price: v.price !== undefined ? parseFloat(v.price) : 0,
-          discountPrice: v.discountPrice ? parseFloat(v.discountPrice) : null,
-          costPrice: v.costPrice ? parseFloat(v.costPrice) : null,
-          stock: v.stock !== undefined ? parseInt(v.stock) : 50,
+          price: (idx === 0 && price !== undefined) ? numPrice : (v.price !== undefined && v.price !== null && !isNaN(Number(v.price)) ? parseFloat(v.price) : numPrice),
+          discountPrice: (idx === 0 && discountPrice !== undefined) ? numDiscountPrice : (v.discountPrice ? parseFloat(v.discountPrice) : null),
+          costPrice: (idx === 0 && costPrice !== undefined) ? numCostPrice : (v.costPrice ? parseFloat(v.costPrice) : null),
+          stock: (idx === 0 && stock !== undefined) ? numStock : (v.stock !== undefined && v.stock !== null && !isNaN(Number(v.stock)) ? parseInt(v.stock) : numStock),
           shadeColor: v.shadeColor || null,
           sizeValue: v.sizeValue || null,
           imageUrl: v.imageUrl || null,
           sku: v.sku || `SKU-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`
         }));
       }
-    } else if (price) {
+    } else if (price !== undefined || stock !== undefined || costPrice !== undefined || discountPrice !== undefined) {
       if (updatedVariants.length > 0) {
-        updatedVariants[0].price = parseFloat(price);
-        updatedVariants[0].discountPrice = discountPrice ? parseFloat(discountPrice) : null;
-        updatedVariants[0].costPrice = costPrice ? parseFloat(costPrice) : null;
-        updatedVariants[0].stock = stock !== undefined ? parseInt(stock) : updatedVariants[0].stock;
+        if (price !== undefined) updatedVariants[0].price = numPrice;
+        if (discountPrice !== undefined) updatedVariants[0].discountPrice = numDiscountPrice;
+        if (costPrice !== undefined) updatedVariants[0].costPrice = numCostPrice;
+        if (stock !== undefined) updatedVariants[0].stock = numStock;
+      } else {
+        updatedVariants = [{
+          id: `var-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          name: "Default",
+          price: numPrice,
+          discountPrice: numDiscountPrice,
+          costPrice: numCostPrice,
+          stock: numStock,
+          sku: `SKU-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`
+        }];
       }
     }
 
-    // Rebuild images strictly from Main Cover URL + active remaining variants' images
+    // Rebuild images
     let updatedImages: any[] = [];
-    const primaryUrl = imageUrl || currentProduct.imageUrl || currentProduct.images?.find((i: any) => i.isPrimary)?.url || currentProduct.images?.[0]?.url;
+    const primaryUrl = imageUrl !== undefined ? imageUrl : (currentProduct.imageUrl || currentProduct.images?.[0]?.url);
     if (primaryUrl) {
       updatedImages.push({ id: `img-primary-${id}`, url: primaryUrl, isPrimary: true });
     }
+    const finalImg2 = imageUrl2 !== undefined ? imageUrl2 : currentProduct.imageUrl2;
+    if (finalImg2) updatedImages.push({ id: `img-2-${id}`, url: finalImg2, isPrimary: false });
+    const finalImg3 = imageUrl3 !== undefined ? imageUrl3 : currentProduct.imageUrl3;
+    if (finalImg3) updatedImages.push({ id: `img-3-${id}`, url: finalImg3, isPrimary: false });
+    const finalImg4 = imageUrl4 !== undefined ? imageUrl4 : currentProduct.imageUrl4;
+    if (finalImg4) updatedImages.push({ id: `img-4-${id}`, url: finalImg4, isPrimary: false });
+
     updatedVariants.forEach((v: any, idx: number) => {
       if (v.imageUrl && v.imageUrl.trim() !== "" && !updatedImages.some(img => img.url === v.imageUrl)) {
         updatedImages.push({ id: `img-var-${v.id || idx}`, url: v.imageUrl, isPrimary: false });
@@ -1047,26 +1558,66 @@ const updateProductHandler = async (req: Request, res: Response) => {
       name: name !== undefined ? name : currentProduct.name,
       slug: cleanSlug,
       description: description !== undefined ? description : currentProduct.description,
-      brandId: brandId !== undefined ? brandId : currentProduct.brandId,
+      brandId: finalBrandId,
       brand: brandJson,
-      categoryId: categoryId !== undefined ? categoryId : currentProduct.categoryId,
+      categoryId: finalCategoryId,
+      subcategoryId: finalSubcategoryId,
       category: categoryJson,
+      subcategory: subcategoryJson,
       metaTitle: metaTitle !== undefined ? metaTitle : currentProduct.metaTitle,
       metaDescription: metaDescription !== undefined ? metaDescription : currentProduct.metaDescription,
       metaKeywords: metaKeywords !== undefined ? metaKeywords : currentProduct.metaKeywords,
       campaignName: campaignName !== undefined ? campaignName : currentProduct.campaignName,
       status: req.body.status || currentProduct.status || "Active",
-      isActive: req.body.isActive !== undefined ? Boolean(req.body.isActive) : true,
-      inStock: req.body.inStock !== undefined ? Boolean(req.body.inStock) : true,
+      isActive: req.body.isActive !== undefined ? Boolean(req.body.isActive) : (currentProduct.isActive !== undefined ? currentProduct.isActive : true),
+      inStock: req.body.inStock !== undefined ? Boolean(req.body.inStock) : (currentProduct.inStock !== undefined ? currentProduct.inStock : true),
+      imageUrl: primaryUrl || currentProduct.imageUrl || "/placeholder-product.svg",
+      imageUrl2: finalImg2 || null,
+      imageUrl3: finalImg3 || null,
+      imageUrl4: finalImg4 || null,
       images: updatedImages,
       variants: updatedVariants,
-      price: updatedVariants[0]?.price || 0,
-      discountPrice: updatedVariants[0]?.discountPrice || null,
-      stock: updatedVariants[0]?.stock || 0,
+      price: numPrice,
+      discountPrice: numDiscountPrice,
+      costPrice: numCostPrice,
+      stock: numStock,
       updatedAt: new Date().toISOString(),
     };
 
     await db.collection("products").doc(id as string).set(updatedProduct);
+
+    // Sync with Prisma
+    try {
+      await prisma.product.upsert({
+        where: { id: String(id) },
+        create: {
+          id: String(id),
+          name: updatedProduct.name,
+          slug: updatedProduct.slug,
+          description: updatedProduct.description,
+          price: updatedProduct.price,
+          discountPrice: updatedProduct.discountPrice,
+          stock: updatedProduct.stock,
+          imageUrl: updatedProduct.imageUrl,
+          brandId: updatedProduct.brandId,
+          categoryId: updatedProduct.categoryId,
+          status: updatedProduct.status || "Active"
+        },
+        update: {
+          name: updatedProduct.name,
+          slug: updatedProduct.slug,
+          description: updatedProduct.description,
+          price: updatedProduct.price,
+          discountPrice: updatedProduct.discountPrice,
+          stock: updatedProduct.stock,
+          imageUrl: updatedProduct.imageUrl,
+          brandId: updatedProduct.brandId,
+          categoryId: updatedProduct.categoryId,
+          status: updatedProduct.status || "Active"
+        }
+      }).catch(() => null);
+    } catch (_) {}
+
     clearProductsCache();
     invalidatePrismaCache("products");
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
@@ -1077,10 +1628,10 @@ const updateProductHandler = async (req: Request, res: Response) => {
   }
 };
 
-router.put("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, updateProductHandler);
-router.patch("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, updateProductHandler);
-router.put("/admin/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, updateProductHandler);
-router.patch("/admin/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, updateProductHandler);
+router.put("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin", "Salesman"]) as any, updateProductHandler);
+router.patch("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin", "Salesman"]) as any, updateProductHandler);
+router.put("/admin/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin", "Salesman"]) as any, updateProductHandler);
+router.patch("/admin/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin", "Salesman"]) as any, updateProductHandler);
 
 // DELETE /api/products/:id & /api/admin/products/:id (Admin only - Delete product & clean uploaded images)
 const deleteProductHandler = async (req: Request, res: Response) => {
@@ -1158,8 +1709,8 @@ const deleteProductHandler = async (req: Request, res: Response) => {
   }
 };
 
-router.delete("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, deleteProductHandler);
-router.delete("/admin/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, deleteProductHandler);
+router.delete("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin", "Salesman"]) as any, deleteProductHandler);
+router.delete("/admin/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin", "Salesman"]) as any, deleteProductHandler);
 
 // POST /api/products/bulk-delete (Admin only)
 const bulkDeleteProductsHandler = async (req: Request, res: Response) => {
