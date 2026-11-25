@@ -3,7 +3,8 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useApp } from "../../context/AppContext";
-import { clearAllCache, triggerGlobalDataSync, API_BASE, fetchWithCache, safeImageUrl, idbGet, idbSet, compressBannerImage } from "../../utils/api";
+import { clearAllCache, triggerGlobalDataSync, API_BASE, API_ROOT, fetchWithCache, safeImageUrl, idbGet, idbSet, compressBannerImage, purgeLiteSpeedCache } from "../../utils/api";
+import { io } from "socket.io-client";
 
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import SocketIoPromoBroadcaster from "../../components/SocketIoPromoBroadcaster";
@@ -53,7 +54,7 @@ export default function ValobasaAdminPanel() {
     if (target === "top-selling-products") target = "top-selling";
     if (target === "customer-messages" || target === "messages") target = "customer-messages";
     if (target === "damage" || target === "returns" || target === "damage-and-returns") target = "damage-returns";
-    if (target === "live-chat" || target === "chat") target = "live-chat";
+    if (target === "live-chat" || target === "chat" || target === "customer-support" || target === "support") target = "live-chat";
     if (target === "combo-builder" || target === "combos" || target === "combo") target = "combo-builder";
 
     if (target !== activeTab) {
@@ -112,7 +113,7 @@ export default function ValobasaAdminPanel() {
       try {
         const stored = localStorage.getItem("gg_card_links");
         if (stored) return JSON.parse(stored);
-      } catch (e) {}
+      } catch (e) { }
     }
     return {};
   });
@@ -172,7 +173,7 @@ export default function ValobasaAdminPanel() {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
-    } catch (e) {}
+    } catch (e) { }
     return DEFAULT_HERO_BANNERS_LIST;
   };
 
@@ -219,7 +220,7 @@ export default function ValobasaAdminPanel() {
               resolve(webp);
               return;
             }
-          } catch (_) {}
+          } catch (_) { }
           resolve(canvas.toDataURL("image/jpeg", 0.88));
         };
         img.onerror = () => {
@@ -268,7 +269,7 @@ export default function ValobasaAdminPanel() {
       try {
         const saved = localStorage.getItem("gg_damaged_products_log");
         if (saved) return JSON.parse(saved);
-      } catch (e) {}
+      } catch (e) { }
     }
     return [
       { id: "dmg-1", productName: "Himalaya Brightening Body Lotion 200ml", qty: 2, type: "Damaged in Shipping", lossAmount: 580, date: "2026-07-28" },
@@ -281,7 +282,7 @@ export default function ValobasaAdminPanel() {
     if (typeof window !== "undefined") {
       try {
         localStorage.setItem("gg_damaged_products_log", JSON.stringify(logs));
-      } catch (e) {}
+      } catch (e) { }
     }
   };
   const [damageForm, setDamageForm] = useState({ productName: "", qty: "1", type: "Damaged in Shipping", lossAmount: "" });
@@ -396,7 +397,7 @@ export default function ValobasaAdminPanel() {
           }
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const saveAvailableOffers = async (updated: any[]) => {
@@ -418,6 +419,24 @@ export default function ValobasaAdminPanel() {
   // Coupons
   const [couponList, setCouponList] = useState<any[]>([]);
   const [couponForm, setCouponForm] = useState({ id: "", code: "", discountType: "Percentage", discountValue: "", minOrderValue: "0", maxDiscount: "", expiryDate: "", usageLimit: "1", imageUrl: "" });
+
+  // LiteSpeed Cache Clean State & Manual Purge Handler
+  const [isPurgingLiteSpeed, setIsPurgingLiteSpeed] = useState(false);
+  const handlePurgeLiteSpeedCache = async () => {
+    setIsPurgingLiteSpeed(true);
+    try {
+      const res = await purgeLiteSpeedCache();
+      if (res.success) {
+        alert("⚡ LiteSpeed Cache Purged Successfully!\nAll visitors will immediately receive the latest updated content.");
+      } else {
+        alert("LiteSpeed Purge Status: " + (res.message || "Purge signal completed."));
+      }
+    } catch (e: any) {
+      alert("Purge signal sent to LiteSpeed web server.");
+    } finally {
+      setIsPurgingLiteSpeed(false);
+    }
+  };
 
   // Master Homepage Banners & Card Slots (35 Total Distinct Slots across Homepage)
   const MASTER_HOMEPAGE_BANNERS = [
@@ -912,7 +931,7 @@ export default function ValobasaAdminPanel() {
           if (k.startsWith("gg_cache_")) localStorage.removeItem(k);
         });
         localStorage.setItem("gg_frontend_home_banners", JSON.stringify(bannersList));
-      } catch (_) {}
+      } catch (_) { }
     } finally {
       window.dispatchEvent(new Event("gg_home_banners_updated"));
       window.dispatchEvent(new Event("storage"));
@@ -964,12 +983,26 @@ export default function ValobasaAdminPanel() {
       if (!b || !b.id) return;
       const isDeleted = deletedIds.includes(b.id) || (b.page && deletedIds.includes(b.page));
 
-      if (map.has(b.id)) {
-        const existing = map.get(b.id);
-        map.set(b.id, {
+      // Normalize legacy slot IDs to avoid duplicate items
+      let resolvedId = b.id;
+      const bPageLower = (b.page || "").toLowerCase().trim();
+      const bIdLower = (b.id || "").toLowerCase().trim();
+
+      if (bIdLower === "cat-makeup" || bIdLower === "catcardmakeup" || bPageLower.includes("makeup") || bPageLower.includes("cosmetic")) resolvedId = "cat-card-makeup";
+      else if (bIdLower === "cat-skincare" || bIdLower === "cat-skin" || bIdLower === "catcardskin" || bPageLower.includes("skin")) resolvedId = "cat-card-skin";
+      else if (bIdLower === "cat-haircare" || bIdLower === "cat-hair" || bIdLower === "catcardhair" || bPageLower.includes("hair")) resolvedId = "cat-card-hair";
+      else if (bIdLower === "cat-mombaby" || bIdLower === "cat-mom-baby" || bIdLower === "catcardmombaby" || bPageLower.includes("mom")) resolvedId = "cat-card-mom-baby";
+      else if (bIdLower === "cat-fragrance" || bIdLower === "catcardfragrance" || bPageLower.includes("fragran") || bPageLower.includes("fregnan") || bPageLower.includes("perfume")) resolvedId = "cat-card-fragrance";
+      else if (bIdLower === "cat-undergarments" || bIdLower === "catcardundergarments" || bPageLower.includes("undergarment")) resolvedId = "cat-card-undergarments";
+      else if (bIdLower === "cat-accessories" || bIdLower === "cat-personal-care" || bIdLower === "catcardpersonalcare" || bPageLower.includes("personal") || bPageLower.includes("bath")) resolvedId = "cat-card-personal-care";
+      else if (bIdLower === "cat-kbeauty" || bIdLower === "cat-combo" || bIdLower === "catcardcombo" || bPageLower.includes("combo")) resolvedId = "cat-card-combo";
+
+      if (map.has(resolvedId)) {
+        const existing = map.get(resolvedId);
+        map.set(resolvedId, {
           ...existing,
           ...b,
-          id: b.id,
+          id: resolvedId,
           imageUrl: isDeleted ? "" : (b.imageUrl ?? existing.imageUrl),
           mobileImageUrl: isDeleted ? "" : (b.mobileImageUrl ?? existing.mobileImageUrl),
           tabletImageUrl: isDeleted ? "" : (b.tabletImageUrl ?? existing.tabletImageUrl),
@@ -978,7 +1011,8 @@ export default function ValobasaAdminPanel() {
       }
 
       const matchedMaster = MASTER_HOMEPAGE_BANNERS.find(
-        (m) => m.page.toLowerCase().trim() === (b.page || "").toLowerCase().trim()
+        (m) => m.page.toLowerCase().trim() === (b.page || "").toLowerCase().trim() ||
+               m.id.toLowerCase().trim() === resolvedId.toLowerCase().trim()
       );
       if (matchedMaster) {
         const existing = map.get(matchedMaster.id) || matchedMaster;
@@ -1015,7 +1049,7 @@ export default function ValobasaAdminPanel() {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) return mergeBannersWithMaster(parsed);
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     return mergeBannersWithMaster([]);
   });
@@ -1301,6 +1335,7 @@ export default function ValobasaAdminPanel() {
   const [manualOrderSelectedProductId, setManualOrderSelectedProductId] = useState("");
   const [manualOrderDeliveryFee, setManualOrderDeliveryFee] = useState("70");
   const [manualOrderDiscount, setManualOrderDiscount] = useState("0");
+  const [manualOrderPaidAmount, setManualOrderPaidAmount] = useState("");
   const [isSubmittingManualOrder, setIsSubmittingManualOrder] = useState(false);
 
   // Product Add Form (Supports up to 4 images)
@@ -1334,7 +1369,7 @@ export default function ValobasaAdminPanel() {
     META_PIXEL_ID: "921781274061851", META_CAPI_TOKEN: "", GA4_MEASUREMENT_ID: "G-533220314", GTM_CONTAINER_ID: "GTM-W78SB3GC",
     SMS_PROVIDER_URL: "", SMS_API_KEY: "", SMS_SENDER_ID: "", SMS_TEMPLATE_ORDER_PLACED: "",
     SMS_TEMPLATE_ORDER_SHIPPED: "", COURIER_PROVIDER: "Pathao", COURIER_API_SECRET: "",
-    COURIER_CLIENT_ID: "", COURIER_STORE_ID: "", PATHAO_CLIENT_ID: "4zbqVlrdpr", PATHAO_CLIENT_SECRET: "wKrjXWP5g5M1gPl8EffHHv29XuXcsNorJXbC12rA",
+    COURIER_CLIENT_ID: "", COURIER_STORE_ID: "", PATHAO_CLIENT_ID: "", PATHAO_CLIENT_SECRET: "",
     PATHAO_CLIENT_EMAIL: "", PATHAO_CLIENT_PASSWORD: "", PATHAO_STORE_ID: "",
     PATHAO_SENDER_NAME: "GlowGoodly Store", PATHAO_SENDER_PHONE: "01700000000",
     STEADFAST_API_KEY: "", STEADFAST_SECRET_KEY: "", STEADFAST_STORE_ID: "", STEADFAST_SENDER_PHONE: "",
@@ -1528,11 +1563,11 @@ export default function ValobasaAdminPanel() {
       let res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          email: email.trim(), 
-          password: password.trim(), 
+        body: JSON.stringify({
+          email: email.trim(),
+          password: password.trim(),
           recaptchaToken: effectiveCaptcha,
-          isAdminLogin: true 
+          isAdminLogin: true
         })
       });
       if (!res.ok && typeof window !== "undefined" && window.location.hostname === "localhost") {
@@ -1540,17 +1575,17 @@ export default function ValobasaAdminPanel() {
           const fallbackRes = await fetch(`http://localhost:5000/api/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-              email: email.trim(), 
-              password: password.trim(), 
+            body: JSON.stringify({
+              email: email.trim(),
+              password: password.trim(),
               recaptchaToken: effectiveCaptcha,
-              isAdminLogin: true 
+              isAdminLogin: true
             })
           });
           if (fallbackRes.ok) {
             res = fallbackRes;
           }
-        } catch (e2) {}
+        } catch (e2) { }
       }
       const data = await res.json();
       if (res.ok && data.token && data.user) {
@@ -1587,8 +1622,8 @@ export default function ValobasaAdminPanel() {
           const fallbackRes = await fetch(`http://localhost:5000/api/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-              email: email.trim(), 
+            body: JSON.stringify({
+              email: email.trim(),
               password: password.trim(),
               recaptchaToken: effectiveCaptcha,
               isAdminLogin: true
@@ -1615,7 +1650,7 @@ export default function ValobasaAdminPanel() {
               return;
             }
           }
-        } catch (e3) {}
+        } catch (e3) { }
       }
       setLoginError(err?.message || "Login failed. Please try again.");
     }
@@ -1631,7 +1666,7 @@ export default function ValobasaAdminPanel() {
 
     let savedUser = user;
     if (!savedUser && savedUserStr) {
-      try { savedUser = JSON.parse(savedUserStr); } catch (e) {}
+      try { savedUser = JSON.parse(savedUserStr); } catch (e) { }
     }
 
     const userRole = (savedUser?.role || "").toLowerCase();
@@ -1665,7 +1700,7 @@ export default function ValobasaAdminPanel() {
             setLiveChatUnreadCount(unread);
           }
         }
-      } catch (e) {}
+      } catch (e) { }
     };
     fetchChatCount();
     const interval = setInterval(fetchChatCount, 5000);
@@ -2277,8 +2312,13 @@ export default function ValobasaAdminPanel() {
         total: item.total
       }));
 
+      const itemsSubtotal = itemsPayload.reduce((acc: number, i: any) => acc + (i.total || 0), 0);
       const deliveryFee = Math.max(0, parseFloat(manualOrderDeliveryFee) || 0);
       const discount = Math.max(0, parseFloat(manualOrderDiscount) || 0);
+      const grandTotal = Math.max(0, itemsSubtotal + deliveryFee - discount);
+      const paidVal = Math.max(0, parseFloat(manualOrderPaidAmount) || 0);
+      const dueVal = Math.max(0, grandTotal - paidVal);
+      const computedPaymentStatus = (paidVal >= grandTotal && grandTotal > 0) ? "Paid" : (paidVal > 0 ? "Partial Paid" : manualOrderCustomer.paymentStatus);
 
       const res = await fetch(`${API_BASE}/orders`, {
         method: "POST",
@@ -2291,10 +2331,14 @@ export default function ValobasaAdminPanel() {
           zone: manualOrderCustomer.zone,
           deliveryZone: manualOrderCustomer.zone,
           paymentMethod: manualOrderCustomer.paymentMethod,
-          paymentStatus: manualOrderCustomer.paymentStatus,
+          paymentStatus: computedPaymentStatus,
           shippingFee: deliveryFee,
           discount: discount,
-          notes: manualOrderCustomer.notes || "POS / Manual Order by Admin",
+          paidAmount: paidVal,
+          dueAmount: dueVal,
+          notes: manualOrderCustomer.notes
+            ? `${manualOrderCustomer.notes}${paidVal > 0 ? ` [Paid: Tk ${paidVal}, Due: Tk ${dueVal}]` : ''}`
+            : (paidVal > 0 ? `POS Order [Paid: Tk ${paidVal}, Due: Tk ${dueVal}]` : "POS / Manual Order by Admin"),
           isManualOrder: true,
           items: itemsPayload
         })
@@ -2302,9 +2346,13 @@ export default function ValobasaAdminPanel() {
 
       if (res.ok) {
         const data = await res.json();
-        const createdOrder = data.order;
+        const createdOrder = {
+          ...data.order,
+          paidAmount: paidVal,
+          dueAmount: dueVal
+        };
         alert(`🎉 Order #${createdOrder.orderNumber} created successfully! Stock has been deducted.`);
-        
+
         // Reset form
         setManualOrderModalOpen(false);
         setManualOrderItems([]);
@@ -2320,6 +2368,7 @@ export default function ValobasaAdminPanel() {
         });
         setManualOrderDeliveryFee("70");
         setManualOrderDiscount("0");
+        setManualOrderPaidAmount("");
 
         // Refresh data in background
         clearAllCache();
@@ -2657,7 +2706,7 @@ export default function ValobasaAdminPanel() {
             try {
               const webp = canvas.toDataURL("image/webp", 0.85);
               if (webp && webp.startsWith("data:image/webp")) return resolve(webp);
-            } catch (_) {}
+            } catch (_) { }
             resolve(canvas.toDataURL("image/jpeg", 0.88));
           } catch (e) {
             resolve(src);
@@ -2773,7 +2822,7 @@ export default function ValobasaAdminPanel() {
             const arr: string[] = JSON.parse(stored);
             localStorage.setItem("gg_deleted_banner_ids", JSON.stringify(arr.filter(x => x !== newSlide.id && x !== newSlide.title)));
           }
-        } catch (_) {}
+        } catch (_) { }
       }
 
       // 2. Save directly in frontend hero banners store
@@ -2860,7 +2909,7 @@ export default function ValobasaAdminPanel() {
           const arr: string[] = stored ? JSON.parse(stored) : [];
           if (!arr.includes(banner.id)) arr.push(banner.id);
           localStorage.setItem("gg_deleted_banner_ids", JSON.stringify(arr));
-        } catch (_) {}
+        } catch (_) { }
       }
 
       // Also remove from gg_frontend_home_banners & banners
@@ -3361,7 +3410,7 @@ export default function ValobasaAdminPanel() {
             const filtered = arr.filter(x => x !== idToSave && x !== pageToSave && x !== newBanner.title);
             localStorage.setItem("gg_deleted_banner_ids", JSON.stringify(filtered));
           }
-        } catch (e) {}
+        } catch (e) { }
       }
 
       // 2. If it is a Hero slide, also update hero banners storage
@@ -3400,42 +3449,37 @@ export default function ValobasaAdminPanel() {
       const pageKey = bannerToDelete?.page;
       const isMasterSlot = MASTER_HOMEPAGE_BANNERS.some((m) => m.id === id || m.page === pageKey) || id.startsWith("hero-slide-");
 
+      const aliasKeys = [id];
+      if (id.startsWith("cat-card-")) aliasKeys.push(id.replace("cat-card-", "cat-"));
+      if (id.startsWith("cat-") && !id.startsWith("cat-card-")) aliasKeys.push(id.replace("cat-", "cat-card-"));
+      if (pageKey) aliasKeys.push(pageKey);
+      if (bannerToDelete?.title) aliasKeys.push(bannerToDelete.title);
+
       if (typeof window !== "undefined") {
         try {
           const stored = localStorage.getItem("gg_deleted_banner_ids");
           const arr: string[] = stored ? JSON.parse(stored) : [];
-          if (!arr.includes(id)) arr.push(id);
-          // Never add multi-item section names like "Hero Slides" to deleted IDs!
-          if (pageKey && pageKey !== "Hero Slides" && !pageKey.includes("Category:") && !pageKey.includes("Concern:") && !arr.includes(pageKey)) {
-            arr.push(pageKey);
-          }
+          aliasKeys.forEach(k => {
+            if (k && k !== "Hero Slides" && !arr.includes(k)) arr.push(k);
+          });
           localStorage.setItem("gg_deleted_banner_ids", JSON.stringify(arr));
-        } catch (e) {}
+        } catch (e) { }
       }
 
-      // If it's a Hero Slide, clear its image from hero banners store
-      if (bannerToDelete?.page === "Hero Slides" || id.startsWith("hero-slide-")) {
-        const heroList = getFrontendHeroBanners();
-        const updatedHero = isMasterSlot
-          ? heroList.map((h: any) => h.id === id ? { ...h, mediaUrl: "", imageUrl: "", mobileImageUrl: "", tabletImageUrl: "" } : h)
-          : heroList.filter((h: any) => h.id !== id);
-        saveFrontendHeroBanners(updatedHero);
-        setHeroBanners(updatedHero);
-      }
-
-      // Update frontend home banners store: if master slot, keep it with empty image; if custom, remove it
       const currentList = getFrontendHomeBanners();
       let updatedList: any[];
       if (isMasterSlot) {
-        const foundIdx = currentList.findIndex((b: any) => b.id === id);
-        if (foundIdx >= 0) {
-          currentList[foundIdx] = { ...currentList[foundIdx], imageUrl: "", mobileImageUrl: "", tabletImageUrl: "" };
-          updatedList = currentList;
-        } else {
-          updatedList = [...currentList, { id, page: pageKey, title: bannerToDelete?.title || id, imageUrl: "", mobileImageUrl: "", tabletImageUrl: "" }];
+        updatedList = currentList.map((b: any) => {
+          if (aliasKeys.includes(b.id) || (pageKey && b.page === pageKey)) {
+            return { ...b, imageUrl: "", mobileImageUrl: "", tabletImageUrl: "" };
+          }
+          return b;
+        });
+        if (!updatedList.some((b: any) => aliasKeys.includes(b.id))) {
+          updatedList.push({ id, page: pageKey, title: bannerToDelete?.title || id, imageUrl: "", mobileImageUrl: "", tabletImageUrl: "" });
         }
       } else {
-        updatedList = currentList.filter((b: any) => b.id !== id);
+        updatedList = currentList.filter((b: any) => !aliasKeys.includes(b.id) && (!pageKey || b.page !== pageKey));
       }
 
       saveFrontendHomeBanners(updatedList);
@@ -3469,7 +3513,7 @@ export default function ValobasaAdminPanel() {
           localStorage.removeItem("gg_admin_banners_cache");
           window.dispatchEvent(new Event("gg_home_banners_updated"));
           window.dispatchEvent(new Event("storage"));
-        } catch (e) {}
+        } catch (e) { }
       }
       setBanners([]);
       setHeroBanners([]);
@@ -3535,7 +3579,7 @@ export default function ValobasaAdminPanel() {
       const isEditing = Boolean(productForm.id);
       const method = isEditing ? "PUT" : "POST";
       const url = isEditing ? `${API_BASE}/products/${productForm.id}` : `${API_BASE}/products`;
-      
+
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
@@ -3556,7 +3600,7 @@ export default function ValobasaAdminPanel() {
               const filtered = arr.filter(x => x !== bannerForm.id && x !== bannerForm.page);
               localStorage.setItem("gg_deleted_banner_ids", JSON.stringify(filtered));
             }
-          } catch (e) {}
+          } catch (e) { }
         }
         clearAllCache(); // Force website to reload fresh data
         triggerGlobalDataSync();
@@ -3689,7 +3733,7 @@ export default function ValobasaAdminPanel() {
 
     try {
       const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("gg_token") || localStorage.getItem("glowgoodly_token") || localStorage.getItem("token") || "" : "");
-      
+
       const formData = new FormData();
       formData.append("title", comboForm.title.trim());
       formData.append("slug", comboForm.slug.trim() || comboForm.title.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
@@ -3882,8 +3926,8 @@ export default function ValobasaAdminPanel() {
         const errJson = await res.json().catch(() => ({}));
         setSettingsMessage(`❌ ${errJson.error || "Failed to save settings."}`);
       }
-    } catch (e: any) { 
-      setSettingsMessage(`❌ Error saving settings: ${e?.message || e}`); 
+    } catch (e: any) {
+      setSettingsMessage(`❌ Error saving settings: ${e?.message || e}`);
     }
   };
 
@@ -3896,7 +3940,7 @@ export default function ValobasaAdminPanel() {
     try {
       const res = await fetch(`${API_BASE}/orders/${orderId}/send-${provider.toLowerCase()}`, {
         method: "POST",
-        headers: { 
+        headers: {
           ...getAuthHeader(token),
           "Content-Type": "application/json"
         }
@@ -3909,8 +3953,8 @@ export default function ValobasaAdminPanel() {
       } else {
         alert(data.error || `Failed to dispatch order via ${provider}. Please check courier credentials.`);
       }
-    } catch (e: any) { 
-      alert(e.message || "Error dispatching order."); 
+    } catch (e: any) {
+      alert(e.message || "Error dispatching order.");
     } finally {
       setSendingCourierOrderId(null);
     }
@@ -3982,6 +4026,10 @@ export default function ValobasaAdminPanel() {
   <div class="row" style="font-size:15px;font-weight:bold;">
     <span>NET PAYABLE:</span><span>Tk ${o.total}</span>
   </div>
+  ${o.paidAmount !== undefined && o.paidAmount > 0 ? `
+  <div class="row" style="font-weight:bold;color:green;"><span>PAID AMOUNT:</span><span>Tk ${o.paidAmount}</span></div>
+  <div class="row" style="font-weight:bold;color:${(o.dueAmount || 0) > 0 ? 'red' : 'green'};"><span>DUE AMOUNT:</span><span>Tk ${o.dueAmount || 0}</span></div>
+  ` : ""}
   <div class="double"></div>
   <div class="center" style="margin-top:10px;font-size:10.5px;">
     <div>THANK YOU FOR SHOPPING!</div>
@@ -4279,12 +4327,12 @@ export default function ValobasaAdminPanel() {
       <main style={{ padding: "100px 20px", display: "flex", justifyContent: "center", minHeight: "100vh", backgroundColor: "#f4f5fa" }}>
         <form onSubmit={handleLogin} style={{ width: "100%", maxWidth: "420px", backgroundColor: "#fff", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "32px", boxShadow: "0 10px 25px rgba(0,0,0,0.06)", display: "flex", flexDirection: "column", gap: "16px", height: "fit-content" }}>
           <div style={{ textAlign: "center", marginBottom: "4px", display: "flex", flexDirection: "column", alignItems: "center" }}>
-            <img 
-              src="/images/logo.png" 
-              alt="GlowGoodly" 
+            <img
+              src="/images/logo.png"
+              alt="GlowGoodly"
               width={56}
               height={56}
-              style={{ width: "56px", height: "56px", objectFit: "contain", marginBottom: "8px" }} 
+              style={{ width: "56px", height: "56px", objectFit: "contain", marginBottom: "8px" }}
               onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/user-glow-logo.png"; }}
             />
             <h1 style={{ fontSize: "22px", fontWeight: "800", color: "#e63b7a", margin: 0 }}>GlowGoodly Admin Access</h1>
@@ -4329,9 +4377,9 @@ export default function ValobasaAdminPanel() {
 
           {/* Cloudflare Turnstile Human Verification Box */}
           <div style={{ display: "flex", justifyContent: "center", margin: "4px 0" }}>
-            <CloudflareTurnstile 
-              onVerify={(token) => { setCaptchaToken(token); setLoginError(""); }} 
-              onExpire={() => setCaptchaToken("")} 
+            <CloudflareTurnstile
+              onVerify={(token) => { setCaptchaToken(token); setLoginError(""); }}
+              onExpire={() => setCaptchaToken("")}
             />
           </div>
 
@@ -4414,12 +4462,12 @@ export default function ValobasaAdminPanel() {
       {/* Dark Sidebar */}
       <div className="admin-sidebar" style={{ width: "240px", backgroundColor: "#1e1e2d", color: "#a2a3b7", display: "flex", flexDirection: "column", flexShrink: 0 }}>
         <div style={{ padding: "20px", display: "flex", alignItems: "center", gap: "10px", borderBottom: "1px solid #2b2b40" }}>
-          <img 
-            src="/images/logo.png" 
-            alt="Logo" 
+          <img
+            src="/images/logo.png"
+            alt="Logo"
             width={34}
             height={34}
-            style={{ width: "34px", height: "34px", objectFit: "contain", borderRadius: "8px", backgroundColor: "#fff", padding: "2px" }} 
+            style={{ width: "34px", height: "34px", objectFit: "contain", borderRadius: "8px", backgroundColor: "#fff", padding: "2px" }}
             onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/user-glow-logo.png"; }}
           />
           <span style={{ fontSize: "16px", fontWeight: "bold", color: "#fff" }}>GlowGoodly Admin</span>
@@ -4448,9 +4496,9 @@ export default function ValobasaAdminPanel() {
 
           {/* Home Slides Accordion (Drawer default closed) */}
           <div>
-            <div 
-              onClick={() => setHomeSlidesOpen(!homeSlidesOpen)} 
-              className={`admin-menu-item ${(activeTab === "home-slides" || activeTab === "home-banner-list" || activeTab === "add-home-banner" || activeTab === "hero-banners") ? "active" : ""}`} 
+            <div
+              onClick={() => setHomeSlidesOpen(!homeSlidesOpen)}
+              className={`admin-menu-item ${(activeTab === "home-slides" || activeTab === "home-banner-list" || activeTab === "add-home-banner" || activeTab === "hero-banners") ? "active" : ""}`}
               style={{ padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", color: (activeTab === "home-slides" || activeTab === "home-banner-list" || activeTab === "add-home-banner" || activeTab === "hero-banners") ? "#fff" : "inherit" }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}><ImageIcon size={18} /><span>Home Slides & Hero</span></div>
@@ -4509,9 +4557,9 @@ export default function ValobasaAdminPanel() {
 
           {/* Categories Accordion (Drawer default closed) */}
           <div>
-            <div 
-              onClick={() => setCategoryOpen(!categoryOpen)} 
-              className={`admin-menu-item ${(activeTab === "categories" || activeTab === "category-list" || activeTab === "add-category" || activeTab === "sub-category-list" || activeTab === "add-sub-category") ? "active" : ""}`} 
+            <div
+              onClick={() => setCategoryOpen(!categoryOpen)}
+              className={`admin-menu-item ${(activeTab === "categories" || activeTab === "category-list" || activeTab === "add-category" || activeTab === "sub-category-list" || activeTab === "add-sub-category") ? "active" : ""}`}
               style={{ padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", color: (activeTab === "categories" || activeTab === "category-list" || activeTab === "add-category" || activeTab === "sub-category-list" || activeTab === "add-sub-category") ? "#fff" : "inherit" }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}><Layers size={18} /><span>Categories</span></div>
@@ -4558,16 +4606,16 @@ export default function ValobasaAdminPanel() {
             <Award size={18} /><span>Top Customers</span>
           </div>
 
-          <div 
+          <div
             onClick={() => {
               navigateTo("live-chat");
               setLiveChatUnreadCount(0);
-            }} 
-            className={`admin-menu-item ${activeTab === "live-chat" ? "active" : ""}`} 
-            style={{ padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", color: activeTab === "live-chat" ? "#fff" : "inherit" }}
+            }}
+            className={`admin-menu-item ${(activeTab === "live-chat" || activeTab === "customer-support") ? "active" : ""}`}
+            style={{ padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", color: (activeTab === "live-chat" || activeTab === "customer-support") ? "#fff" : "inherit" }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <MessageSquare size={18} /><span>Live Chat</span>
+              <MessageSquare size={18} /><span>Customer Support</span>
             </div>
             {liveChatUnreadCount > 0 && (
               <span style={{ backgroundColor: "#e63b7a", color: "#fff", fontSize: "10.5px", fontWeight: "900", padding: "2px 7px", borderRadius: "10px" }}>
@@ -4625,6 +4673,29 @@ export default function ValobasaAdminPanel() {
             <span style={{ fontWeight: "700", color: "#1e293b", textTransform: "uppercase", fontSize: "13px" }}>
               GlowGoodly Admin / <span style={{ color: "#e63b7a" }}>{activeTab.replace(/-/g, " ")}</span>
             </span>
+            <button
+              type="button"
+              onClick={handlePurgeLiteSpeedCache}
+              disabled={isPurgingLiteSpeed}
+              title="Purge LiteSpeed Web Server Cache so all changes reflect immediately across the entire website"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                backgroundColor: isPurgingLiteSpeed ? "#94a3b8" : "#0284c7",
+                color: "#ffffff",
+                border: "none",
+                padding: "6px 14px",
+                borderRadius: "6px",
+                fontWeight: "800",
+                fontSize: "12px",
+                cursor: isPurgingLiteSpeed ? "not-allowed" : "pointer",
+                boxShadow: "0 2px 6px rgba(2, 132, 199, 0.25)"
+              }}
+            >
+              <RefreshCw size={14} className={isPurgingLiteSpeed ? "animate-spin" : ""} />
+              {isPurgingLiteSpeed ? "Purging LiteSpeed..." : "⚡ Clean LiteSpeed Cache"}
+            </button>
           </div>
           <div
             onClick={() => {
@@ -4676,7 +4747,7 @@ export default function ValobasaAdminPanel() {
                 </div>
 
                 <div style={{ display: "flex", gap: "10px" }}>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => {
                       const pageTitle = prompt("Enter new landing page name (e.g. Valentine Combo Deal):");
@@ -4710,10 +4781,10 @@ export default function ValobasaAdminPanel() {
                     ➕ Create New Landing Page
                   </button>
 
-                  <a 
-                    href={seasonalOfferForm.slug === "seasonal-offer" ? "/seasonal-offer" : `/landing/${seasonalOfferForm.slug || "seasonal-offer"}`} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
+                  <a
+                    href={seasonalOfferForm.slug === "seasonal-offer" ? "/seasonal-offer" : `/landing/${seasonalOfferForm.slug || "seasonal-offer"}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     style={{ background: "#0f172a", color: "#fff", padding: "10px 16px", borderRadius: "8px", textDecoration: "none", fontWeight: "700", fontSize: "13.5px", display: "flex", alignItems: "center", gap: "6px" }}
                   >
                     <ExternalLink size={16} />
@@ -4722,7 +4793,7 @@ export default function ValobasaAdminPanel() {
                 </div>
               </div>
 
-              <form 
+              <form
                 onSubmit={async (e) => {
                   e.preventDefault();
                   try {
@@ -4732,9 +4803,9 @@ export default function ValobasaAdminPanel() {
                     };
                     const res = await fetch(`${API_BASE}/settings/seasonal-offer`, {
                       method: "POST",
-                      headers: { 
+                      headers: {
                         "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}` 
+                        Authorization: `Bearer ${token}`
                       },
                       body: JSON.stringify(payload)
                     });
@@ -4949,9 +5020,9 @@ export default function ValobasaAdminPanel() {
                   <button type="submit" style={{ backgroundColor: "#e63b7a", color: "#fff", border: "none", padding: "12px 28px", borderRadius: "6px", fontWeight: "800", cursor: "pointer", fontSize: "15px" }}>
                     Save Landing Page
                   </button>
-                  
-                  <button 
-                    type="button" 
+
+                  <button
+                    type="button"
                     onClick={() => {
                       navigator.clipboard.writeText(`${window.location.origin}/seasonal-offer`);
                       alert("Landing page link copied to clipboard! (Ready for ad campaigns)");
@@ -5536,107 +5607,107 @@ export default function ValobasaAdminPanel() {
                     )}
                   </div>
                 ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: "20px" }}>
-                  {/* Left Column: Messages List */}
-                  <div style={{ borderRight: "1px solid #e2e8f0", paddingRight: "16px", display: "flex", flexDirection: "column", gap: "10px", maxHeight: "600px", overflowY: "auto" }}>
-                    {contactMessages.length === 0 ? (
-                      <div style={{ padding: "30px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>No customer messages received yet.</div>
-                    ) : (
-                      contactMessages.map((msg: any) => (
-                        <div
-                          key={msg.id}
-                          onClick={() => setSelectedMessage(msg)}
-                          style={{
-                            padding: "14px",
-                            borderRadius: "10px",
-                            border: "1px solid",
-                            borderColor: selectedMessage?.id === msg.id ? "#e63b7a" : "#e2e8f0",
-                            backgroundColor: selectedMessage?.id === msg.id ? "#fff5f8" : "#f8fafc",
-                            cursor: "pointer",
-                            transition: "all 0.15s ease"
-                          }}
-                        >
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                            <span style={{ fontWeight: "800", fontSize: "13.5px", color: "#0f172a" }}>{msg.name}</span>
-                            <span style={{ fontSize: "10px", fontWeight: "700", padding: "2px 8px", borderRadius: "10px", backgroundColor: msg.status === "Replied" ? "#dcfce7" : "#fee2e2", color: msg.status === "Replied" ? "#166534" : "#991b1b" }}>
-                              {msg.status || "Unread"}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: "12px", color: "#64748b", fontWeight: "600" }}>📞 {msg.phone || msg.email || "N/A"}</div>
-                          <div style={{ fontSize: "12.5px", color: "#334155", fontWeight: "500", marginTop: "6px", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                            "{msg.message}"
-                          </div>
-                          <div style={{ fontSize: "10px", color: "#94a3b8", marginTop: "6px", textAlign: "right" }}>
-                            {new Date(msg.createdAt).toLocaleString()}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  {/* Right Column: Message Detail & Reply Box */}
-                  <div>
-                    {selectedMessage ? (
-                      <div style={{ backgroundColor: "#f8fafc", padding: "20px", borderRadius: "10px", border: "1px solid #e2e8f0", display: "flex", flexDirection: "column", gap: "16px" }}>
-                        <div style={{ borderBottom: "1.5px solid #cbd5e1", paddingBottom: "12px" }}>
-                          <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#0f172a", margin: "0 0 6px 0" }}>{selectedMessage.name}</h3>
-                          <div style={{ fontSize: "12.5px", color: "#475569", fontWeight: "600", display: "flex", gap: "14px" }}>
-                            <span>📞 {selectedMessage.phone || "N/A"}</span>
-                            <span>✉️ {selectedMessage.email || "N/A"}</span>
-                          </div>
-                          <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "4px" }}>Received: {new Date(selectedMessage.createdAt).toLocaleString()}</div>
-                        </div>
-
-                        {/* Customer Message Body */}
-                        <div>
-                          <div style={{ fontSize: "11px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", marginBottom: "4px" }}>Customer Inquiry:</div>
-                          <div style={{ backgroundColor: "#ffffff", padding: "14px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13.5px", color: "#1e293b", lineHeight: "1.6" }}>
-                            {selectedMessage.message}
-                          </div>
-                        </div>
-
-                        {/* Existing Replies List */}
-                        {selectedMessage.replies && selectedMessage.replies.length > 0 && (
-                          <div>
-                            <div style={{ fontSize: "11px", fontWeight: "800", color: "#166534", textTransform: "uppercase", marginBottom: "6px" }}>Admin Replies:</div>
-                            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                              {selectedMessage.replies.map((r: any) => (
-                                <div key={r.id} style={{ backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", padding: "10px 14px", borderRadius: "8px", fontSize: "12.5px" }}>
-                                  <div style={{ fontWeight: "800", color: "#166534", fontSize: "11.5px" }}>{r.sender} · <span style={{ fontWeight: "500", color: "#64748b" }}>{new Date(r.createdAt).toLocaleString()}</span></div>
-                                  <div style={{ color: "#0f172a", marginTop: "4px" }}>{r.message}</div>
-                                </div>
-                              ))}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: "20px" }}>
+                    {/* Left Column: Messages List */}
+                    <div style={{ borderRight: "1px solid #e2e8f0", paddingRight: "16px", display: "flex", flexDirection: "column", gap: "10px", maxHeight: "600px", overflowY: "auto" }}>
+                      {contactMessages.length === 0 ? (
+                        <div style={{ padding: "30px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>No customer messages received yet.</div>
+                      ) : (
+                        contactMessages.map((msg: any) => (
+                          <div
+                            key={msg.id}
+                            onClick={() => setSelectedMessage(msg)}
+                            style={{
+                              padding: "14px",
+                              borderRadius: "10px",
+                              border: "1px solid",
+                              borderColor: selectedMessage?.id === msg.id ? "#e63b7a" : "#e2e8f0",
+                              backgroundColor: selectedMessage?.id === msg.id ? "#fff5f8" : "#f8fafc",
+                              cursor: "pointer",
+                              transition: "all 0.15s ease"
+                            }}
+                          >
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                              <span style={{ fontWeight: "800", fontSize: "13.5px", color: "#0f172a" }}>{msg.name}</span>
+                              <span style={{ fontSize: "10px", fontWeight: "700", padding: "2px 8px", borderRadius: "10px", backgroundColor: msg.status === "Replied" ? "#dcfce7" : "#fee2e2", color: msg.status === "Replied" ? "#166534" : "#991b1b" }}>
+                                {msg.status || "Unread"}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: "12px", color: "#64748b", fontWeight: "600" }}>📞 {msg.phone || msg.email || "N/A"}</div>
+                            <div style={{ fontSize: "12.5px", color: "#334155", fontWeight: "500", marginTop: "6px", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                              "{msg.message}"
+                            </div>
+                            <div style={{ fontSize: "10px", color: "#94a3b8", marginTop: "6px", textAlign: "right" }}>
+                              {new Date(msg.createdAt).toLocaleString()}
                             </div>
                           </div>
-                        )}
+                        ))
+                      )}
+                    </div>
 
-                        {/* Reply Form */}
-                        <form onSubmit={handleSendAdminReply} style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "10px" }}>
-                          <label style={{ fontSize: "12.5px", fontWeight: "800", color: "#0f172a" }}>Send Reply Message to Customer</label>
-                          <textarea
-                            rows={4}
-                            required
-                            placeholder="Type your response to the customer..."
-                            value={ticketReplyText}
-                            onChange={(e) => setTicketReplyText(e.target.value)}
-                            style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13px", outline: "none" }}
-                          />
-                          <button
-                            type="submit"
-                            disabled={replySending}
-                            style={{ backgroundColor: "#e63b7a", color: "#ffffff", border: "none", padding: "10px 20px", borderRadius: "6px", fontWeight: "800", fontSize: "13px", cursor: "pointer", alignSelf: "flex-end" }}
-                          >
-                            {replySending ? "Sending..." : "Send Reply Message ✉️"}
-                          </button>
-                        </form>
-                      </div>
-                    ) : (
-                      <div style={{ padding: "50px", textAlign: "center", color: "#94a3b8", backgroundColor: "#f8fafc", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
-                        Click on any message on the left to view details and send a reply.
-                      </div>
-                    )}
+                    {/* Right Column: Message Detail & Reply Box */}
+                    <div>
+                      {selectedMessage ? (
+                        <div style={{ backgroundColor: "#f8fafc", padding: "20px", borderRadius: "10px", border: "1px solid #e2e8f0", display: "flex", flexDirection: "column", gap: "16px" }}>
+                          <div style={{ borderBottom: "1.5px solid #cbd5e1", paddingBottom: "12px" }}>
+                            <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#0f172a", margin: "0 0 6px 0" }}>{selectedMessage.name}</h3>
+                            <div style={{ fontSize: "12.5px", color: "#475569", fontWeight: "600", display: "flex", gap: "14px" }}>
+                              <span>📞 {selectedMessage.phone || "N/A"}</span>
+                              <span>✉️ {selectedMessage.email || "N/A"}</span>
+                            </div>
+                            <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "4px" }}>Received: {new Date(selectedMessage.createdAt).toLocaleString()}</div>
+                          </div>
+
+                          {/* Customer Message Body */}
+                          <div>
+                            <div style={{ fontSize: "11px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", marginBottom: "4px" }}>Customer Inquiry:</div>
+                            <div style={{ backgroundColor: "#ffffff", padding: "14px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13.5px", color: "#1e293b", lineHeight: "1.6" }}>
+                              {selectedMessage.message}
+                            </div>
+                          </div>
+
+                          {/* Existing Replies List */}
+                          {selectedMessage.replies && selectedMessage.replies.length > 0 && (
+                            <div>
+                              <div style={{ fontSize: "11px", fontWeight: "800", color: "#166534", textTransform: "uppercase", marginBottom: "6px" }}>Admin Replies:</div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                                {selectedMessage.replies.map((r: any) => (
+                                  <div key={r.id} style={{ backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", padding: "10px 14px", borderRadius: "8px", fontSize: "12.5px" }}>
+                                    <div style={{ fontWeight: "800", color: "#166534", fontSize: "11.5px" }}>{r.sender} · <span style={{ fontWeight: "500", color: "#64748b" }}>{new Date(r.createdAt).toLocaleString()}</span></div>
+                                    <div style={{ color: "#0f172a", marginTop: "4px" }}>{r.message}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Reply Form */}
+                          <form onSubmit={handleSendAdminReply} style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "10px" }}>
+                            <label style={{ fontSize: "12.5px", fontWeight: "800", color: "#0f172a" }}>Send Reply Message to Customer</label>
+                            <textarea
+                              rows={4}
+                              required
+                              placeholder="Type your response to the customer..."
+                              value={ticketReplyText}
+                              onChange={(e) => setTicketReplyText(e.target.value)}
+                              style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13px", outline: "none" }}
+                            />
+                            <button
+                              type="submit"
+                              disabled={replySending}
+                              style={{ backgroundColor: "#e63b7a", color: "#ffffff", border: "none", padding: "10px 20px", borderRadius: "6px", fontWeight: "800", fontSize: "13px", cursor: "pointer", alignSelf: "flex-end" }}
+                            >
+                              {replySending ? "Sending..." : "Send Reply Message ✉️"}
+                            </button>
+                          </form>
+                        </div>
+                      ) : (
+                        <div style={{ padding: "50px", textAlign: "center", color: "#94a3b8", backgroundColor: "#f8fafc", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+                          Click on any message on the left to view details and send a reply.
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
                 )}
               </div>
             </div>
@@ -6067,7 +6138,7 @@ export default function ValobasaAdminPanel() {
                 </div>
 
                 <form onSubmit={handleSaveBanner} style={{ display: "flex", flexDirection: "column", gap: "18px", maxWidth: "720px" }}>
-                  
+
                   {/* Slot Selector */}
                   <div style={{ backgroundColor: "#fff0f5", padding: "16px", borderRadius: "10px", border: "1.5px solid #fbcfe8" }}>
                     <label style={{ display: "block", fontSize: "13px", fontWeight: "800", color: "#be185d", marginBottom: "6px" }}>
@@ -6385,33 +6456,30 @@ export default function ValobasaAdminPanel() {
           {(activeTab === "home-banner-list" || activeTab === "home-slides") && (
             <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
 
-              {/* 🎬 Hero Banner Section at Top of Home Banner List */}
-              {renderHeroBannerSection()}
-
               {/* ═══════════ CATEGORY & CONCERN QUICK UPLOAD & LINK MANAGER SECTION ═══════════ */}
               {(() => {
                 const CARD_SLOTS = [
-                  { id: "cat-makeup", label: "Makeup", emoji: "💄", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=makeup" },
-                  { id: "cat-kbeauty", label: "K-Beauty", emoji: "✨", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=k-beauty" },
-                  { id: "cat-haircare", label: "Hair Care", emoji: "💇", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=haircare" },
-                  { id: "cat-mombaby", label: "Mom & Baby", emoji: "👶", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=mom-baby" },
-                  { id: "cat-skincare", label: "Skin Care", emoji: "🌸", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=skincare" },
-                  { id: "cat-accessories", label: "Accessories", emoji: "👜", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=accessories" },
-                  { id: "cat-undergarments", label: "Undergarments", emoji: "👗", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=undergarments" },
-                  { id: "cat-fragrance", label: "Fragrance", emoji: "🌺", section: "🛍️ SHOP BY CATEGORY", defaultLink: "/shop?category=fragrance" },
-                  { id: "concern-card-acne", label: "Acne Treatment", emoji: "🌿", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare&sub=Acne%20Treatment" },
-                  { id: "concern-card-anti-aging", label: "Anti Aging", emoji: "✨", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare&sub=Anti%20Aging" },
-                  { id: "concern-card-dandruff", label: "Dandruff", emoji: "💧", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=haircare&sub=Dandruff" },
-                  { id: "concern-card-dry-skin", label: "Dry Skin", emoji: "🧾", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare&sub=Dry%20Skin" },
-                  { id: "concern-card-hair-fall", label: "Hair Fall", emoji: "💇‍♀️", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=haircare&sub=Hair%20Fall" },
-                  { id: "concern-card-oil-control", label: "Oil Control", emoji: "🏃", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare" },
-                  { id: "concern-card-pore-care", label: "Pore Care", emoji: "🧴", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare&sub=Pore%20Care" },
-                  { id: "concern-card-spot-treatment", label: "Spot Treatment", emoji: "🎯", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare" },
-                  { id: "concern-card-hair-thinning", label: "Hair Thinning", emoji: "🌾", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=haircare" },
-                  { id: "concern-card-sun-burn", label: "Sun Burn", emoji: "☀️", section: "🩺 SHOP BY CONCERN", defaultLink: "/shop?category=skincare" },
+                  { id: "cat-card-makeup", label: "Makeup / Cosmetics", emoji: "💄", section: "🛍️ SHOP BY CATEGORY", canonicalPage: "Category: Makeup", defaultLink: "/shop?category=makeup" },
+                  { id: "cat-card-skin", label: "Skin Care", emoji: "🌸", section: "🛍️ SHOP BY CATEGORY", canonicalPage: "Category: Skin", defaultLink: "/shop?category=skincare" },
+                  { id: "cat-card-hair", label: "Hair Care", emoji: "💇", section: "🛍️ SHOP BY CATEGORY", canonicalPage: "Category: Hair", defaultLink: "/shop?category=haircare" },
+                  { id: "cat-card-personal-care", label: "Bath & Body / Personal Care", emoji: "🛁", section: "🛍️ SHOP BY CATEGORY", canonicalPage: "Category: Personal Care", defaultLink: "/shop?category=personal-care" },
+                  { id: "cat-card-mom-baby", label: "Mom & Baby", emoji: "👶", section: "🛍️ SHOP BY CATEGORY", canonicalPage: "Category: Mom & Baby", defaultLink: "/shop?category=mom-baby" },
+                  { id: "cat-card-fragrance", label: "Fragrance / Perfume", emoji: "🌺", section: "🛍️ SHOP BY CATEGORY", canonicalPage: "Category: Fragrance", defaultLink: "/shop?category=fragrance" },
+                  { id: "cat-card-undergarments", label: "Undergarments", emoji: "👗", section: "🛍️ SHOP BY CATEGORY", canonicalPage: "Category: Undergarments", defaultLink: "/shop?category=undergarments" },
+                  { id: "cat-card-combo", label: "Combo & Special Offers", emoji: "🎁", section: "🛍️ SHOP BY CATEGORY", canonicalPage: "Category: Combo", defaultLink: "/shop?category=combo" },
+                  { id: "concern-card-acne", label: "Acne Treatment", emoji: "🌿", section: "🩺 SHOP BY CONCERN", canonicalPage: "Concern: Acne", defaultLink: "/shop?category=skincare&sub=Acne%20Treatment" },
+                  { id: "concern-card-anti-aging", label: "Anti Aging", emoji: "✨", section: "🩺 SHOP BY CONCERN", canonicalPage: "Concern: Anti Aging", defaultLink: "/shop?category=skincare&sub=Anti%20Aging" },
+                  { id: "concern-card-dandruff", label: "Dandruff", emoji: "💧", section: "🩺 SHOP BY CONCERN", canonicalPage: "Concern: Dandruff", defaultLink: "/shop?category=haircare&sub=Dandruff" },
+                  { id: "concern-card-dry-skin", label: "Dry Skin", emoji: "🧾", section: "🩺 SHOP BY CONCERN", canonicalPage: "Concern: Dry Skin", defaultLink: "/shop?category=skincare&sub=Dry%20Skin" },
+                  { id: "concern-card-hair-fall", label: "Hair Fall", emoji: "💇‍♀️", section: "🩺 SHOP BY CONCERN", canonicalPage: "Concern: Hair Fall", defaultLink: "/shop?category=haircare&sub=Hair%20Fall" },
+                  { id: "concern-card-oil-control", label: "Oil Control", emoji: "🏃", section: "🩺 SHOP BY CONCERN", canonicalPage: "Concern: Oil Control", defaultLink: "/shop?category=skincare" },
+                  { id: "concern-card-pore-care", label: "Pore Care", emoji: "🧴", section: "🩺 SHOP BY CONCERN", canonicalPage: "Concern: Pore Care", defaultLink: "/shop?category=skincare&sub=Pore%20Care" },
+                  { id: "concern-card-spot-treatment", label: "Spot Treatment", emoji: "🎯", section: "🩺 SHOP BY CONCERN", canonicalPage: "Concern: Spot Treatment", defaultLink: "/shop?category=skincare" },
+                  { id: "concern-card-hair-thinning", label: "Hair Thinning", emoji: "🌾", section: "🩺 SHOP BY CONCERN", canonicalPage: "Concern: Hair Thinning", defaultLink: "/shop?category=haircare" },
+                  { id: "concern-card-sun-burn", label: "Sun Burn", emoji: "☀️", section: "🩺 SHOP BY CONCERN", canonicalPage: "Concern: Sun Burn", defaultLink: "/shop?category=skincare" },
                 ];
 
-                const handleCardImageUpload = async (slotId: string, slotLabel: string, file: File, defaultSlotLink?: string) => {
+                const handleCardImageUpload = async (slotId: string, slotLabel: string, file: File, canonicalPage?: string, defaultSlotLink?: string) => {
                   const reader = new FileReader();
                   reader.onload = async (ev) => {
                     const dataUrl = ev.target?.result as string;
@@ -6429,23 +6497,19 @@ export default function ValobasaAdminPanel() {
                         ctx.fillRect(0, 0, 400, 400);
                         ctx.drawImage(img, Math.round((400 - sw) / 2), Math.round((400 - sh) / 2), sw, sh);
                       }
-                      const resized = canvas.toDataURL("image/jpeg", 0.88);
-                      // Find existing banner for this slot
+                      const resized = canvas.toDataURL("image/jpeg", 0.85);
+                      const pageName = canonicalPage || `Category: ${slotLabel}`;
                       const slotSlug = slotLabel.toLowerCase().replace(/\s+/g, "-");
-                      const cleanSlotSlug = slotSlug.replace(/[^a-z0-9]/g, "");
-                      const slotIdClean = slotId.toLowerCase().replace(/[^a-z0-9]/g, "");
+
                       const existing = banners.find((b: any) => {
                         if (!b) return false;
                         const p = (b.page || "").toLowerCase().trim();
                         const id = (b.id || "").toLowerCase().trim();
-                        const s = slotId.toLowerCase().trim();
-                        const cleanId = id.replace(/[^a-z0-9]/g, "");
-                        const cleanTitle = (b.title || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-                        return p === s || id === s || cleanId === slotIdClean || cleanId === cleanSlotSlug ||
-                               cleanId.includes(slotIdClean) || slotIdClean.includes(cleanId) ||
-                               cleanTitle.includes(cleanSlotSlug) || cleanSlotSlug.includes(cleanTitle);
+                        return id === slotId.toLowerCase() || p === pageName.toLowerCase() || p === slotId.toLowerCase();
                       });
+
                       const targetLink = (cardLinks[slotId] !== undefined ? cardLinks[slotId] : (existing?.linkUrl || defaultSlotLink || `/shop?category=${encodeURIComponent(slotSlug)}`)).trim();
+
                       const payload = {
                         id: slotId,
                         title: slotLabel + " Card",
@@ -6453,28 +6517,31 @@ export default function ValobasaAdminPanel() {
                         mobileImageUrl: resized,
                         tabletImageUrl: resized,
                         linkUrl: targetLink,
-                        page: slotId,
+                        page: pageName,
                         isActive: true,
                         sortOrder: existing?.sortOrder || 99,
                         bgColor: "#ffffff",
+                        section: slotId.startsWith("cat-") ? "🛍️ Category Cards" : "🌿 Concern Cards",
+                        desktopSize: "400 x 400 px (1:1 Square)",
                         updatedAt: Date.now()
                       };
 
                       // 1. Unmark from deleted IDs
+                      const aliasKeys = [slotId, slotId.replace("cat-card-", "cat-"), pageName, slotLabel];
                       if (typeof window !== "undefined") {
                         try {
                           const stored = localStorage.getItem("gg_deleted_banner_ids");
                           if (stored) {
                             const arr: string[] = JSON.parse(stored);
-                            const filtered = arr.filter(x => x !== slotId && x !== payload.title && x !== slotLabel && x !== existing?.id);
+                            const filtered = arr.filter(x => !aliasKeys.includes(x));
                             localStorage.setItem("gg_deleted_banner_ids", JSON.stringify(filtered));
                           }
-                        } catch (e) {}
+                        } catch (e) { }
                       }
 
                       // 2. Save directly to frontend localStorage
                       const currentList = getFrontendHomeBanners();
-                      const updatedList = currentList.filter((b: any) => b.id !== slotId && b.page !== slotId);
+                      const updatedList = currentList.filter((b: any) => !aliasKeys.includes(b.id) && !aliasKeys.includes(b.page));
                       updatedList.push(payload);
                       saveFrontendHomeBanners(updatedList);
 
@@ -6483,11 +6550,39 @@ export default function ValobasaAdminPanel() {
 
                       clearAllCache();
                       triggerGlobalDataSync();
-                      alert(`✓ "${slotLabel}" image updated in frontend! Homepage will show new image immediately.`);
+                      alert(`✓ "${slotLabel}" image updated!\nHomepage category card will show this new image immediately.`);
                     };
                     img.src = dataUrl;
                   };
                   reader.readAsDataURL(file);
+                };
+
+                const handleCardImageDelete = async (slotId: string, slotLabel: string, canonicalPage?: string) => {
+                  if (!confirm(`Are you sure you want to remove the picture for "${slotLabel}"?`)) return;
+                  const pageName = canonicalPage || `Category: ${slotLabel}`;
+                  const aliasKeys = [slotId, slotId.replace("cat-card-", "cat-"), pageName, slotLabel];
+
+                  // 1. Mark in deleted IDs
+                  if (typeof window !== "undefined") {
+                    try {
+                      const stored = localStorage.getItem("gg_deleted_banner_ids");
+                      const arr: string[] = stored ? JSON.parse(stored) : [];
+                      aliasKeys.forEach(k => {
+                        if (!arr.includes(k)) arr.push(k);
+                      });
+                      localStorage.setItem("gg_deleted_banner_ids", JSON.stringify(arr));
+                    } catch (_) {}
+                  }
+
+                  // 2. Remove image from stored banners
+                  const currentList = getFrontendHomeBanners();
+                  const updatedList = currentList.filter((b: any) => !aliasKeys.includes(b.id) && !aliasKeys.includes(b.page));
+                  saveFrontendHomeBanners(updatedList);
+                  setBanners(mergeBannersWithMaster(updatedList));
+
+                  clearAllCache();
+                  triggerGlobalDataSync();
+                  alert(`✓ Picture removed for "${slotLabel}"!`);
                 };
 
                 const handleUpdateCardLink = async (slotId: string, slotLabel: string, targetLink: string, defaultSlotLink: string) => {
@@ -6498,7 +6593,7 @@ export default function ValobasaAdminPanel() {
                     setCardLinks(prev => {
                       const updated = { ...prev, [slotId]: linkToSave };
                       if (typeof window !== "undefined") {
-                        try { localStorage.setItem("gg_card_links", JSON.stringify(updated)); } catch (_) {}
+                        try { localStorage.setItem("gg_card_links", JSON.stringify(updated)); } catch (_) { }
                       }
                       return updated;
                     });
@@ -6559,8 +6654,8 @@ export default function ValobasaAdminPanel() {
                               const cleanId = id.replace(/[^a-z0-9]/g, "");
                               const cleanTitle = (b.title || "").toLowerCase().replace(/[^a-z0-9]/g, "");
                               return p === s || id === s || cleanId === slotIdClean || cleanId === cleanSlotSlug ||
-                                     cleanId.includes(slotIdClean) || slotIdClean.includes(cleanId) ||
-                                     cleanTitle.includes(cleanSlotSlug) || cleanSlotSlug.includes(cleanTitle);
+                                cleanId.includes(slotIdClean) || slotIdClean.includes(cleanId) ||
+                                cleanTitle.includes(cleanSlotSlug) || cleanSlotSlug.includes(cleanTitle);
                             });
                             const currentImg = existing?.imageUrl ? safeImageUrl(existing.imageUrl) : "";
                             const currentLink = cardLinks[slot.id] !== undefined ? cardLinks[slot.id] : (existing?.linkUrl || slot.defaultLink);
@@ -6587,15 +6682,27 @@ export default function ValobasaAdminPanel() {
                                     <span style={{ fontSize: "10px", color: "#64748b", fontWeight: "700" }}>400x400px</span>
                                   </div>
 
-                                  {/* Upload Button */}
-                                  <label style={{ display: "block", backgroundColor: currentImg ? "#7c3aed" : "#e63b7a", color: "#fff", textAlign: "center", padding: "7px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "800", cursor: "pointer", letterSpacing: "0.3px" }}>
-                                    {currentImg ? "🔄 Replace Image" : "📤 Upload Image"}
-                                    <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => {
-                                      const f = e.target.files?.[0];
-                                      if (f) handleCardImageUpload(slot.id, slot.label, f, slot.defaultLink);
-                                      e.target.value = "";
-                                    }} />
-                                  </label>
+                                  {/* Upload & Delete Action Buttons */}
+                                  <div style={{ display: "flex", gap: "6px" }}>
+                                    <label style={{ flex: 1, backgroundColor: currentImg ? "#7c3aed" : "#e63b7a", color: "#fff", textAlign: "center", padding: "7px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "800", cursor: "pointer", letterSpacing: "0.3px", display: "inline-block" }}>
+                                      {currentImg ? "🔄 Replace" : "📤 Upload"}
+                                      <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => {
+                                        const f = e.target.files?.[0];
+                                        if (f) handleCardImageUpload(slot.id, slot.label, f, slot.canonicalPage, slot.defaultLink);
+                                        e.target.value = "";
+                                      }} />
+                                    </label>
+                                    {currentImg && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleCardImageDelete(slot.id, slot.label, slot.canonicalPage)}
+                                        style={{ backgroundColor: "#fee2e2", color: "#b91c1c", border: "1px solid #fca5a5", padding: "7px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "800", cursor: "pointer" }}
+                                        title="Delete this image"
+                                      >
+                                        🗑️
+                                      </button>
+                                    )}
+                                  </div>
 
                                   {/* Link Edit Section */}
                                   <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: "8px" }}>
@@ -6728,7 +6835,14 @@ export default function ValobasaAdminPanel() {
                       const p = (b.page || "").toLowerCase();
                       const t = (b.title || "").toLowerCase();
                       const id = (b.id || "").toLowerCase();
-                      if (bannerCategoryFilter === "All") return true;
+                      if (bannerCategoryFilter === "All") {
+                        // Hide category and concern cards from "All" grid to prevent 2-3x duplicate rendering
+                        // (They are already prominently featured in the top Quick Manager above)
+                        const isCatCard = p.includes("category") || t.includes("category") || id.startsWith("cat-") || id.startsWith("catcard");
+                        const isConcernCard = p.includes("concern") || t.includes("concern") || id.startsWith("concern");
+                        if (isCatCard || isConcernCard) return false;
+                        return true;
+                      }
                       if (bannerCategoryFilter === "Hero Slides") {
                         return p.includes("hero") || t.includes("hero") || p.includes("slide") || id.includes("hero");
                       }
@@ -6798,7 +6912,7 @@ export default function ValobasaAdminPanel() {
                                 </span>
                               )}
                             </div>
-                            
+
                             {/* Prominent Exact Dimensions Box Under Image */}
                             <div style={{ backgroundColor: "#f8fafc", padding: "8px 10px", borderRadius: "8px", border: "1px solid #e2e8f0", fontSize: "11px", display: "flex", flexDirection: "column", gap: "4px", margin: "2px 0" }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -6854,7 +6968,7 @@ export default function ValobasaAdminPanel() {
                                               const arr: string[] = JSON.parse(stored);
                                               localStorage.setItem("gg_deleted_banner_ids", JSON.stringify(arr.filter(x => x !== b.id && x !== b.page && x !== b.title)));
                                             }
-                                          } catch (_) {}
+                                          } catch (_) { }
                                         }
 
                                         // 2. If it is a Hero slide, also update hero store
@@ -6926,7 +7040,7 @@ export default function ValobasaAdminPanel() {
                                       setCardLinks(prev => {
                                         const updated = { ...prev, [b.id]: updatedUrl };
                                         if (typeof window !== "undefined") {
-                                          try { localStorage.setItem("gg_card_links", JSON.stringify(updated)); } catch (_) {}
+                                          try { localStorage.setItem("gg_card_links", JSON.stringify(updated)); } catch (_) { }
                                         }
                                         return updated;
                                       });
@@ -7155,9 +7269,9 @@ export default function ValobasaAdminPanel() {
                             <label style={{ fontSize: "12.5px", fontWeight: "800", color: "#0f172a" }}>🖥️ DESKTOP BANNER IMAGE *</label>
                             <span style={{ fontSize: "11px", backgroundColor: "#e0f2fe", color: "#0369a1", padding: "3px 8px", borderRadius: "4px", fontWeight: "800" }}>
                               {bannerForm.page === "Hero Slides" ? "🎯 1920 x 500 px" :
-                               bannerForm.page === "Homepage Wide Banner" ? "🎯 1200 x 300 px" :
-                               bannerForm.page?.startsWith("Category:") || bannerForm.page?.startsWith("Concern:") ? "🎯 400 x 400 px" :
-                               "🎯 600 x 600 px"}
+                                bannerForm.page === "Homepage Wide Banner" ? "🎯 1200 x 300 px" :
+                                  bannerForm.page?.startsWith("Category:") || bannerForm.page?.startsWith("Concern:") ? "🎯 400 x 400 px" :
+                                    "🎯 600 x 600 px"}
                             </span>
                           </div>
 
@@ -7261,8 +7375,8 @@ export default function ValobasaAdminPanel() {
                             <label style={{ fontSize: "12.5px", fontWeight: "800", color: "#0f172a" }}>📟 TABLET BANNER IMAGE</label>
                             <span style={{ fontSize: "11px", backgroundColor: "#f3e8ff", color: "#7e22ce", padding: "3px 8px", borderRadius: "4px", fontWeight: "800" }}>
                               {bannerForm.page === "Hero Slides" ? "🎯 1024 x 450 px" :
-                               bannerForm.page === "Homepage Wide Banner" ? "🎯 1024 x 300 px" :
-                               "🎯 600 x 600 px"} (Auto)
+                                bannerForm.page === "Homepage Wide Banner" ? "🎯 1024 x 300 px" :
+                                  "🎯 600 x 600 px"} (Auto)
                             </span>
                           </div>
                           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
@@ -7300,8 +7414,8 @@ export default function ValobasaAdminPanel() {
                             <label style={{ fontSize: "12.5px", fontWeight: "800", color: "#0f172a" }}>📱 MOBILE BANNER IMAGE</label>
                             <span style={{ fontSize: "11px", backgroundColor: "#fef3c7", color: "#b45309", padding: "3px 8px", borderRadius: "4px", fontWeight: "800" }}>
                               {bannerForm.page === "Hero Slides" ? "🎯 750 x 750 px (Square 1:1)" :
-                               bannerForm.page === "Homepage Wide Banner" ? "🎯 750 x 350 px" :
-                               "🎯 500 x 500 px"} (Auto)
+                                bannerForm.page === "Homepage Wide Banner" ? "🎯 750 x 350 px" :
+                                  "🎯 500 x 500 px"} (Auto)
                             </span>
                           </div>
                           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
@@ -7860,7 +7974,7 @@ export default function ValobasaAdminPanel() {
 
                 {/* 3D TAPERED TRAPEZOID FUNNEL STACK */}
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", maxWidth: "760px", margin: "0 auto", padding: "16px 0" }}>
-                  
+
                   {/* Tier 1: Total Products Sold (Gold #f59e0b) */}
                   <div onClick={() => navigateTo("recent-orders")} title="Click to view Products & Orders" style={{ width: "100%", height: "54px", backgroundColor: "#f59e0b", clipPath: "polygon(0 0, 100% 0, 93% 100%, 7% 100%)", display: "flex", alignItems: "center", justifyContent: "center", color: "#ffffff", fontWeight: "900", fontSize: "14px", borderRadius: "4px", boxShadow: "0 4px 10px rgba(245,158,11,0.3)", cursor: "pointer", transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.9"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
                     🛒 1. Total Products Sold: {orders.reduce((acc: number, o: any) => acc + (o.items?.length || 1), 0)} Items
@@ -7900,7 +8014,7 @@ export default function ValobasaAdminPanel() {
 
               {/* Quick Alerts & Activity Section (Connected to Live State) */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-                
+
                 {/* Low Stock Alerts (Filtered directly from adminProducts catalog) */}
                 <div style={{ backgroundColor: "#ffffff", borderRadius: "10px", padding: "20px", border: "1px solid #e2e8f0" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
@@ -8018,45 +8132,45 @@ export default function ValobasaAdminPanel() {
                 </div>
               ) : (
                 <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: "60px" }}>RANK</th>
-                    <th style={{ width: "70px" }}>IMAGE</th>
-                    <th>PRODUCT NAME</th>
-                    <th>BRAND</th>
-                    <th style={{ textAlign: "center" }}>UNITS SOLD</th>
-                    <th>UNIT PRICE</th>
-                    <th>TOTAL REVENUE</th>
-                    <th style={{ textAlign: "center" }}>STOCK STATUS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topSellingProducts.map((p, idx) => (
-                    <tr key={p.id || idx} onClick={() => setViewingTopProduct(p)} style={{ cursor: "pointer" }} className="promo-card-hover">
-                      <td style={{ fontWeight: "900", fontSize: "16px", color: idx === 0 ? "#e63b7a" : idx === 1 ? "#f59e0b" : idx === 2 ? "#3b82f6" : "#64748b" }}>
-                        #{idx + 1}
-                      </td>
-                      <td>
-                        <img src={p.image} alt={p.name} style={{ width: "52px", height: "52px", objectFit: "cover", borderRadius: "8px", border: "1px solid #e2e8f0" }}
-                          onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=200&q=80"; }} />
-                      </td>
-                      <td style={{ fontWeight: "700", color: "#1e293b" }}>
-                        {p.name}
-                        <div style={{ fontSize: "11px", color: "#2563eb", fontWeight: "600" }}>🔍 Click for Details Popup</div>
-                      </td>
-                      <td><span className="badge badge-info">{p.brandName}</span></td>
-                      <td style={{ textAlign: "center", fontWeight: "800", fontSize: "15px", color: "#e63b7a" }}>{p.unitsSold} pcs</td>
-                      <td style={{ fontWeight: "700" }}>Tk {p.price}</td>
-                      <td style={{ fontWeight: "900", color: "#059669" }}>Tk {p.totalRevenue}</td>
-                      <td style={{ textAlign: "center" }}>
-                        <span className={`badge ${p.stock > 10 ? "badge-success" : "badge-danger"}`}>
-                          {p.stock > 10 ? `In Stock (${p.stock})` : "Low Stock"}
-                        </span>
-                      </td>
+                  <thead>
+                    <tr>
+                      <th style={{ width: "60px" }}>RANK</th>
+                      <th style={{ width: "70px" }}>IMAGE</th>
+                      <th>PRODUCT NAME</th>
+                      <th>BRAND</th>
+                      <th style={{ textAlign: "center" }}>UNITS SOLD</th>
+                      <th>UNIT PRICE</th>
+                      <th>TOTAL REVENUE</th>
+                      <th style={{ textAlign: "center" }}>STOCK STATUS</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {topSellingProducts.map((p, idx) => (
+                      <tr key={p.id || idx} onClick={() => setViewingTopProduct(p)} style={{ cursor: "pointer" }} className="promo-card-hover">
+                        <td style={{ fontWeight: "900", fontSize: "16px", color: idx === 0 ? "#e63b7a" : idx === 1 ? "#f59e0b" : idx === 2 ? "#3b82f6" : "#64748b" }}>
+                          #{idx + 1}
+                        </td>
+                        <td>
+                          <img src={p.image} alt={p.name} style={{ width: "52px", height: "52px", objectFit: "cover", borderRadius: "8px", border: "1px solid #e2e8f0" }}
+                            onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=200&q=80"; }} />
+                        </td>
+                        <td style={{ fontWeight: "700", color: "#1e293b" }}>
+                          {p.name}
+                          <div style={{ fontSize: "11px", color: "#2563eb", fontWeight: "600" }}>🔍 Click for Details Popup</div>
+                        </td>
+                        <td><span className="badge badge-info">{p.brandName}</span></td>
+                        <td style={{ textAlign: "center", fontWeight: "800", fontSize: "15px", color: "#e63b7a" }}>{p.unitsSold} pcs</td>
+                        <td style={{ fontWeight: "700" }}>Tk {p.price}</td>
+                        <td style={{ fontWeight: "900", color: "#059669" }}>Tk {p.totalRevenue}</td>
+                        <td style={{ textAlign: "center" }}>
+                          <span className={`badge ${p.stock > 10 ? "badge-success" : "badge-danger"}`}>
+                            {p.stock > 10 ? `In Stock (${p.stock})` : "Low Stock"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )}
             </div>
           )}
@@ -8162,7 +8276,7 @@ export default function ValobasaAdminPanel() {
 
                 {/* KPI Stat Cards */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" }}>
-                  <div 
+                  <div
                     onClick={() => setInventoryViewTab("all")}
                     style={{ backgroundColor: "#ffffff", padding: "18px 20px", borderRadius: "12px", border: inventoryViewTab === "all" ? "2px solid #0284c7" : "1px solid #e2e8f0", cursor: "pointer", transition: "all 0.15s ease", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
                   >
@@ -8171,7 +8285,7 @@ export default function ValobasaAdminPanel() {
                     <div style={{ fontSize: "12px", color: "#0284c7", fontWeight: "700", marginTop: "4px" }}>{totalUnits.toLocaleString()} total units in stock</div>
                   </div>
 
-                  <div 
+                  <div
                     onClick={() => setInventoryViewTab("low_stock")}
                     style={{ backgroundColor: lowStockCount > 0 ? "#fffbeb" : "#ffffff", padding: "18px 20px", borderRadius: "12px", border: inventoryViewTab === "low_stock" ? "2px solid #f59e0b" : "1px solid #fef3c7", cursor: "pointer", transition: "all 0.15s ease", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
                   >
@@ -8180,7 +8294,7 @@ export default function ValobasaAdminPanel() {
                     <div style={{ fontSize: "12px", color: "#b45309", fontWeight: "600", marginTop: "4px" }}>Click to filter items needing re-order</div>
                   </div>
 
-                  <div 
+                  <div
                     onClick={() => setInventoryViewTab("out_of_stock")}
                     style={{ backgroundColor: outOfStockCount > 0 ? "#fef2f2" : "#ffffff", padding: "18px 20px", borderRadius: "12px", border: inventoryViewTab === "out_of_stock" ? "2px solid #ef4444" : "1px solid #fee2e2", cursor: "pointer", transition: "all 0.15s ease", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
                   >
@@ -8189,7 +8303,7 @@ export default function ValobasaAdminPanel() {
                     <div style={{ fontSize: "12px", color: "#b91c1c", fontWeight: "600", marginTop: "4px" }}>Urgent restocking required</div>
                   </div>
 
-                  <div 
+                  <div
                     onClick={() => {
                       setInventoryViewTab("logs");
                       if (inventoryLogs.length === 0) fetchInventoryLogs();
@@ -8359,10 +8473,10 @@ export default function ValobasaAdminPanel() {
                             </thead>
                             <tbody>
                               {filteredProducts.map((p) => {
-                                const currentPrices = inventoryPrices[p.id] || { 
-                                  costPrice: p.variants?.[0]?.costPrice || p.costPrice || 0, 
-                                  price: p.variants?.[0]?.price || p.price || 0, 
-                                  discountPrice: p.variants?.[0]?.discountPrice || p.discountPrice || 0, 
+                                const currentPrices = inventoryPrices[p.id] || {
+                                  costPrice: p.variants?.[0]?.costPrice || p.costPrice || 0,
+                                  price: p.variants?.[0]?.price || p.price || 0,
+                                  discountPrice: p.variants?.[0]?.discountPrice || p.discountPrice || 0,
                                   stock: p.variants?.[0]?.stock !== undefined ? p.variants[0].stock : (p.stock || 0)
                                 };
                                 const isEditing = editingInventoryId === p.id;
@@ -8599,7 +8713,7 @@ export default function ValobasaAdminPanel() {
                 {manualOrderModalOpen && (
                   <div style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh", backgroundColor: "#ffffff", zIndex: 999999, overflowY: "auto", padding: "24px 36px" }}>
                     <div style={{ width: "100%", maxWidth: "1400px", margin: "0 auto", position: "relative" }}>
-                      
+
                       {/* Modal Header */}
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px", borderBottom: "1px solid #e2e8f0", paddingBottom: "16px" }}>
                         <div>
@@ -8621,7 +8735,7 @@ export default function ValobasaAdminPanel() {
 
                       <form onSubmit={handleCreateManualOrder}>
                         <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1.3fr", gap: "24px" }}>
-                          
+
                           {/* Left Column: Customer & Delivery Information */}
                           <div style={{ backgroundColor: "#f8fafc", padding: "20px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
                             <h3 style={{ fontSize: "15px", fontWeight: "800", color: "#1e293b", margin: "0 0 16px 0", display: "flex", alignItems: "center", gap: "6px" }}>
@@ -8771,7 +8885,7 @@ export default function ValobasaAdminPanel() {
 
                           {/* Right Column: Product Picker & Bill Summary */}
                           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                            
+
                             {/* Product Selector */}
                             <div style={{ backgroundColor: "#fdf2f8", padding: "16px", borderRadius: "12px", border: "1px solid #fbcfe8" }}>
                               <label style={{ fontSize: "13px", fontWeight: "800", color: "#9d174d", display: "block", marginBottom: "6px" }}>
@@ -8909,15 +9023,51 @@ export default function ValobasaAdminPanel() {
                                       />
                                     </div>
                                   </div>
-                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "2px dashed #cbd5e1", paddingTop: "8px" }}>
+
+                                  {/* Advance / Paid Amount Field (Partial Payment Support) */}
+                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12.5px", color: "#475569", marginBottom: "8px", backgroundColor: "#f0fdf4", padding: "6px 8px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
+                                    <span style={{ fontWeight: "700", color: "#166534" }}>Paid / অগ্রিম প্রদান:</span>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                      <span style={{ color: "#166534", fontWeight: "700" }}>Tk </span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        placeholder="0"
+                                        value={manualOrderPaidAmount}
+                                        onChange={(e) => setManualOrderPaidAmount(e.target.value)}
+                                        style={{ width: "80px", padding: "3px 6px", border: "1.5px solid #16a34a", borderRadius: "4px", fontSize: "12px", textAlign: "right", fontWeight: "800", color: "#166534", backgroundColor: "#ffffff" }}
+                                        title="Customer partial/advance payment amount"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "2px dashed #cbd5e1", paddingTop: "8px", marginBottom: "4px" }}>
                                     <div>
                                       <div style={{ fontSize: "13px", fontWeight: "800", color: "#0f172a" }}>GRAND TOTAL:</div>
                                       <div style={{ fontSize: "11px", color: "#64748b" }}>Calculated for cash memo / invoice</div>
                                     </div>
-                                    <div style={{ fontSize: "22px", fontWeight: "900", color: "#e2136e" }}>
+                                    <div style={{ fontSize: "20px", fontWeight: "900", color: "#e2136e" }}>
                                       Tk {grandTotal}
                                     </div>
                                   </div>
+
+                                  {(() => {
+                                    const paidVal = Math.max(0, parseFloat(manualOrderPaidAmount) || 0);
+                                    const dueVal = Math.max(0, grandTotal - paidVal);
+                                    if (paidVal <= 0) return null;
+                                    return (
+                                      <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "6px", marginTop: "4px" }}>
+                                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#166534", fontWeight: "700", marginBottom: "2px" }}>
+                                          <span>Paid Amount (পরিশোধিত):</span>
+                                          <strong>Tk {paidVal}</strong>
+                                        </div>
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px", color: dueVal > 0 ? "#dc2626" : "#166534", fontWeight: "900" }}>
+                                          <span>{dueVal > 0 ? "DUE (বাকি টাকা):" : "Status:"}</span>
+                                          <strong style={{ fontSize: "15px" }}>{dueVal > 0 ? `Tk ${dueVal}` : "FULL PAID ✅"}</strong>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               );
                             })()}
@@ -8962,9 +9112,9 @@ export default function ValobasaAdminPanel() {
                     </div>
                   </div>
                 )}
-               </div>
-             );
-           })()}
+              </div>
+            );
+          })()}
 
           {/* 4. ORDERS LIST */}
           {(activeTab === "recent-orders" || activeTab === "orders") && (
@@ -9057,17 +9207,17 @@ export default function ValobasaAdminPanel() {
                         <td>
                           <div style={{ display: "flex", flexDirection: "column", gap: "6px", minWidth: "160px" }}>
                             {/* Main Send to Pathao Button (Always Visible) */}
-                            <button 
-                              onClick={() => handleSendCourier(o.id, "pathao")} 
+                            <button
+                              onClick={() => handleSendCourier(o.id, "pathao")}
                               disabled={sendingCourierOrderId === o.id}
-                              style={{ 
-                                padding: "6px 12px", 
-                                backgroundColor: sendingCourierOrderId === o.id ? "#9ca3af" : "#059669", 
-                                color: "#ffffff", 
-                                border: "none", 
-                                borderRadius: "6px", 
-                                fontSize: "11.5px", 
-                                fontWeight: "800", 
+                              style={{
+                                padding: "6px 12px",
+                                backgroundColor: sendingCourierOrderId === o.id ? "#9ca3af" : "#059669",
+                                color: "#ffffff",
+                                border: "none",
+                                borderRadius: "6px",
+                                fontSize: "11.5px",
+                                fontWeight: "800",
                                 cursor: sendingCourierOrderId === o.id ? "not-allowed" : "pointer",
                                 display: "inline-flex",
                                 alignItems: "center",
@@ -9268,14 +9418,14 @@ export default function ValobasaAdminPanel() {
                       🧾 Choose Format:
                     </div>
                     <div style={{ display: "flex", gap: "6px" }}>
-                      <button 
-                        onClick={() => setVoucherPrintSize("POS-80mm")} 
+                      <button
+                        onClick={() => setVoucherPrintSize("POS-80mm")}
                         style={{ padding: "6px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: "800", border: voucherPrintSize === "POS-80mm" ? "2px solid #e2136e" : "1px solid #cbd5e1", backgroundColor: voucherPrintSize === "POS-80mm" ? "#fdf2f8" : "#fff", color: voucherPrintSize === "POS-80mm" ? "#e2136e" : "#475569", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}
                       >
                         🧾 POS 80mm Thermal (Receipt)
                       </button>
-                      <button 
-                        onClick={() => setVoucherPrintSize("A4")} 
+                      <button
+                        onClick={() => setVoucherPrintSize("A4")}
                         style={{ padding: "6px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: "800", border: voucherPrintSize === "A4" ? "2px solid #2563eb" : "1px solid #cbd5e1", backgroundColor: voucherPrintSize === "A4" ? "#eff6ff" : "#fff", color: voucherPrintSize === "A4" ? "#2563eb" : "#475569", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}
                       >
                         📄 A4 Invoice
@@ -9284,20 +9434,20 @@ export default function ValobasaAdminPanel() {
                   </div>
 
                   <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                    <button 
-                      onClick={() => handlePrintVoucherWithSize(voucherPrintSize)} 
+                    <button
+                      onClick={() => handlePrintVoucherWithSize(voucherPrintSize)}
                       style={{ backgroundColor: "#059669", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "6px", fontWeight: "800", fontSize: "12.5px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", boxShadow: "0 2px 6px rgba(5,150,105,0.25)" }}
                     >
                       <Printer size={16} /> 1-Click Print ({voucherPrintSize})
                     </button>
-                    <button 
-                      onClick={handleDownloadVoucher} 
+                    <button
+                      onClick={handleDownloadVoucher}
                       style={{ backgroundColor: "#2563eb", color: "#fff", border: "none", padding: "8px 14px", borderRadius: "6px", fontWeight: "700", fontSize: "12.5px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
                     >
                       <Download size={15} /> Download
                     </button>
-                    <button 
-                      onClick={() => setSelectedVoucherOrder(null)} 
+                    <button
+                      onClick={() => setSelectedVoucherOrder(null)}
                       style={{ backgroundColor: "#f1f5f9", color: "#475569", border: "none", padding: "8px 14px", borderRadius: "6px", fontWeight: "700", fontSize: "12.5px", cursor: "pointer" }}
                     >
                       ✕ Close
@@ -9307,11 +9457,11 @@ export default function ValobasaAdminPanel() {
 
                 {/* Printable Voucher Section */}
                 <div id="printable-voucher" style={{ backgroundColor: "#fff", padding: voucherPrintSize.includes("POS") ? "12px 16px" : "24px", border: "1px solid #e2e8f0", borderRadius: "10px" }}>
-                  
+
                   {voucherPrintSize.includes("POS") ? (
                     /* ================= POS 80MM / 58MM THERMAL RECEIPT LAYOUT ================= */
                     <div style={{ maxWidth: "340px", margin: "0 auto", fontFamily: "'Courier New', Courier, monospace, sans-serif", color: "#000", fontSize: "12px", lineHeight: "1.4" }}>
-                      
+
                       {/* Store Header */}
                       <div style={{ textAlign: "center", marginBottom: "8px" }}>
                         <div style={{ fontSize: "20px", fontWeight: "900", letterSpacing: "1.5px", textTransform: "uppercase" }}>GLOWGOODLY</div>
@@ -9406,10 +9556,10 @@ export default function ValobasaAdminPanel() {
                         <div>100% Genuine Imported Beauty Care</div>
                         <div style={{ marginTop: "3px" }}>* Keep this token memo for support *</div>
                         <div style={{ margin: "8px 0" }}>
-                          <img 
-                            src="https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=https://shop.glowgoodly.com" 
-                            alt="QR Code" 
-                            style={{ width: "75px", height: "75px", display: "inline-block" }} 
+                          <img
+                            src="https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=https://shop.glowgoodly.com"
+                            alt="QR Code"
+                            style={{ width: "75px", height: "75px", display: "inline-block" }}
                           />
                           <div style={{ fontSize: "9.5px", fontWeight: "700", marginTop: "3px" }}>Scan to visit: shop.glowgoodly.com</div>
                         </div>
@@ -9422,14 +9572,14 @@ export default function ValobasaAdminPanel() {
                   ) : (
                     /* ================= A4 FULL PAGE CORPORATE INVOICE LAYOUT ================= */
                     <div style={{ fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", color: "#1e293b", fontSize: "13px" }}>
-                      
+
                       {/* Top Header */}
                       <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "2px solid #e2136e", paddingBottom: "16px", marginBottom: "20px" }}>
                         <div>
                           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                            <img 
-                              src="/images/logo.png" 
-                              alt="GlowGoodly" 
+                            <img
+                              src="/images/logo.png"
+                              alt="GlowGoodly"
                               style={{ width: "42px", height: "42px", objectFit: "contain", borderRadius: "6px" }}
                               onError={(e) => { (e.currentTarget as any).src = "/user-glow-logo.png"; }}
                             />
@@ -9517,6 +9667,18 @@ export default function ValobasaAdminPanel() {
                             <span>GRAND TOTAL:</span>
                             <span>Tk {selectedVoucherOrder.total}</span>
                           </div>
+                          {(selectedVoucherOrder.paidAmount !== undefined && selectedVoucherOrder.paidAmount > 0) && (
+                            <>
+                              <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: "13px", color: "#166534", fontWeight: "700" }}>
+                                <span>Paid (পরিশোধিত):</span>
+                                <strong>Tk {selectedVoucherOrder.paidAmount}</strong>
+                              </div>
+                              <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: "13.5px", color: (selectedVoucherOrder.dueAmount || 0) > 0 ? "#dc2626" : "#166534", fontWeight: "900", borderTop: "1px dashed #cbd5e1", marginTop: "4px" }}>
+                                <span>{(selectedVoucherOrder.dueAmount || 0) > 0 ? "DUE (বাকি টাকা):" : "STATUS:"}</span>
+                                <strong>{(selectedVoucherOrder.dueAmount || 0) > 0 ? `Tk ${selectedVoucherOrder.dueAmount}` : "FULL PAID ✅"}</strong>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
 
@@ -9659,8 +9821,8 @@ export default function ValobasaAdminPanel() {
                     const subs = (Array.isArray(c.subCategories) && c.subCategories.length > 0)
                       ? c.subCategories
                       : (Array.isArray(c.subs) && c.subs.length > 0)
-                      ? c.subs
-                      : subCategories.filter((s: any) => s.parentId === c.id);
+                        ? c.subs
+                        : subCategories.filter((s: any) => s.parentId === c.id);
 
                     return (
                       <tr key={c.id}>
@@ -9770,101 +9932,456 @@ export default function ValobasaAdminPanel() {
           {/* 8. PRODUCTS */}
           {activeTab === "products" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-              <div style={{ backgroundColor: "#ffffff", borderRadius: "10px", border: "1px solid #e5e7eb", padding: "24px" }}>
-                <h2 style={{ fontSize: "18px", fontWeight: "800", marginBottom: "16px" }}>Add New Product</h2>
-                <form onSubmit={handleSaveProduct} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                  <div><label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Product Name *</label><input required value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px" }} placeholder="Enter product name" /></div>
+              <div style={{ backgroundColor: "#ffffff", borderRadius: "12px", border: "1.5px solid #e2e8f0", padding: "28px", boxShadow: "0 4px 16px rgba(0,0,0,0.03)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", borderBottom: "1.5px solid #f1f5f9", paddingBottom: "14px" }}>
                   <div>
-                    <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Brand *</label>
-                    <select
-                      required
-                      value={productForm.brandId}
-                      onChange={(e) => setProductForm({ ...productForm, brandId: e.target.value })}
-                      style={{ width: "100%", padding: "10px", border: "1.5px solid #cbd5e1", borderRadius: "6px", backgroundColor: "#fff", fontSize: "13px" }}
-                    >
-                      <option value="">-- Select Brand --</option>
-                      {adminBrands.map((b: any) => (
-                        <option key={b.id || b.name} value={b.id || b.name}>🏷️ {b.name}</option>
-                      ))}
-                    </select>
+                    <h2 style={{ fontSize: "20px", fontWeight: "900", color: "#0f172a", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+                      ✨ Add New Cosmetics / Skincare Product
+                    </h2>
+                    <p style={{ margin: "4px 0 0 0", fontSize: "12.5px", color: "#64748b" }}>
+                      Professional GlowGoodly beauty catalog entry with formula specifications, packshot imagery & pricing economics.
+                    </p>
                   </div>
-                  <div>
-                    <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>
-                      Category * (Choose Category or Subcategory)
-                    </label>
-                    <select
-                      required
-                      value={productForm.categoryId}
-                      onChange={(e) => setProductForm({ ...productForm, categoryId: e.target.value })}
-                      style={{ width: "100%", padding: "10px", border: "1.5px solid #cbd5e1", borderRadius: "6px", backgroundColor: "#fff", fontSize: "13px" }}
-                    >
-                      <option value="">-- Select Category or Subcategory --</option>
-                      {adminCategories.map((cat: any) => {
-                        const subs = (Array.isArray(cat.subCategories) && cat.subCategories.length > 0)
-                          ? cat.subCategories
-                          : (Array.isArray(cat.subs) && cat.subs.length > 0)
-                          ? cat.subs
-                          : subCategories.filter((s: any) => s.parentId === cat.id);
+                  <span style={{ backgroundColor: "#fdf2f8", color: "#be185d", border: "1px solid #fbcfe8", padding: "4px 12px", borderRadius: "20px", fontSize: "12px", fontWeight: "800" }}>
+                    Standard Catalog Architecture
+                  </span>
+                </div>
 
-                        if (subs && subs.length > 0) {
-                          return (
-                            <optgroup key={cat.id || cat.name} label={`📂 ${cat.name}`}>
-                              <option value={cat.id || cat.slug || cat.name} style={{ fontWeight: "bold" }}>
-                                ⭐ {cat.name} (Main Category)
-                              </option>
-                              {subs.map((sub: any) => {
-                                const subId = typeof sub === "string" ? sub : (sub.id || sub.name);
-                                const subName = typeof sub === "string" ? sub : (sub.name || subId);
-                                return (
-                                  <option key={subId} value={subId}>
-                                    &nbsp;&nbsp;&nbsp;&nbsp;↳ {subName}
+                <form onSubmit={handleSaveProduct} style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+
+                  {/* Section 1: Basic Information & Badges */}
+                  <div style={{ backgroundColor: "#f8fafc", padding: "20px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+                    <div style={{ fontSize: "14px", fontWeight: "800", color: "#1e293b", marginBottom: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span>🏷️</span> SECTION 1: BASIC PRODUCT INFORMATION & STATUS
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px" }}>
+                      <div style={{ gridColumn: "span 2" }}>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "5px" }}>Product Name *</label>
+                        <input
+                          required
+                          value={productForm.name}
+                          onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                          style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #cbd5e1", borderRadius: "7px", fontSize: "13.5px" }}
+                          placeholder="e.g. CeraVe Foaming Facial Cleanser 236ml"
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "5px" }}>Brand *</label>
+                        <select
+                          required
+                          value={productForm.brandId}
+                          onChange={(e) => setProductForm({ ...productForm, brandId: e.target.value })}
+                          style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #cbd5e1", borderRadius: "7px", backgroundColor: "#fff", fontSize: "13px" }}
+                        >
+                          <option value="">-- Select Brand --</option>
+                          {adminBrands.map((b: any) => (
+                            <option key={b.id || b.name} value={b.id || b.name}>🏷️ {b.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "5px" }}>
+                          Category & Subcategory *
+                        </label>
+                        <select
+                          required
+                          value={productForm.categoryId}
+                          onChange={(e) => setProductForm({ ...productForm, categoryId: e.target.value })}
+                          style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #cbd5e1", borderRadius: "7px", backgroundColor: "#fff", fontSize: "13px" }}
+                        >
+                          <option value="">-- Select Category or Subcategory --</option>
+                          {adminCategories.map((cat: any) => {
+                            const subs = (Array.isArray(cat.subCategories) && cat.subCategories.length > 0)
+                              ? cat.subCategories
+                              : (Array.isArray(cat.subs) && cat.subs.length > 0)
+                                ? cat.subs
+                                : subCategories.filter((s: any) => s.parentId === cat.id);
+
+                            if (subs && subs.length > 0) {
+                              return (
+                                <optgroup key={cat.id || cat.name} label={`📂 ${cat.name}`}>
+                                  <option value={cat.id || cat.slug || cat.name} style={{ fontWeight: "bold" }}>
+                                    ⭐ {cat.name} (Main Category)
                                   </option>
-                                );
-                              })}
-                            </optgroup>
-                          );
-                        }
+                                  {subs.map((sub: any) => {
+                                    const subId = typeof sub === "string" ? sub : (sub.id || sub.name);
+                                    const subName = typeof sub === "string" ? sub : (sub.name || subId);
+                                    return (
+                                      <option key={subId} value={subId}>
+                                        &nbsp;&nbsp;&nbsp;&nbsp;↳ {subName}
+                                      </option>
+                                    );
+                                  })}
+                                </optgroup>
+                              );
+                            }
 
-                        return (
-                          <option key={cat.id || cat.name} value={cat.id || cat.slug || cat.name}>
-                            📁 {cat.name}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-                  <div><label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Sell Price (BDT) *</label><input type="number" required value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px" }} /></div>
-                  <div><label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Buy Price / Cost (BDT)</label><input type="number" value={productForm.costPrice} onChange={(e) => setProductForm({ ...productForm, costPrice: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px" }} /></div>
-                  <div><label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Discount Price (BDT)</label><input type="number" value={productForm.discountPrice} onChange={(e) => setProductForm({ ...productForm, discountPrice: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px" }} /></div>
-                  <div><label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Stock</label><input type="number" value={productForm.stock} onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px" }} /></div>
-                  <div style={{ gridColumn: "1 / -1", backgroundColor: "#fff0f5", padding: "14px", borderRadius: "8px", border: "1px solid #fbcfe8" }}>
-                    <label style={{ fontSize: "13px", fontWeight: "800", display: "block", marginBottom: "6px", color: "#be185d" }}>🖼️ Product Main Cover Image (Constant image for all shades)</label>
-                    <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+                            return (
+                              <option key={cat.id || cat.name} value={cat.id || cat.slug || cat.name}>
+                                📁 {cat.name}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "5px" }}>SKU / Product Code</label>
+                        <input
+                          value={productForm.sku}
+                          onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
+                          style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #cbd5e1", borderRadius: "7px", fontSize: "13px" }}
+                          placeholder="e.g. CRV-CLN-236"
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "5px" }}>Product Status</label>
+                        <select
+                          value={productForm.status}
+                          onChange={(e) => setProductForm({ ...productForm, status: e.target.value })}
+                          style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #cbd5e1", borderRadius: "7px", backgroundColor: "#fff", fontSize: "13px" }}
+                        >
+                          <option value="Active">Active (Visible in Store)</option>
+                          <option value="Draft">Draft (Hidden)</option>
+                          <option value="Archived">Archived</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Flags / Badges */}
+                    <div style={{ display: "flex", gap: "20px", marginTop: "14px", flexWrap: "wrap", padding: "10px 14px", backgroundColor: "#ffffff", borderRadius: "7px", border: "1px solid #e2e8f0" }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", fontWeight: "700", color: "#334155", cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={productForm.isFeatured}
+                          onChange={(e) => setProductForm({ ...productForm, isFeatured: e.target.checked })}
+                          style={{ width: "16px", height: "16px", accentColor: "#e63b7a" }}
+                        />
+                        ⭐ Featured Product
+                      </label>
+                      <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", fontWeight: "700", color: "#334155", cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={productForm.isNewArrival}
+                          onChange={(e) => setProductForm({ ...productForm, isNewArrival: e.target.checked })}
+                          style={{ width: "16px", height: "16px", accentColor: "#e63b7a" }}
+                        />
+                        ✨ New Arrival
+                      </label>
+                      <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", fontWeight: "700", color: "#334155", cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={productForm.isBestSeller}
+                          onChange={(e) => setProductForm({ ...productForm, isBestSeller: e.target.checked })}
+                          style={{ width: "16px", height: "16px", accentColor: "#e63b7a" }}
+                        />
+                        🔥 Best Seller
+                      </label>
+                    </div>
+
+                    <div style={{ marginTop: "14px" }}>
+                      <label style={{ fontSize: "12px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "5px" }}>Short Description (Above the fold highlight)</label>
                       <input
-                        type="text"
-                        value={productForm.imageUrl || ""}
-                        onChange={(e) => setProductForm(prev => ({ ...prev, imageUrl: e.target.value }))}
-                        placeholder="Main Cover Image URL (https://...)"
-                        style={{ flex: 1, minWidth: "200px", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px" }}
+                        value={productForm.shortDescription}
+                        onChange={(e) => setProductForm({ ...productForm, shortDescription: e.target.value })}
+                        style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #cbd5e1", borderRadius: "7px", fontSize: "13px" }}
+                        placeholder="Quick 1-line benefit statement (e.g. Gentle cleanser that cleanses and removes excess oil without disrupting skin barrier)"
                       />
-                      <input type="file" accept="image/*" onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => setProductForm(prev => ({ ...prev, imageUrl: reader.result as string }));
-                          reader.readAsDataURL(file);
-                        }
-                      }} style={{ fontSize: "12px", width: "160px" }} />
-                      {productForm.imageUrl && <img src={productForm.imageUrl} alt="Main Cover" style={{ width: "45px", height: "45px", objectFit: "cover", borderRadius: "6px", border: "1px solid #cbd5e1" }} />}
                     </div>
                   </div>
 
-                  {/* Shade / Variant Manager in Add Product Form */}
-                  <div style={{ gridColumn: "1 / -1", backgroundColor: "#fdf2f8", padding: "16px", borderRadius: "8px", border: "1.5px dashed #f472b6" }}>
+                  {/* Section 2: Pricing & Discount Economics */}
+                  <div style={{ backgroundColor: "#f0fdf4", padding: "20px", borderRadius: "10px", border: "1px solid #bbf7d0" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                      <div style={{ fontSize: "14px", fontWeight: "800", color: "#166534", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span>💰</span> SECTION 2: PRICING & DISCOUNT ECONOMICS
+                      </div>
+                      {(() => {
+                        const reg = parseFloat(productForm.price) || 0;
+                        const sale = parseFloat(productForm.discountPrice) || 0;
+                        if (reg > 0 && sale > 0 && reg > sale) {
+                          const pct = Math.round(((reg - sale) / reg) * 100);
+                          return (
+                            <span style={{ backgroundColor: "#15803d", color: "#ffffff", padding: "4px 12px", borderRadius: "20px", fontSize: "12px", fontWeight: "900" }}>
+                              🏷️ Auto Discount: {pct}% OFF (৳{reg - sale} Savings)
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#166534", display: "block", marginBottom: "5px" }}>Regular Price (BDT) *</label>
+                        <input
+                          type="number"
+                          required
+                          value={productForm.price}
+                          onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
+                          style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #86efac", borderRadius: "7px", fontSize: "14px", fontWeight: "700" }}
+                          placeholder="e.g. 1500"
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#166534", display: "block", marginBottom: "5px" }}>Sale / Offer Price (BDT)</label>
+                        <input
+                          type="number"
+                          value={productForm.discountPrice}
+                          onChange={(e) => setProductForm({ ...productForm, discountPrice: e.target.value })}
+                          style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #86efac", borderRadius: "7px", fontSize: "14px", fontWeight: "700" }}
+                          placeholder="Leave blank if no discount"
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#166534", display: "block", marginBottom: "5px" }}>Buy Price / Cost Price (BDT, Admin Only)</label>
+                        <input
+                          type="number"
+                          value={productForm.costPrice}
+                          onChange={(e) => setProductForm({ ...productForm, costPrice: e.target.value })}
+                          style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #86efac", borderRadius: "7px", fontSize: "14px" }}
+                          placeholder="e.g. 950"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section 3: Media & Packshot Cosmetics Presentation */}
+                  <div style={{ backgroundColor: "#fff0f5", padding: "20px", borderRadius: "10px", border: "1px solid #fbcfe8" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                      <label style={{ fontSize: "13px", fontWeight: "800", color: "#be185d" }}>
-                        🎨 Product Shades & Variants (Add Shade Name, Color & Image)
-                      </label>
+                      <div style={{ fontSize: "14px", fontWeight: "800", color: "#9d174d", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span>🖼️</span> SECTION 3: MEDIA & PACKSHOT COSMETICS PRESENTATION
+                      </div>
+                      <span style={{ fontSize: "11px", fontWeight: "700", color: "#be185d", backgroundColor: "#ffffff", padding: "3px 8px", borderRadius: "6px", border: "1px solid #fbcfe8" }}>
+                        Packshot standard: 800x800 px (Square) • Non-crop Contain
+                      </span>
+                    </div>
+                    <p style={{ fontSize: "12px", color: "#64748b", margin: "0 0 14px 0" }}>
+                      Dropper bottles, tubes, and lipstick packaging will never be clipped. Preview renders in pure #ffffff clean containment.
+                    </p>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "14px" }}>
+                      {/* Main Cover */}
+                      <div style={{ backgroundColor: "#ffffff", padding: "12px", borderRadius: "8px", border: "1.5px solid #f472b6" }}>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#be185d", display: "block", marginBottom: "6px" }}>
+                          ⭐ Main Cover Image (Primary Packshot)
+                        </label>
+                        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                          <input
+                            type="text"
+                            value={productForm.imageUrl || ""}
+                            onChange={(e) => setProductForm({ ...productForm, imageUrl: e.target.value })}
+                            placeholder="Image URL (https://...)"
+                            style={{ flex: 1, padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px" }}
+                          />
+                          <input type="file" accept="image/*" onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onloadend = () => setProductForm(prev => ({ ...prev, imageUrl: reader.result as string }));
+                              reader.readAsDataURL(file);
+                            }
+                          }} style={{ fontSize: "11px", width: "130px" }} />
+                        </div>
+                        {productForm.imageUrl && (
+                          <div style={{ marginTop: "10px", width: "100px", height: "100px", backgroundColor: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <img src={productForm.imageUrl} alt="Packshot 1" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Gallery Image 2 */}
+                      <div style={{ backgroundColor: "#ffffff", padding: "12px", borderRadius: "8px", border: "1px solid #cbd5e1" }}>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "6px" }}>
+                          Gallery Image 2 (Texture / Swatch)
+                        </label>
+                        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                          <input
+                            type="text"
+                            value={productForm.imageUrl2 || ""}
+                            onChange={(e) => setProductForm({ ...productForm, imageUrl2: e.target.value })}
+                            placeholder="Image URL 2"
+                            style={{ flex: 1, padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px" }}
+                          />
+                          <input type="file" accept="image/*" onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onloadend = () => setProductForm(prev => ({ ...prev, imageUrl2: reader.result as string }));
+                              reader.readAsDataURL(file);
+                            }
+                          }} style={{ fontSize: "11px", width: "130px" }} />
+                        </div>
+                        {productForm.imageUrl2 && (
+                          <div style={{ marginTop: "10px", width: "70px", height: "70px", backgroundColor: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "4px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <img src={productForm.imageUrl2} alt="Packshot 2" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Gallery Image 3 */}
+                      <div style={{ backgroundColor: "#ffffff", padding: "12px", borderRadius: "8px", border: "1px solid #cbd5e1" }}>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "6px" }}>
+                          Gallery Image 3 (Application / Model)
+                        </label>
+                        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                          <input
+                            type="text"
+                            value={productForm.imageUrl3 || ""}
+                            onChange={(e) => setProductForm({ ...productForm, imageUrl3: e.target.value })}
+                            placeholder="Image URL 3"
+                            style={{ flex: 1, padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px" }}
+                          />
+                          <input type="file" accept="image/*" onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onloadend = () => setProductForm(prev => ({ ...prev, imageUrl3: reader.result as string }));
+                              reader.readAsDataURL(file);
+                            }
+                          }} style={{ fontSize: "11px", width: "130px" }} />
+                        </div>
+                        {productForm.imageUrl3 && (
+                          <div style={{ marginTop: "10px", width: "70px", height: "70px", backgroundColor: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "4px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <img src={productForm.imageUrl3} alt="Packshot 3" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Gallery Image 4 */}
+                      <div style={{ backgroundColor: "#ffffff", padding: "12px", borderRadius: "8px", border: "1px solid #cbd5e1" }}>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "6px" }}>
+                          Gallery Image 4 (Box Packaging / Ingredients)
+                        </label>
+                        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                          <input
+                            type="text"
+                            value={productForm.imageUrl4 || ""}
+                            onChange={(e) => setProductForm({ ...productForm, imageUrl4: e.target.value })}
+                            placeholder="Image URL 4"
+                            style={{ flex: 1, padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px" }}
+                          />
+                          <input type="file" accept="image/*" onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onloadend = () => setProductForm(prev => ({ ...prev, imageUrl4: reader.result as string }));
+                              reader.readAsDataURL(file);
+                            }
+                          }} style={{ fontSize: "11px", width: "130px" }} />
+                        </div>
+                        {productForm.imageUrl4 && (
+                          <div style={{ marginTop: "10px", width: "70px", height: "70px", backgroundColor: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "4px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <img src={productForm.imageUrl4} alt="Packshot 4" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section 4: Beauty & Cosmetic Specifications (Formula / INCI) */}
+                  <div style={{ backgroundColor: "#eff6ff", padding: "20px", borderRadius: "10px", border: "1px solid #bfdbfe" }}>
+                    <div style={{ fontSize: "14px", fontWeight: "800", color: "#1e40af", marginBottom: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span>🧪</span> SECTION 4: BEAUTY SPECIFICATIONS, INCI FORMULA & APPLICATION
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#1e3a8a", display: "block", marginBottom: "5px" }}>Skin Type</label>
+                        <select
+                          value={productForm.skinType}
+                          onChange={(e) => setProductForm({ ...productForm, skinType: e.target.value })}
+                          style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #93c5fd", borderRadius: "7px", backgroundColor: "#fff", fontSize: "13px" }}
+                        >
+                          <option value="All Skin Types">All Skin Types</option>
+                          <option value="Dry Skin">Dry Skin</option>
+                          <option value="Oily Skin">Oily Skin</option>
+                          <option value="Combination Skin">Combination Skin</option>
+                          <option value="Sensitive Skin">Sensitive Skin</option>
+                          <option value="Acne-Prone Skin">Acne-Prone Skin</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#1e3a8a", display: "block", marginBottom: "5px" }}>Country of Origin</label>
+                        <select
+                          value={productForm.countryOfOrigin}
+                          onChange={(e) => setProductForm({ ...productForm, countryOfOrigin: e.target.value })}
+                          style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #93c5fd", borderRadius: "7px", backgroundColor: "#fff", fontSize: "13px" }}
+                        >
+                          <option value="South Korea">🇰🇷 South Korea</option>
+                          <option value="USA">🇺🇸 United States</option>
+                          <option value="France">🇫🇷 France</option>
+                          <option value="United Kingdom">🇬🇧 United Kingdom</option>
+                          <option value="Japan">🇯🇵 Japan</option>
+                          <option value="Germany">🇩🇪 Germany</option>
+                          <option value="Canada">🇨🇦 Canada</option>
+                          <option value="Thailand">🇹🇭 Thailand</option>
+                          <option value="Bangladesh">🇧🇩 Bangladesh</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#1e3a8a", display: "block", marginBottom: "5px" }}>Volume / Net Weight</label>
+                        <input
+                          value={productForm.volume}
+                          onChange={(e) => setProductForm({ ...productForm, volume: e.target.value })}
+                          style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #93c5fd", borderRadius: "7px", fontSize: "13px" }}
+                          placeholder="e.g. 50ml / 236ml / 50g"
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#1e3a8a", display: "block", marginBottom: "5px" }}>Key Benefits & Claims</label>
+                        <input
+                          value={productForm.benefits}
+                          onChange={(e) => setProductForm({ ...productForm, benefits: e.target.value })}
+                          style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #93c5fd", borderRadius: "7px", fontSize: "13px" }}
+                          placeholder="e.g. Hydrating, Barrier Repair, Soothing"
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginTop: "14px" }}>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#1e3a8a", display: "block", marginBottom: "5px" }}>Full INCI Ingredients List</label>
+                        <textarea
+                          rows={3}
+                          value={productForm.ingredients}
+                          onChange={(e) => setProductForm({ ...productForm, ingredients: e.target.value })}
+                          style={{ width: "100%", padding: "10px", border: "1.5px solid #93c5fd", borderRadius: "7px", fontSize: "12.5px" }}
+                          placeholder="Aqua / Water, Glycerin, Niacinamide, Cetearyl Alcohol, Ceramide NP, Ceramide AP, Hyaluronic Acid, Carbomer, Phenoxyethanol..."
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#1e3a8a", display: "block", marginBottom: "5px" }}>How to Use (Step-by-step Application Guide)</label>
+                        <textarea
+                          rows={3}
+                          value={productForm.howToUse}
+                          onChange={(e) => setProductForm({ ...productForm, howToUse: e.target.value })}
+                          style={{ width: "100%", padding: "10px", border: "1.5px solid #93c5fd", borderRadius: "7px", fontSize: "12.5px" }}
+                          placeholder="1. Wet skin with lukewarm water. 2. Massage cleanser into skin in a gentle, circular motion. 3. Rinse thoroughly and pat dry."
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: "14px" }}>
+                      <label style={{ fontSize: "12px", fontWeight: "800", color: "#1e3a8a", display: "block", marginBottom: "5px" }}>Detailed Description</label>
+                      <textarea
+                        rows={4}
+                        value={productForm.description}
+                        onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                        style={{ width: "100%", padding: "10px", border: "1.5px solid #93c5fd", borderRadius: "7px", fontSize: "13px" }}
+                        placeholder="Comprehensive product story, dermatologist testing credentials, suitable conditions, and results..."
+                      />
+                    </div>
+                  </div>
+
+                  {/* Section 5: Optional Shade & Size Variants */}
+                  <div style={{ backgroundColor: "#fdf2f8", padding: "20px", borderRadius: "10px", border: "1.5px dashed #f472b6" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                      <div>
+                        <div style={{ fontSize: "14px", fontWeight: "800", color: "#be185d", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span>🎨</span> SECTION 5: SHADE & VARIANT MANAGER
+                        </div>
+                        <div style={{ fontSize: "11px", color: "#9d174d", fontWeight: "600", marginTop: "2px" }}>
+                          Optional: Add foundation shades, lipstick colors, or volume sizes with dedicated swatch hex & packshot image.
+                        </div>
+                      </div>
                       <button
                         type="button"
                         onClick={() => {
@@ -9879,23 +10396,20 @@ export default function ValobasaAdminPanel() {
                             };
                           });
                         }}
-                        style={{ backgroundColor: "#e63b7a", color: "#ffffff", border: "none", padding: "6px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: "800", cursor: "pointer", boxShadow: "0 2px 6px rgba(230,59,122,0.2)" }}
+                        style={{ backgroundColor: "#e63b7a", color: "#ffffff", border: "none", padding: "8px 16px", borderRadius: "7px", fontSize: "12.5px", fontWeight: "800", cursor: "pointer", boxShadow: "0 2px 8px rgba(230,59,122,0.25)" }}
                       >
                         + Add Shade Variant
                       </button>
                     </div>
-                    
-                    <div style={{ fontSize: "11px", color: "#9d174d", fontWeight: "700", marginBottom: "12px" }}>
-                      📋 Recommended Shade Image Size: 500x500 px (Square 1:1 Aspect Ratio)
-                    </div>
 
-                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "12px" }}>
                       {(productForm.variants || []).length === 0 ? (
-                        <div style={{ fontSize: "12px", color: "#94a3b8", textAlign: "center", padding: "10px" }}>No shade variants added yet. Click '+ Add Shade Variant' to add shades by name and color.</div>
+                        <div style={{ fontSize: "12.5px", color: "#94a3b8", textAlign: "center", padding: "14px", backgroundColor: "#ffffff", borderRadius: "8px", border: "1px dashed #cbd5e1" }}>
+                          No shades or variants added. If this product is a single item (e.g. Cleanser 236ml), leave this empty.
+                        </div>
                       ) : (
                         (productForm.variants || []).map((v: any, vIdx: number) => (
                           <div key={v.id || vIdx} style={{ display: "flex", gap: "10px", alignItems: "center", backgroundColor: "#ffffff", padding: "10px 14px", borderRadius: "8px", border: "1px solid #fecdd3", flexWrap: "wrap" }}>
-                            {/* Shade Color Swatch */}
                             <input
                               type="color"
                               value={v.shadeColor || "#e63b7a"}
@@ -9908,9 +10422,8 @@ export default function ValobasaAdminPanel() {
                                 });
                               }}
                               title="Pick Shade Color"
-                              style={{ width: "32px", height: "32px", border: "none", borderRadius: "4px", cursor: "pointer", padding: "0" }}
+                              style={{ width: "34px", height: "34px", border: "none", borderRadius: "6px", cursor: "pointer", padding: "0" }}
                             />
-                            {/* Shade Name */}
                             <input
                               type="text"
                               value={v.name || ""}
@@ -9922,70 +10435,185 @@ export default function ValobasaAdminPanel() {
                                   return { ...prev, variants: nextVars };
                                 });
                               }}
-                              placeholder="Shade Name (e.g. Shade 120 Classic Ivory)"
-                              style={{ flex: 1, minWidth: "180px", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12.5px", fontWeight: "700" }}
+                              placeholder="Shade Name (e.g. 120 Classic Ivory)"
+                              style={{ flex: 1, minWidth: "160px", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12.5px", fontWeight: "700" }}
                             />
-                            {/* Shade Specific Image URL or Upload */}
-                            <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-                              <input
-                                type="text"
-                                value={v.imageUrl || ""}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setProductForm((prev: any) => {
-                                    const nextVars = [...(prev.variants || [])];
-                                    nextVars[vIdx] = { ...nextVars[vIdx], imageUrl: val };
-                                    return { ...prev, variants: nextVars };
-                                  });
-                                }}
-                                placeholder="Shade Image URL (https://...)"
-                                style={{ width: "180px", padding: "6px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "11.5px" }}
-                              />
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                    const reader = new FileReader();
-                                    reader.onloadend = () => {
-                                      setProductForm((prev: any) => {
-                                        const nextVars = [...(prev.variants || [])];
-                                        nextVars[vIdx] = { ...nextVars[vIdx], imageUrl: reader.result as string };
-                                        return { ...prev, variants: nextVars };
-                                      });
-                                    };
-                                    reader.readAsDataURL(file);
-                                  }
-                                }}
-                                style={{ fontSize: "11px", width: "140px" }}
-                              />
-                              {v.imageUrl && (
-                                <img src={v.imageUrl} alt={v.name} style={{ width: "36px", height: "36px", objectFit: "cover", borderRadius: "6px", border: "1px solid #e2e8f0" }} />
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setProductForm((prev: any) => {
-                                    const nextVars = (prev.variants || []).filter((_: any, idx: number) => idx !== vIdx);
-                                    return { ...prev, variants: nextVars };
-                                  });
-                                }}
-                                style={{ backgroundColor: "#fee2e2", color: "#ef4444", border: "none", padding: "6px 10px", borderRadius: "6px", fontSize: "11.5px", fontWeight: "800", cursor: "pointer", whiteSpace: "nowrap" }}
-                              >
-                                🗑️ Delete
-                              </button>
-                            </div>
+                            <input
+                              type="number"
+                              value={v.price || ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setProductForm((prev: any) => {
+                                  const nextVars = [...(prev.variants || [])];
+                                  nextVars[vIdx] = { ...nextVars[vIdx], price: val };
+                                  return { ...prev, variants: nextVars };
+                                });
+                              }}
+                              placeholder="Price (Tk)"
+                              style={{ width: "90px", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px" }}
+                            />
+                            <input
+                              type="number"
+                              value={v.stock || ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setProductForm((prev: any) => {
+                                  const nextVars = [...(prev.variants || [])];
+                                  nextVars[vIdx] = { ...nextVars[vIdx], stock: val };
+                                  return { ...prev, variants: nextVars };
+                                });
+                              }}
+                              placeholder="Stock"
+                              style={{ width: "70px", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px" }}
+                            />
+                            <input
+                              type="text"
+                              value={v.imageUrl || ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setProductForm((prev: any) => {
+                                  const nextVars = [...(prev.variants || [])];
+                                  nextVars[vIdx] = { ...nextVars[vIdx], imageUrl: val };
+                                  return { ...prev, variants: nextVars };
+                                });
+                              }}
+                              placeholder="Shade Image URL"
+                              style={{ width: "160px", padding: "6px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "11.5px" }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setProductForm((prev: any) => {
+                                  const nextVars = (prev.variants || []).filter((_: any, idx: number) => idx !== vIdx);
+                                  return { ...prev, variants: nextVars };
+                                });
+                              }}
+                              style={{ backgroundColor: "#fee2e2", color: "#ef4444", border: "none", padding: "6px 10px", borderRadius: "6px", fontSize: "11.5px", fontWeight: "800", cursor: "pointer" }}
+                            >
+                              🗑️ Delete
+                            </button>
                           </div>
                         ))
                       )}
                     </div>
                   </div>
-                  <div><label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>🔍 SEO Meta Title</label><input value={productForm.metaTitle} onChange={(e) => setProductForm({ ...productForm, metaTitle: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px" }} placeholder="e.g. Buy CeraVe Cleanser Online BD" /></div>
-                  <div><label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>🔍 SEO Meta Description</label><input value={productForm.metaDescription} onChange={(e) => setProductForm({ ...productForm, metaDescription: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px" }} placeholder="100% original CeraVe cleanser with best price in Bangladesh." /></div>
-                  <div style={{ gridColumn: "1 / -1" }}><label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Description</label><textarea value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px", minHeight: "80px" }} /></div>
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <button type="submit" style={{ backgroundColor: "#e63b7a", color: "#fff", border: "none", padding: "12px 28px", borderRadius: "6px", fontWeight: "800", cursor: "pointer" }}>ADD PRODUCT</button>
+
+                  {/* Section 6: Inventory Guard & Stock Control */}
+                  <div style={{ backgroundColor: "#fffbeb", padding: "20px", borderRadius: "10px", border: "1px solid #fde68a" }}>
+                    <div style={{ fontSize: "14px", fontWeight: "800", color: "#92400e", marginBottom: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span>📦</span> SECTION 6: INVENTORY CONTROL & NEGATIVE STOCK GUARD
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#92400e", display: "block", marginBottom: "5px" }}>Current Available Stock *</label>
+                        <input
+                          type="number"
+                          min="0"
+                          required
+                          value={productForm.stock}
+                          onChange={(e) => setProductForm({ ...productForm, stock: Math.max(0, parseInt(e.target.value, 10) || 0).toString() })}
+                          style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #fcd34d", borderRadius: "7px", fontSize: "14px", fontWeight: "700" }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#92400e", display: "block", marginBottom: "5px" }}>Low Stock Alert Threshold</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={productForm.lowStockThreshold}
+                          onChange={(e) => setProductForm({ ...productForm, lowStockThreshold: e.target.value })}
+                          style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #fcd34d", borderRadius: "7px", fontSize: "14px" }}
+                          placeholder="e.g. 5"
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#92400e", display: "block", marginBottom: "5px" }}>Tags / Badges</label>
+                        <input
+                          value={productForm.tags}
+                          onChange={(e) => setProductForm({ ...productForm, tags: e.target.value })}
+                          style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #fcd34d", borderRadius: "7px", fontSize: "13px" }}
+                          placeholder="e.g. Vegan, Cruelty-free, Halal"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section 7: Search Engine Optimization (SEO) & Google SERP Preview */}
+                  <div style={{ backgroundColor: "#f8fafc", padding: "20px", borderRadius: "10px", border: "1px solid #cbd5e1" }}>
+                    <div style={{ fontSize: "14px", fontWeight: "800", color: "#1e293b", marginBottom: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span>🔍</span> SECTION 7: SEARCH ENGINE OPTIMIZATION (SEO) & GOOGLE SERP PREVIEW
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "5px" }}>SEO Meta Title</label>
+                        <input
+                          value={productForm.metaTitle}
+                          onChange={(e) => setProductForm({ ...productForm, metaTitle: e.target.value })}
+                          style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #cbd5e1", borderRadius: "7px", fontSize: "13px" }}
+                          placeholder="e.g. Buy CeraVe Foaming Cleanser 236ml in BD | GlowGoodly"
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "5px" }}>SEO Meta Keywords</label>
+                        <input
+                          value={productForm.metaKeywords}
+                          onChange={(e) => setProductForm({ ...productForm, metaKeywords: e.target.value })}
+                          style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #cbd5e1", borderRadius: "7px", fontSize: "13px" }}
+                          placeholder="e.g. cerave cleanser, cerave bangladesh, authentic skincare"
+                        />
+                      </div>
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <label style={{ fontSize: "12px", fontWeight: "800", color: "#334155", display: "block", marginBottom: "5px" }}>SEO Meta Description</label>
+                        <textarea
+                          rows={2}
+                          value={productForm.metaDescription}
+                          onChange={(e) => setProductForm({ ...productForm, metaDescription: e.target.value })}
+                          style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #cbd5e1", borderRadius: "7px", fontSize: "13px" }}
+                          placeholder="100% authentic CeraVe cleanser imported directly with best price in Bangladesh. Fast home delivery and cash on delivery nationwide."
+                        />
+                      </div>
+                    </div>
+
+                    {/* Google SERP Live Snippet Box */}
+                    <div style={{ marginTop: "16px", padding: "16px", backgroundColor: "#ffffff", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                      <div style={{ fontSize: "11px", fontWeight: "700", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>
+                        Live Google Search Result Preview
+                      </div>
+                      <div style={{ fontSize: "12px", color: "#202124", display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px" }}>
+                        <span style={{ color: "#202124", fontWeight: "600" }}>glowgoodly.com</span>
+                        <span style={{ color: "#5f6368" }}>&rsaquo; product &rsaquo; {generateSlug(productForm.name || "product-name")}</span>
+                      </div>
+                      <div style={{ fontSize: "18px", color: "#1a0dab", fontWeight: "600", cursor: "pointer", textDecoration: "none", lineHeight: "1.3" }}>
+                        {productForm.metaTitle || (productForm.name ? `${productForm.name} - GlowGoodly Bangladesh` : "Product Title Preview")}
+                      </div>
+                      <div style={{ fontSize: "13px", color: "#4d5156", marginTop: "4px", lineHeight: "1.4" }}>
+                        {productForm.metaDescription || (productForm.shortDescription ? `${productForm.shortDescription} 100% genuine guaranteed with fast cash on delivery nationwide in Bangladesh.` : "Product description snippet will appear here on Google search results.")}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Submission Action Bar */}
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", paddingTop: "10px", borderTop: "1.5px solid #f1f5f9" }}>
+                    <button
+                      type="submit"
+                      style={{
+                        backgroundColor: "#e63b7a",
+                        color: "#ffffff",
+                        border: "none",
+                        padding: "14px 36px",
+                        borderRadius: "8px",
+                        fontWeight: "900",
+                        fontSize: "14.5px",
+                        cursor: "pointer",
+                        boxShadow: "0 4px 14px rgba(230,59,122,0.35)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px"
+                      }}
+                    >
+                      <span>🚀</span> PUBLISH PRODUCT TO CATALOG
+                    </button>
                   </div>
                 </form>
               </div>
@@ -10056,8 +10684,8 @@ export default function ValobasaAdminPanel() {
                         const subs = (Array.isArray(cat.subCategories) && cat.subCategories.length > 0)
                           ? cat.subCategories
                           : (Array.isArray(cat.subs) && cat.subs.length > 0)
-                          ? cat.subs
-                          : subCategories.filter((s: any) => s.parentId === cat.id);
+                            ? cat.subs
+                            : subCategories.filter((s: any) => s.parentId === cat.id);
 
                         if (subs && subs.length > 0) {
                           return (
@@ -10144,8 +10772,8 @@ export default function ValobasaAdminPanel() {
                       const pSlug = p.category?.slug?.toLowerCase() || "";
                       const filterLower = productCategoryFilter.toLowerCase();
                       if (
-                        cId !== productCategoryFilter && 
-                        cName !== filterLower && 
+                        cId !== productCategoryFilter &&
+                        cName !== filterLower &&
                         pId !== productCategoryFilter &&
                         pSlug !== filterLower
                       ) return false;
@@ -10292,6 +10920,20 @@ export default function ValobasaAdminPanel() {
                                           ...p,
                                           name: p.name,
                                           description: p.description || "",
+                                          shortDescription: p.shortDescription || "",
+                                          ingredients: p.ingredients || "",
+                                          howToUse: p.howToUse || "",
+                                          skinType: p.skinType || "All Skin Types",
+                                          countryOfOrigin: p.countryOfOrigin || "South Korea",
+                                          volume: p.volume || "50ml",
+                                          benefits: p.benefits || "",
+                                          sku: p.sku || p.variants?.[0]?.sku || "",
+                                          lowStockThreshold: p.lowStockThreshold || "5",
+                                          status: p.status || (p.isActive === false ? "Draft" : "Active"),
+                                          isFeatured: Boolean(p.isFeatured),
+                                          isNewArrival: Boolean(p.isNewArrival),
+                                          isBestSeller: Boolean(p.isBestSeller),
+                                          tags: p.tags || "Vegan, Cruelty-free, Authentic",
                                           metaTitle: p.metaTitle || "",
                                           metaDescription: p.metaDescription || "",
                                           metaKeywords: p.metaKeywords || "",
@@ -10406,38 +11048,33 @@ export default function ValobasaAdminPanel() {
                 })()}
               </div>
 
-                {/* Edit Product Modal (Supports 4 Images) */}
-                {editingProduct && (
-                  <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
-                    <div style={{ backgroundColor: "#fff", borderRadius: "10px", padding: "24px", width: "620px", maxHeight: "90vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: "14px" }}>
-                      <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "800" }}>Edit Product & Gallery Images – {editingProduct.name}</h3>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                        <div style={{ gridColumn: "1 / -1" }}>
+              {/* Edit Product Modal (Supports 4 Images) */}
+              {/* Edit Product Modal (Professional Beauty Architecture) */}
+              {editingProduct && (
+                <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, backdropFilter: "blur(2px)" }}>
+                  <div style={{ backgroundColor: "#ffffff", borderRadius: "12px", padding: "26px", width: "760px", maxWidth: "95vw", maxHeight: "90vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: "18px", boxShadow: "0 20px 40px rgba(0,0,0,0.2)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1.5px solid #f1f5f9", paddingBottom: "12px" }}>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: "18px", fontWeight: "900", color: "#0f172a" }}>Edit Product – {editingProduct.name}</h3>
+                        <span style={{ fontSize: "11.5px", color: "#64748b" }}>ID: {editingProduct.id} • Professional GlowGoodly Cosmetics Architecture</span>
+                      </div>
+                      <button onClick={() => setEditingProduct(null)} style={{ backgroundColor: "#f1f5f9", border: "none", borderRadius: "6px", width: "30px", height: "30px", fontSize: "16px", cursor: "pointer", fontWeight: "bold" }}>✕</button>
+                    </div>
+
+                    {/* Section 1: Basic Information */}
+                    <div style={{ backgroundColor: "#f8fafc", padding: "16px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                      <div style={{ fontSize: "13px", fontWeight: "800", color: "#1e293b", marginBottom: "10px" }}>🏷️ Basic Information & Status</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px" }}>
+                        <div style={{ gridColumn: "span 2" }}>
                           <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Product Name *</label>
-                          <input value={editingProduct.name || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, name: e.target.value }))} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }} />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Selling Price (BDT) *</label>
-                          <input type="number" value={editingProduct.price || 0} onChange={e => setEditingProduct((prev: any) => ({ ...prev, price: e.target.value }))} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }} />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Stock Units *</label>
-                          <input type="number" value={editingProduct.stock || 0} onChange={e => setEditingProduct((prev: any) => ({ ...prev, stock: e.target.value }))} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }} />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Buy Price / Cost (BDT)</label>
-                          <input type="number" value={editingProduct.costPrice || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, costPrice: e.target.value }))} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }} placeholder="Optional cost price" />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Discount Price (BDT)</label>
-                          <input type="number" value={editingProduct.discountPrice || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, discountPrice: e.target.value }))} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }} placeholder="Optional discount offer" />
+                          <input value={editingProduct.name || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, name: e.target.value }))} style={{ width: "100%", padding: "8px 10px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px" }} />
                         </div>
                         <div>
                           <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Brand</label>
                           <select
                             value={editingProduct.brandId || editingProduct.brand?.id || ""}
                             onChange={e => setEditingProduct((prev: any) => ({ ...prev, brandId: e.target.value }))}
-                            style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px", backgroundColor: "#fff" }}
+                            style={{ width: "100%", padding: "8px 10px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px", backgroundColor: "#fff" }}
                           >
                             <option value="">-- Select Brand --</option>
                             {adminBrands.map((b: any) => (
@@ -10446,19 +11083,19 @@ export default function ValobasaAdminPanel() {
                           </select>
                         </div>
                         <div>
-                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Category</label>
+                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Category / Subcategory</label>
                           <select
                             value={editingProduct.categoryId || editingProduct.category?.id || ""}
                             onChange={e => setEditingProduct((prev: any) => ({ ...prev, categoryId: e.target.value }))}
-                            style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px", backgroundColor: "#fff" }}
+                            style={{ width: "100%", padding: "8px 10px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px", backgroundColor: "#fff" }}
                           >
                             <option value="">-- Select Category or Subcategory --</option>
                             {adminCategories.map((cat: any) => {
                               const subs = (Array.isArray(cat.subCategories) && cat.subCategories.length > 0)
                                 ? cat.subCategories
                                 : (Array.isArray(cat.subs) && cat.subs.length > 0)
-                                ? cat.subs
-                                : subCategories.filter((s: any) => s.parentId === cat.id);
+                                  ? cat.subs
+                                  : subCategories.filter((s: any) => s.parentId === cat.id);
 
                               if (subs && subs.length > 0) {
                                 return (
@@ -10468,9 +11105,7 @@ export default function ValobasaAdminPanel() {
                                       const subId = typeof sub === "string" ? sub : (sub.id || sub.name);
                                       const subName = typeof sub === "string" ? sub : (sub.name || subId);
                                       return (
-                                        <option key={subId} value={subId}>
-                                          &nbsp;&nbsp;&nbsp;&nbsp;↳ {subName}
-                                        </option>
+                                        <option key={subId} value={subId}>&nbsp;&nbsp;&nbsp;&nbsp;↳ {subName}</option>
                                       );
                                     })}
                                   </optgroup>
@@ -10485,248 +11120,376 @@ export default function ValobasaAdminPanel() {
                             })}
                           </select>
                         </div>
-                        {/* Unified Product Image & Shade Variant Manager */}
-                        <div style={{ gridColumn: "1 / -1", backgroundColor: "#fff0f5", padding: "16px", borderRadius: "10px", border: "1.5px solid #fbcfe8" }}>
-                          {/* 1. Constant Main Product Banner Cover */}
-                          <div style={{ marginBottom: "14px", backgroundColor: "#ffffff", padding: "12px", borderRadius: "8px", border: "1px solid #fecdd3" }}>
-                            <label style={{ fontSize: "12.5px", fontWeight: "800", color: "#881337", display: "block", marginBottom: "4px" }}>
-                              🖼️ Main Product Cover Image (Constant main banner for all shades)
-                            </label>
-                            <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
-                              <input
-                                type="text"
-                                value={editingProduct.imageUrl || ""}
-                                onChange={(e) => setEditingProduct((prev: any) => ({ ...prev, imageUrl: e.target.value }))}
-                                placeholder="Main Cover Image URL (https://...)"
-                                style={{ flex: 1, minWidth: "200px", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px" }}
-                              />
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                    const reader = new FileReader();
-                                    reader.onloadend = () => setEditingProduct((prev: any) => ({ ...prev, imageUrl: reader.result as string }));
-                                    reader.readAsDataURL(file);
-                                  }
-                                }}
-                                style={{ fontSize: "12px", width: "160px" }}
-                              />
-                              {editingProduct.imageUrl && (
-                                <img src={editingProduct.imageUrl} alt="Main Cover" style={{ width: "42px", height: "42px", objectFit: "cover", borderRadius: "6px", border: "1px solid #cbd5e1" }} />
-                              )}
-                            </div>
-                          </div>
-
-                          {/* 2. Shade / Variant Specific Images */}
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                            <label style={{ fontSize: "12.5px", fontWeight: "800", color: "#be185d" }}>
-                              🎨 Product Shades & Variant Specific Images (Clicking shade on product page switches image)
-                            </label>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingProduct((prev: any) => {
-                                  const currentVars = prev.variants || [];
-                                  return {
-                                    ...prev,
-                                    variants: [
-                                      ...currentVars,
-                                      { id: `var-${Date.now()}`, name: `Shade ${currentVars.length + 1}`, price: Number(prev.price || 0), stock: 50, imageUrl: "" }
-                                    ]
-                                  };
-                                });
-                              }}
-                              style={{ backgroundColor: "#e63b7a", color: "#ffffff", border: "none", padding: "6px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: "800", cursor: "pointer", boxShadow: "0 2px 6px rgba(230,59,122,0.2)" }}
-                            >
-                              + Add Shade Variant
-                            </button>
-                          </div>
-
-                          <div style={{ fontSize: "11px", color: "#9d174d", fontWeight: "700", marginBottom: "12px" }}>
-                            📏 Recommended Shade Image Size: 500x500 px (Square 1:1 Aspect Ratio)
-                          </div>
-
-                          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                            {(editingProduct.variants || []).length === 0 ? (
-                              <div style={{ fontSize: "12px", color: "#94a3b8", textAlign: "center", padding: "10px" }}>No shade variants added. Click '+ Add Shade Variant' above.</div>
-                            ) : (
-                              (editingProduct.variants || []).map((v: any, vIdx: number) => (
-                                <div key={v.id || vIdx} style={{ display: "flex", gap: "10px", alignItems: "center", backgroundColor: "#ffffff", padding: "10px 14px", borderRadius: "8px", border: "1px solid #fecdd3", flexWrap: "wrap" }}>
-                                  {/* Shade Color Picker */}
-                                  <input
-                                    type="color"
-                                    value={v.shadeColor || "#e63b7a"}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setEditingProduct((prev: any) => {
-                                        const nextVars = [...(prev.variants || [])];
-                                        nextVars[vIdx] = { ...nextVars[vIdx], shadeColor: val };
-                                        return { ...prev, variants: nextVars };
-                                      });
-                                    }}
-                                    title="Pick Shade Color"
-                                    style={{ width: "32px", height: "32px", border: "none", borderRadius: "4px", cursor: "pointer", padding: "0" }}
-                                  />
-                                  <input
-                                    type="text"
-                                    value={v.name || ""}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setEditingProduct((prev: any) => {
-                                        const nextVars = [...(prev.variants || [])];
-                                        nextVars[vIdx] = { ...nextVars[vIdx], name: val };
-                                        return { ...prev, variants: nextVars };
-                                      });
-                                    }}
-                                    placeholder="Shade Name (e.g. Shade 120 Classic Ivory)"
-                                    style={{ flex: 1, minWidth: "180px", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12.5px", fontWeight: "700" }}
-                                  />
-                                  <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-                                    <input
-                                      type="text"
-                                      value={v.imageUrl || ""}
-                                      onChange={(e) => {
-                                        const val = e.target.value;
-                                        setEditingProduct((prev: any) => {
-                                          const nextVars = [...(prev.variants || [])];
-                                          nextVars[vIdx] = { ...nextVars[vIdx], imageUrl: val };
-                                          return { ...prev, variants: nextVars };
-                                        });
-                                      }}
-                                      placeholder="Shade Image URL (https://...)"
-                                      style={{ width: "180px", padding: "6px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "11.5px" }}
-                                    />
-                                    <input
-                                      type="file"
-                                      accept="image/*"
-                                      onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) {
-                                          const reader = new FileReader();
-                                          reader.onloadend = () => {
-                                            setEditingProduct((prev: any) => {
-                                              const nextVars = [...(prev.variants || [])];
-                                              nextVars[vIdx] = { ...nextVars[vIdx], imageUrl: reader.result as string };
-                                              return { ...prev, variants: nextVars };
-                                            });
-                                          };
-                                          reader.readAsDataURL(file);
-                                        }
-                                      }}
-                                      style={{ fontSize: "11px", width: "140px" }}
-                                    />
-                                    {v.imageUrl && (
-                                      <img src={v.imageUrl} alt={v.name} style={{ width: "36px", height: "36px", objectFit: "cover", borderRadius: "6px", border: "1px solid #e2e8f0" }} />
-                                    )}
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setEditingProduct((prev: any) => {
-                                          const nextVars = (prev.variants || []).filter((_: any, idx: number) => idx !== vIdx);
-                                          return { ...prev, variants: nextVars };
-                                        });
-                                      }}
-                                      style={{ backgroundColor: "#fee2e2", color: "#ef4444", border: "none", padding: "6px 10px", borderRadius: "6px", fontSize: "11.5px", fontWeight: "800", cursor: "pointer", whiteSpace: "nowrap" }}
-                                    >
-                                      🗑️ Delete
-                                    </button>
-                                  </div>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
-
-                        <div style={{ gridColumn: "1 / -1" }}>
-                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Product Description</label>
-                          <textarea rows={3} value={editingProduct.description || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, description: e.target.value }))} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px" }} placeholder="Enter full product details & instructions..." />
+                        <div>
+                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>SKU / Product Code</label>
+                          <input value={editingProduct.sku || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, sku: e.target.value }))} style={{ width: "100%", padding: "8px 10px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px" }} placeholder="e.g. CRV-CLN-236" />
                         </div>
                         <div>
-                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>🔍 SEO Meta Title</label>
-                          <input value={editingProduct.metaTitle || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, metaTitle: e.target.value }))} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px" }} placeholder="e.g. Buy CeraVe Cleanser Online BD" />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>🔍 SEO Meta Keywords</label>
-                          <input value={editingProduct.metaKeywords || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, metaKeywords: e.target.value }))} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px" }} placeholder="e.g. skincare, cleanser, cerave" />
-                        </div>
-                        <div style={{ gridColumn: "1 / -1" }}>
-                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>🔍 SEO Meta Description</label>
-                          <input value={editingProduct.metaDescription || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, metaDescription: e.target.value }))} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px" }} placeholder="100% authentic product with fast delivery in Bangladesh." />
+                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Status</label>
+                          <select value={editingProduct.status || "Active"} onChange={e => setEditingProduct((prev: any) => ({ ...prev, status: e.target.value }))} style={{ width: "100%", padding: "8px 10px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px", backgroundColor: "#fff" }}>
+                            <option value="Active">Active</option>
+                            <option value="Draft">Draft</option>
+                            <option value="Archived">Archived</option>
+                          </select>
                         </div>
                       </div>
-                      <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "10px" }}>
-                        <button onClick={() => setEditingProduct(null)} style={{ backgroundColor: "#f1f5f9", padding: "8px 16px", border: "none", borderRadius: "6px", fontWeight: "700", cursor: "pointer" }}>Cancel</button>
-                        <button onClick={async () => {
-                          try {
-                            const numPrice = Number(editingProduct.price) || 0;
-                            const numStock = Number(editingProduct.stock) || 0;
-                            const numCostPrice = editingProduct.costPrice ? Number(editingProduct.costPrice) : null;
-                            const numDiscountPrice = editingProduct.discountPrice ? Number(editingProduct.discountPrice) : null;
 
-                            let syncedVariants = Array.isArray(editingProduct.variants) ? [...editingProduct.variants] : [];
-                            if (syncedVariants.length > 0) {
-                              syncedVariants[0] = {
-                                ...syncedVariants[0],
-                                price: numPrice,
-                                stock: numStock,
-                                costPrice: numCostPrice,
-                                discountPrice: numDiscountPrice
-                              };
-                            } else {
-                              syncedVariants = [{
-                                id: `var-${Date.now()}`,
-                                name: "Default",
-                                price: numPrice,
-                                stock: numStock,
-                                costPrice: numCostPrice,
-                                discountPrice: numDiscountPrice
-                              }];
-                            }
+                      {/* Flags */}
+                      <div style={{ display: "flex", gap: "16px", marginTop: "10px", flexWrap: "wrap", padding: "8px 12px", backgroundColor: "#ffffff", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>
+                          <input type="checkbox" checked={Boolean(editingProduct.isFeatured)} onChange={e => setEditingProduct((prev: any) => ({ ...prev, isFeatured: e.target.checked }))} style={{ accentColor: "#e63b7a" }} />
+                          ⭐ Featured
+                        </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>
+                          <input type="checkbox" checked={Boolean(editingProduct.isNewArrival)} onChange={e => setEditingProduct((prev: any) => ({ ...prev, isNewArrival: e.target.checked }))} style={{ accentColor: "#e63b7a" }} />
+                          ✨ New Arrival
+                        </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>
+                          <input type="checkbox" checked={Boolean(editingProduct.isBestSeller)} onChange={e => setEditingProduct((prev: any) => ({ ...prev, isBestSeller: e.target.checked }))} style={{ accentColor: "#e63b7a" }} />
+                          🔥 Best Seller
+                        </label>
+                      </div>
 
-                            const payload = {
-                              name: editingProduct.name,
-                              description: editingProduct.description,
-                              brandId: editingProduct.brandId || editingProduct.brand?.id,
-                              categoryId: editingProduct.categoryId || editingProduct.category?.id,
-                              subcategoryId: editingProduct.categoryId || editingProduct.category?.id,
-                              metaTitle: editingProduct.metaTitle,
-                              metaDescription: editingProduct.metaDescription,
-                              metaKeywords: editingProduct.metaKeywords,
-                              price: numPrice,
-                              costPrice: numCostPrice,
-                              discountPrice: numDiscountPrice,
-                              stock: numStock,
-                              imageUrl: editingProduct.imageUrl,
-                              imageUrl2: editingProduct.imageUrl2,
-                              imageUrl3: editingProduct.imageUrl3,
-                              imageUrl4: editingProduct.imageUrl4,
-                              variants: syncedVariants
-                            };
-
-                            const res = await fetch(`${API_BASE}/admin/products/${editingProduct.id}`, {
-                              method: "PATCH",
-                              headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
-                              body: JSON.stringify(payload)
-                            });
-                            if (res.ok) {
-                              clearAllCache(); // Force website to reload fresh data
-                              triggerGlobalDataSync();
-                              alert("Product, Price, Stock & Categories updated successfully!");
-                              setEditingProduct(null);
-                              fetchData(true);
-                              fetchAdminProducts(true);
-                            } else {
-                              const errData = await res.json().catch(() => ({}));
-                              alert(errData.error || `Failed to update product (Status: ${res.status})`);
-                            }
-                          } catch (e: any) { alert(`Error updating product: ${e.message || e}`); }
-                        }} style={{ backgroundColor: "#e63b7a", color: "#fff", padding: "8px 16px", border: "none", borderRadius: "6px", fontWeight: "700", cursor: "pointer" }}>SAVE CHANGES</button>
+                      <div style={{ marginTop: "10px" }}>
+                        <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Short Description</label>
+                        <input value={editingProduct.shortDescription || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, shortDescription: e.target.value }))} style={{ width: "100%", padding: "8px 10px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px" }} placeholder="Quick benefit highlight..." />
                       </div>
                     </div>
+
+                    {/* Section 2: Pricing & Economics */}
+                    <div style={{ backgroundColor: "#f0fdf4", padding: "16px", borderRadius: "8px", border: "1px solid #bbf7d0" }}>
+                      <div style={{ fontSize: "13px", fontWeight: "800", color: "#166534", marginBottom: "10px" }}>💰 Pricing & Inventory Guard</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "10px" }}>
+                        <div>
+                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px", color: "#166534" }}>Regular Price (Tk) *</label>
+                          <input type="number" value={editingProduct.price || 0} onChange={e => setEditingProduct((prev: any) => ({ ...prev, price: e.target.value }))} style={{ width: "100%", padding: "8px", border: "1px solid #86efac", borderRadius: "6px", fontSize: "13.5px", fontWeight: "700" }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px", color: "#166534" }}>Offer Price (Tk)</label>
+                          <input type="number" value={editingProduct.discountPrice || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, discountPrice: e.target.value }))} style={{ width: "100%", padding: "8px", border: "1px solid #86efac", borderRadius: "6px", fontSize: "13.5px", fontWeight: "700" }} placeholder="Optional" />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px", color: "#166534" }}>Cost Price (Tk)</label>
+                          <input type="number" value={editingProduct.costPrice || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, costPrice: e.target.value }))} style={{ width: "100%", padding: "8px", border: "1px solid #86efac", borderRadius: "6px", fontSize: "13px" }} placeholder="Optional" />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px", color: "#166534" }}>Stock Units *</label>
+                          <input type="number" min="0" value={editingProduct.stock || 0} onChange={e => setEditingProduct((prev: any) => ({ ...prev, stock: Math.max(0, parseInt(e.target.value, 10) || 0) }))} style={{ width: "100%", padding: "8px", border: "1px solid #86efac", borderRadius: "6px", fontSize: "13.5px", fontWeight: "700" }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px", color: "#166534" }}>Low Stock Alert</label>
+                          <input type="number" min="1" value={editingProduct.lowStockThreshold || "5"} onChange={e => setEditingProduct((prev: any) => ({ ...prev, lowStockThreshold: e.target.value }))} style={{ width: "100%", padding: "8px", border: "1px solid #86efac", borderRadius: "6px", fontSize: "13px" }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 3: Packshot Images */}
+                    <div style={{ backgroundColor: "#fff0f5", padding: "16px", borderRadius: "8px", border: "1.5px solid #fbcfe8" }}>
+                      <label style={{ fontSize: "13px", fontWeight: "800", color: "#881337", display: "block", marginBottom: "6px" }}>
+                        🖼️ Main Packshot Cover Image (Contained inside pure #ffffff)
+                      </label>
+                      <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+                        <input
+                          type="text"
+                          value={editingProduct.imageUrl || ""}
+                          onChange={(e) => setEditingProduct((prev: any) => ({ ...prev, imageUrl: e.target.value }))}
+                          placeholder="Main Cover Image URL (https://...)"
+                          style={{ flex: 1, minWidth: "200px", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px" }}
+                        />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onloadend = () => setEditingProduct((prev: any) => ({ ...prev, imageUrl: reader.result as string }));
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                          style={{ fontSize: "12px", width: "160px" }}
+                        />
+                        {editingProduct.imageUrl && (
+                          <div style={{ width: "50px", height: "50px", backgroundColor: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "4px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <img src={editingProduct.imageUrl} alt="Cover" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Additional 3 Gallery Images */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginTop: "10px" }}>
+                        <div>
+                          <label style={{ fontSize: "11px", fontWeight: "700", color: "#475569" }}>Gallery Image 2</label>
+                          <input type="text" value={editingProduct.imageUrl2 || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, imageUrl2: e.target.value }))} placeholder="URL 2" style={{ width: "100%", padding: "5px 8px", fontSize: "11.5px", border: "1px solid #cbd5e1", borderRadius: "4px" }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "11px", fontWeight: "700", color: "#475569" }}>Gallery Image 3</label>
+                          <input type="text" value={editingProduct.imageUrl3 || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, imageUrl3: e.target.value }))} placeholder="URL 3" style={{ width: "100%", padding: "5px 8px", fontSize: "11.5px", border: "1px solid #cbd5e1", borderRadius: "4px" }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "11px", fontWeight: "700", color: "#475569" }}>Gallery Image 4</label>
+                          <input type="text" value={editingProduct.imageUrl4 || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, imageUrl4: e.target.value }))} placeholder="URL 4" style={{ width: "100%", padding: "5px 8px", fontSize: "11.5px", border: "1px solid #cbd5e1", borderRadius: "4px" }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 4: Beauty Specifications & Formula */}
+                    <div style={{ backgroundColor: "#eff6ff", padding: "16px", borderRadius: "8px", border: "1px solid #bfdbfe" }}>
+                      <div style={{ fontSize: "13px", fontWeight: "800", color: "#1e40af", marginBottom: "10px" }}>🧪 Beauty Specifications & Formula</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "10px" }}>
+                        <div>
+                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "3px" }}>Skin Type</label>
+                          <select value={editingProduct.skinType || "All Skin Types"} onChange={e => setEditingProduct((prev: any) => ({ ...prev, skinType: e.target.value }))} style={{ width: "100%", padding: "7px 10px", border: "1px solid #93c5fd", borderRadius: "6px", fontSize: "12.5px", backgroundColor: "#fff" }}>
+                            <option value="All Skin Types">All Skin Types</option>
+                            <option value="Dry Skin">Dry Skin</option>
+                            <option value="Oily Skin">Oily Skin</option>
+                            <option value="Combination Skin">Combination Skin</option>
+                            <option value="Sensitive Skin">Sensitive Skin</option>
+                            <option value="Acne-Prone Skin">Acne-Prone Skin</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "3px" }}>Country of Origin</label>
+                          <select value={editingProduct.countryOfOrigin || "South Korea"} onChange={e => setEditingProduct((prev: any) => ({ ...prev, countryOfOrigin: e.target.value }))} style={{ width: "100%", padding: "7px 10px", border: "1px solid #93c5fd", borderRadius: "6px", fontSize: "12.5px", backgroundColor: "#fff" }}>
+                            <option value="South Korea">🇰🇷 South Korea</option>
+                            <option value="USA">🇺🇸 United States</option>
+                            <option value="France">🇫🇷 France</option>
+                            <option value="United Kingdom">🇬🇧 United Kingdom</option>
+                            <option value="Japan">🇯🇵 Japan</option>
+                            <option value="Germany">🇩🇪 Germany</option>
+                            <option value="Canada">🇨🇦 Canada</option>
+                            <option value="Thailand">🇹🇭 Thailand</option>
+                            <option value="Bangladesh">🇧🇩 Bangladesh</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "3px" }}>Volume / Net Weight</label>
+                          <input value={editingProduct.volume || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, volume: e.target.value }))} style={{ width: "100%", padding: "7px 10px", border: "1px solid #93c5fd", borderRadius: "6px", fontSize: "12.5px" }} placeholder="e.g. 50ml" />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "3px" }}>Benefits / Claims</label>
+                          <input value={editingProduct.benefits || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, benefits: e.target.value }))} style={{ width: "100%", padding: "7px 10px", border: "1px solid #93c5fd", borderRadius: "6px", fontSize: "12.5px" }} placeholder="e.g. Hydrating" />
+                        </div>
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "10px" }}>
+                        <div>
+                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "3px" }}>INCI Ingredients List</label>
+                          <textarea rows={2} value={editingProduct.ingredients || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, ingredients: e.target.value }))} style={{ width: "100%", padding: "7px", border: "1px solid #93c5fd", borderRadius: "6px", fontSize: "12px" }} placeholder="Full ingredients..." />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "3px" }}>How to Use</label>
+                          <textarea rows={2} value={editingProduct.howToUse || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, howToUse: e.target.value }))} style={{ width: "100%", padding: "7px", border: "1px solid #93c5fd", borderRadius: "6px", fontSize: "12px" }} placeholder="Step-by-step instructions..." />
+                        </div>
+                      </div>
+
+                      <div style={{ marginTop: "10px" }}>
+                        <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "3px" }}>Full Product Description</label>
+                        <textarea rows={3} value={editingProduct.description || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, description: e.target.value }))} style={{ width: "100%", padding: "8px", border: "1px solid #93c5fd", borderRadius: "6px", fontSize: "12.5px" }} placeholder="Full product details..." />
+                      </div>
+                    </div>
+
+                    {/* Section 5: Shade Variants */}
+                    <div style={{ backgroundColor: "#fdf2f8", padding: "16px", borderRadius: "8px", border: "1.5px dashed #f472b6" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                        <label style={{ fontSize: "13px", fontWeight: "800", color: "#be185d" }}>
+                          🎨 Shade & Variant Manager
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingProduct((prev: any) => {
+                              const currentVars = prev.variants || [];
+                              return {
+                                ...prev,
+                                variants: [
+                                  ...currentVars,
+                                  { id: `var-${Date.now()}`, name: `Shade ${currentVars.length + 1}`, shadeColor: "#e63b7a", price: Number(prev.price || 0), stock: 50, imageUrl: "" }
+                                ]
+                              };
+                            });
+                          }}
+                          style={{ backgroundColor: "#e63b7a", color: "#ffffff", border: "none", padding: "6px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: "800", cursor: "pointer" }}
+                        >
+                          + Add Shade Variant
+                        </button>
+                      </div>
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        {(editingProduct.variants || []).length === 0 ? (
+                          <div style={{ fontSize: "12px", color: "#94a3b8", textAlign: "center", padding: "8px" }}>No shade variants added. Single item product.</div>
+                        ) : (
+                          (editingProduct.variants || []).map((v: any, vIdx: number) => (
+                            <div key={v.id || vIdx} style={{ display: "flex", gap: "8px", alignItems: "center", backgroundColor: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid #fecdd3", flexWrap: "wrap" }}>
+                              <input
+                                type="color"
+                                value={v.shadeColor || "#e63b7a"}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setEditingProduct((prev: any) => {
+                                    const nextVars = [...(prev.variants || [])];
+                                    nextVars[vIdx] = { ...nextVars[vIdx], shadeColor: val };
+                                    return { ...prev, variants: nextVars };
+                                  });
+                                }}
+                                style={{ width: "30px", height: "30px", border: "none", borderRadius: "4px", cursor: "pointer", padding: "0" }}
+                              />
+                              <input
+                                type="text"
+                                value={v.name || ""}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setEditingProduct((prev: any) => {
+                                    const nextVars = [...(prev.variants || [])];
+                                    nextVars[vIdx] = { ...nextVars[vIdx], name: val };
+                                    return { ...prev, variants: nextVars };
+                                  });
+                                }}
+                                placeholder="Shade Name"
+                                style={{ flex: 1, minWidth: "140px", padding: "6px 8px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "12px", fontWeight: "700" }}
+                              />
+                              <input
+                                type="text"
+                                value={v.imageUrl || ""}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setEditingProduct((prev: any) => {
+                                    const nextVars = [...(prev.variants || [])];
+                                    nextVars[vIdx] = { ...nextVars[vIdx], imageUrl: val };
+                                    return { ...prev, variants: nextVars };
+                                  });
+                                }}
+                                placeholder="Shade Image URL"
+                                style={{ width: "160px", padding: "6px 8px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "11px" }}
+                              />
+                              {v.imageUrl && (
+                                <img src={v.imageUrl} alt={v.name} style={{ width: "32px", height: "32px", objectFit: "contain", borderRadius: "4px", border: "1px solid #e2e8f0", backgroundColor: "#fff" }} />
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingProduct((prev: any) => {
+                                    const nextVars = (prev.variants || []).filter((_: any, idx: number) => idx !== vIdx);
+                                    return { ...prev, variants: nextVars };
+                                  });
+                                }}
+                                style={{ backgroundColor: "#fee2e2", color: "#ef4444", border: "none", padding: "6px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: "800", cursor: "pointer" }}
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Section 6: SEO */}
+                    <div style={{ backgroundColor: "#f8fafc", padding: "16px", borderRadius: "8px", border: "1px solid #cbd5e1" }}>
+                      <div style={{ fontSize: "13px", fontWeight: "800", color: "#1e293b", marginBottom: "8px" }}>🔍 SEO Meta Tags</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                        <div>
+                          <label style={{ fontSize: "11px", fontWeight: "700", display: "block", marginBottom: "3px" }}>Meta Title</label>
+                          <input value={editingProduct.metaTitle || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, metaTitle: e.target.value }))} style={{ width: "100%", padding: "7px 10px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "12.5px" }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "11px", fontWeight: "700", display: "block", marginBottom: "3px" }}>Meta Keywords</label>
+                          <input value={editingProduct.metaKeywords || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, metaKeywords: e.target.value }))} style={{ width: "100%", padding: "7px 10px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "12.5px" }} />
+                        </div>
+                        <div style={{ gridColumn: "span 2" }}>
+                          <label style={{ fontSize: "11px", fontWeight: "700", display: "block", marginBottom: "3px" }}>Meta Description</label>
+                          <textarea rows={2} value={editingProduct.metaDescription || ""} onChange={e => setEditingProduct((prev: any) => ({ ...prev, metaDescription: e.target.value }))} style={{ width: "100%", padding: "7px 10px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "12.5px" }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Bar */}
+                    <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "10px", borderTop: "1px solid #f1f5f9", paddingTop: "14px" }}>
+                      <button onClick={() => setEditingProduct(null)} style={{ backgroundColor: "#f1f5f9", padding: "10px 20px", border: "none", borderRadius: "6px", fontWeight: "700", cursor: "pointer", fontSize: "13px" }}>Cancel</button>
+                      <button onClick={async () => {
+                        try {
+                          const numPrice = Number(editingProduct.price) || 0;
+                          const numStock = Number(editingProduct.stock) || 0;
+                          const numCostPrice = editingProduct.costPrice ? Number(editingProduct.costPrice) : null;
+                          const numDiscountPrice = editingProduct.discountPrice ? Number(editingProduct.discountPrice) : null;
+
+                          let syncedVariants = Array.isArray(editingProduct.variants) ? [...editingProduct.variants] : [];
+                          if (syncedVariants.length > 0) {
+                            syncedVariants[0] = {
+                              ...syncedVariants[0],
+                              price: numPrice,
+                              stock: numStock,
+                              costPrice: numCostPrice,
+                              discountPrice: numDiscountPrice
+                            };
+                          } else {
+                            syncedVariants = [{
+                              id: `var-${Date.now()}`,
+                              name: "Default",
+                              price: numPrice,
+                              stock: numStock,
+                              costPrice: numCostPrice,
+                              discountPrice: numDiscountPrice
+                            }];
+                          }
+
+                          const payload = {
+                            name: editingProduct.name,
+                            description: editingProduct.description,
+                            shortDescription: editingProduct.shortDescription,
+                            ingredients: editingProduct.ingredients,
+                            howToUse: editingProduct.howToUse,
+                            skinType: editingProduct.skinType,
+                            countryOfOrigin: editingProduct.countryOfOrigin,
+                            volume: editingProduct.volume,
+                            benefits: editingProduct.benefits,
+                            sku: editingProduct.sku,
+                            status: editingProduct.status || "Active",
+                            isFeatured: Boolean(editingProduct.isFeatured),
+                            isNewArrival: Boolean(editingProduct.isNewArrival),
+                            isBestSeller: Boolean(editingProduct.isBestSeller),
+                            tags: editingProduct.tags,
+                            lowStockThreshold: editingProduct.lowStockThreshold,
+                            brandId: editingProduct.brandId || editingProduct.brand?.id,
+                            categoryId: editingProduct.categoryId || editingProduct.category?.id,
+                            subcategoryId: editingProduct.categoryId || editingProduct.category?.id,
+                            metaTitle: editingProduct.metaTitle,
+                            metaDescription: editingProduct.metaDescription,
+                            metaKeywords: editingProduct.metaKeywords,
+                            price: numPrice,
+                            costPrice: numCostPrice,
+                            discountPrice: numDiscountPrice,
+                            stock: numStock,
+                            imageUrl: editingProduct.imageUrl,
+                            imageUrl2: editingProduct.imageUrl2,
+                            imageUrl3: editingProduct.imageUrl3,
+                            imageUrl4: editingProduct.imageUrl4,
+                            variants: syncedVariants
+                          };
+
+                          const res = await fetch(`${API_BASE}/admin/products/${editingProduct.id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
+                            body: JSON.stringify(payload)
+                          });
+                          if (res.ok) {
+                            clearAllCache();
+                            triggerGlobalDataSync();
+                            alert("Product, Beauty Specifications, Packshots & Stock updated successfully!");
+                            setEditingProduct(null);
+                            fetchData(true);
+                            fetchAdminProducts(true);
+                          } else {
+                            const errData = await res.json().catch(() => ({}));
+                            alert(errData.error || `Failed to update product (Status: ${res.status})`);
+                          }
+                        } catch (e: any) { alert(`Error updating product: ${e.message || e}`); }
+                      }} style={{ backgroundColor: "#e63b7a", color: "#fff", padding: "10px 24px", border: "none", borderRadius: "6px", fontWeight: "800", cursor: "pointer", fontSize: "13.5px", boxShadow: "0 4px 12px rgba(230,59,122,0.3)" }}>
+                        SAVE PRODUCT CHANGES 🚀
+                      </button>
+                    </div>
                   </div>
-                )}
+                </div>
+              )}
             </div>
           )}
 
@@ -11441,9 +12204,9 @@ export default function ValobasaAdminPanel() {
                 </div>
 
                 {(() => {
-                  const filteredBrands = adminBrands.filter(b => 
-                    !brandSearchQuery || 
-                    b.name?.toLowerCase().includes(brandSearchQuery.toLowerCase()) || 
+                  const filteredBrands = adminBrands.filter(b =>
+                    !brandSearchQuery ||
+                    b.name?.toLowerCase().includes(brandSearchQuery.toLowerCase()) ||
                     b.originCountry?.toLowerCase().includes(brandSearchQuery.toLowerCase())
                   );
                   const effectiveSize = brandPageSize === "All" ? (filteredBrands.length || 1) : Number(brandPageSize);
@@ -11551,56 +12314,56 @@ export default function ValobasaAdminPanel() {
                 })()}
               </div>
 
-                {/* Edit Brand Modal */}
-                {editingBrand && (
-                  <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
-                    <div style={{ backgroundColor: "#fff", borderRadius: "10px", padding: "24px", width: "420px", display: "flex", flexDirection: "column", gap: "14px" }}>
-                      <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "800" }}>Edit Brand – {editingBrand.name}</h3>
-                      <div>
-                        <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Brand Name *</label>
-                        <input value={editingBrand.name || ""} onChange={e => setEditingBrand({ ...editingBrand, name: e.target.value })} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }} />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Origin Country</label>
-                        <input value={editingBrand.originCountry || ""} onChange={e => setEditingBrand({ ...editingBrand, originCountry: e.target.value })} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }} />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Upload / Change Logo</label>
-                        <input type="file" accept="image/*" onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onloadend = () => setEditingBrand((prev: any) => ({ ...prev, logoUrl: reader.result as string }));
-                            reader.readAsDataURL(file);
+              {/* Edit Brand Modal */}
+              {editingBrand && (
+                <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
+                  <div style={{ backgroundColor: "#fff", borderRadius: "10px", padding: "24px", width: "420px", display: "flex", flexDirection: "column", gap: "14px" }}>
+                    <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "800" }}>Edit Brand – {editingBrand.name}</h3>
+                    <div>
+                      <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Brand Name *</label>
+                      <input value={editingBrand.name || ""} onChange={e => setEditingBrand({ ...editingBrand, name: e.target.value })} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Origin Country</label>
+                      <input value={editingBrand.originCountry || ""} onChange={e => setEditingBrand({ ...editingBrand, originCountry: e.target.value })} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: "12px", fontWeight: "700", display: "block", marginBottom: "4px" }}>Upload / Change Logo</label>
+                      <input type="file" accept="image/*" onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => setEditingBrand((prev: any) => ({ ...prev, logoUrl: reader.result as string }));
+                          reader.readAsDataURL(file);
+                        }
+                      }} style={{ width: "100%", padding: "6px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "12px" }} />
+                      {editingBrand.logoUrl && <img src={editingBrand.logoUrl} alt="Preview" style={{ width: "80px", height: "50px", objectFit: "contain", borderRadius: "4px", marginTop: "8px", border: "1.5px solid #e63b7a", backgroundColor: "#f8fafc", padding: "4px" }} />}
+                    </div>
+                    <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "10px" }}>
+                      <button onClick={() => setEditingBrand(null)} style={{ backgroundColor: "#f1f5f9", padding: "8px 16px", border: "none", borderRadius: "6px", fontWeight: "700", cursor: "pointer" }}>Cancel</button>
+                      <button onClick={async () => {
+                        try {
+                          // Optimistically update adminBrands state immediately
+                          setAdminBrands((prev) => prev.map((b) => b.id === editingBrand.id ? { ...b, name: editingBrand.name, originCountry: editingBrand.originCountry, logoUrl: editingBrand.logoUrl } : b));
+                          const res = await fetch(`${API_BASE}/admin/brands/${editingBrand.id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
+                            body: JSON.stringify({ name: editingBrand.name, originCountry: editingBrand.originCountry, logoUrl: editingBrand.logoUrl })
+                          });
+                          if (res.ok) {
+                            clearAllCache();
+                            triggerGlobalDataSync();
+                            alert("Brand updated successfully!");
+                            setEditingBrand(null);
+                            fetchData(true);
+                            fetchAdminBrands(true);
                           }
-                        }} style={{ width: "100%", padding: "6px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "12px" }} />
-                        {editingBrand.logoUrl && <img src={editingBrand.logoUrl} alt="Preview" style={{ width: "80px", height: "50px", objectFit: "contain", borderRadius: "4px", marginTop: "8px", border: "1.5px solid #e63b7a", backgroundColor: "#f8fafc", padding: "4px" }} />}
-                      </div>
-                      <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "10px" }}>
-                        <button onClick={() => setEditingBrand(null)} style={{ backgroundColor: "#f1f5f9", padding: "8px 16px", border: "none", borderRadius: "6px", fontWeight: "700", cursor: "pointer" }}>Cancel</button>
-                        <button onClick={async () => {
-                          try {
-                            // Optimistically update adminBrands state immediately
-                            setAdminBrands((prev) => prev.map((b) => b.id === editingBrand.id ? { ...b, name: editingBrand.name, originCountry: editingBrand.originCountry, logoUrl: editingBrand.logoUrl } : b));
-                            const res = await fetch(`${API_BASE}/admin/brands/${editingBrand.id}`, {
-                              method: "PATCH",
-                              headers: { "Content-Type": "application/json", ...getAuthHeader(token) },
-                              body: JSON.stringify({ name: editingBrand.name, originCountry: editingBrand.originCountry, logoUrl: editingBrand.logoUrl })
-                            });
-                            if (res.ok) {
-                              clearAllCache();
-                              triggerGlobalDataSync();
-                              alert("Brand updated successfully!");
-                              setEditingBrand(null);
-                              fetchData(true);
-                              fetchAdminBrands(true);
-                            }
-                          } catch (e) { alert("Error updating brand"); }
-                        }} style={{ backgroundColor: "#e63b7a", color: "#fff", padding: "8px 16px", border: "none", borderRadius: "6px", fontWeight: "700", cursor: "pointer" }}>SAVE CHANGES</button>
-                      </div>
+                        } catch (e) { alert("Error updating brand"); }
+                      }} style={{ backgroundColor: "#e63b7a", color: "#fff", padding: "8px 16px", border: "none", borderRadius: "6px", fontWeight: "700", cursor: "pointer" }}>SAVE CHANGES</button>
                     </div>
                   </div>
-                )}
+                </div>
+              )}
             </div>
           )}
 
@@ -12495,7 +13258,7 @@ export default function ValobasaAdminPanel() {
                     <div style={{ backgroundColor: "#f8fafc", padding: "18px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
                       <h4 style={{ fontSize: "14px", fontWeight: "800", color: "#0f172a", margin: "0 0 4px 0" }}>🔗 Routine & 101 Guides Custom Link Manager</h4>
                       <p style={{ fontSize: "12px", color: "#64748b", margin: "0 0 14px 0" }}>Customize target URLs for KNOW YOUR ROUTINE and 101 Beauty Guides shown in site Header, Footer, and pages.</p>
-                      
+
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
                         <div>
                           <label style={{ fontSize: "12px", fontWeight: "700", color: "#334155", display: "block", marginBottom: "4px" }}>KNOW YOUR ROUTINE Link</label>
@@ -12913,7 +13676,7 @@ export default function ValobasaAdminPanel() {
 }
 
 // ═══════════════════════════════════════════
-// LIVE CHAT PANEL (separate component to keep state isolated)
+// PREMIUM CUSTOMER SUPPORT CENTER & LIVE INBOX
 // ═══════════════════════════════════════════
 function LiveChatPanel({ token, staffList }: { token: string | null; staffList?: any[] }) {
   const [threads, setThreads] = useState<any[]>(() => {
@@ -12921,17 +13684,49 @@ function LiveChatPanel({ token, staffList }: { token: string | null; staffList?:
       try {
         const saved = localStorage.getItem("gg_admin_chat_threads");
         if (saved) return JSON.parse(saved);
-      } catch (e) {}
+      } catch (e) { }
     }
     return [];
   });
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [assignedAgents, setAssignedAgents] = useState<Record<string, string>>({});
+  const [threadStatuses, setThreadStatuses] = useState<Record<string, "Open" | "Pending" | "Resolved">>({});
   const [chatHistory, setChatHistory] = useState<any[]>([]);
   const [replyText, setReplyText] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [searchFilter, setSearchFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"All" | "Open" | "Pending" | "Resolved">("All");
+  const [showTawkGuide, setShowTawkGuide] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
+
+  // Load and persist thread statuses
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("gg_chat_thread_statuses");
+        if (saved) setThreadStatuses(JSON.parse(saved));
+        const savedAgents = localStorage.getItem("gg_chat_assigned_agents");
+        if (savedAgents) setAssignedAgents(JSON.parse(savedAgents));
+      } catch (_) {}
+    }
+  }, []);
+
+  const updateThreadStatus = (chatId: string, status: "Open" | "Pending" | "Resolved") => {
+    setThreadStatuses(prev => {
+      const updated = { ...prev, [chatId]: status };
+      try { localStorage.setItem("gg_chat_thread_statuses", JSON.stringify(updated)); } catch (_) {}
+      return updated;
+    });
+  };
+
+  const updateAssignedAgent = (chatId: string, agent: string) => {
+    setAssignedAgents(prev => {
+      const updated = { ...prev, [chatId]: agent };
+      try { localStorage.setItem("gg_chat_assigned_agents", JSON.stringify(updated)); } catch (_) {}
+      return updated;
+    });
+  };
 
   // Fetch thread list every 4s and keep persisted in localStorage
   useEffect(() => {
@@ -12944,13 +13739,12 @@ function LiveChatPanel({ token, staffList }: { token: string | null; staffList?:
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data)) {
-            // Sort newest messages strictly on top
             data.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
             setThreads(data);
             if (typeof window !== "undefined") {
               try {
                 localStorage.setItem("gg_admin_chat_threads", JSON.stringify(data));
-              } catch (e) {}
+              } catch (e) { }
             }
           }
           setIsLoading(false);
@@ -12969,19 +13763,88 @@ function LiveChatPanel({ token, staffList }: { token: string | null; staffList?:
     if (!selectedChatId) return;
     const fetchHistory = async () => {
       try {
-        const res = await fetch(`${API_BASE}/chat/history/${selectedChatId}`);
+        const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : "");
+        const res = await fetch(`${API_BASE}/chat/history/${selectedChatId}`, {
+          headers: getAuthHeader(activeToken),
+        });
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data)) {
             setChatHistory(data);
           }
         }
-      } catch (e) {}
+      } catch (e) { }
     };
     fetchHistory();
     const interval = setInterval(fetchHistory, 2500);
     return () => clearInterval(interval);
-  }, [selectedChatId]);
+  }, [selectedChatId, token]);
+
+  // Real-time Socket.IO connection for instant live customer support in admin inbox
+  useEffect(() => {
+    const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : "");
+    if (!activeToken) return;
+
+    let socket: any = null;
+    try {
+      socket = io(API_ROOT, {
+        auth: { token: activeToken },
+        transports: ["websocket", "polling"],
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 2000,
+      });
+
+      socket.on("connect", () => {
+        console.log("[Native Support Admin Socket] Staff connected:", socket.id, "Emitted auth_staff");
+      });
+
+      socket.emit("auth_staff", activeToken);
+
+      const normalizeId = (id: string) => String(id || "").replace(/^chat_/, "");
+      const handleNewMessage = (newMsg: any) => {
+        if (!newMsg || !newMsg.message) return;
+        const msgChatId = newMsg.chatId || "";
+        if (selectedChatId && (msgChatId === selectedChatId || normalizeId(msgChatId) === normalizeId(selectedChatId))) {
+          console.log("[Native Support Admin Socket] Received message event:", { id: newMsg?.id, chatId: newMsg?.chatId, sender: newMsg?.sender });
+          setChatHistory(prev => {
+            if (prev.some(m => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
+        }
+      };
+
+      socket.on("chat:new_message", handleNewMessage);
+      socket.on("new_chat_message", handleNewMessage);
+      socket.on("new_customer_message", handleNewMessage);
+      socket.on("admin_reply", handleNewMessage);
+      socket.on("receive_message", handleNewMessage);
+
+      socket.on("chat:threads_updated", (payload: any) => {
+        if (!payload || !payload.chatId) return;
+        setThreads(prev => {
+          const idx = prev.findIndex(t => t.chatId === payload.chatId || `chat_${t.chatId}` === payload.chatId);
+          if (idx !== -1) {
+            const updated = [...prev];
+            updated[idx] = {
+              ...updated[idx],
+              lastMessage: payload.lastMessage || updated[idx].lastMessage,
+              lastSender: payload.lastSender || updated[idx].lastSender,
+              updatedAt: payload.updatedAt || new Date().toISOString(),
+            };
+            return updated.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+          }
+          return prev;
+        });
+      });
+    } catch (_) { }
+
+    return () => {
+      try {
+        if (socket) socket.disconnect();
+      } catch (_) { }
+    };
+  }, [token, selectedChatId]);
 
   // Auto scroll to bottom on new messages
   useEffect(() => {
@@ -12993,30 +13856,47 @@ function LiveChatPanel({ token, staffList }: { token: string | null; staffList?:
     if (!replyText.trim() || !selectedChatId || isSending) return;
     setIsSending(true);
     const text = replyText.trim();
-    setReplyText("");
-    const newMsg = { id: "tmp_" + Date.now(), chatId: selectedChatId, sender: "Admin", message: text, createdAt: new Date().toISOString() };
-    setChatHistory(prev => [...prev, newMsg]);
-
-    // Update thread snippet optimistically
-    setThreads(prev => {
-      const idx = prev.findIndex(t => t.chatId === selectedChatId);
-      if (idx !== -1) {
-        const updated = [...prev];
-        updated[idx] = { ...updated[idx], lastMessage: text, lastSender: "Admin", updatedAt: newMsg.createdAt };
-        return updated.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-      }
-      return prev;
-    });
+    const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : "");
+    console.log("[Native Support Admin] Send button clicked for conversation:", selectedChatId);
+    console.log("[Native Support Admin] API request initiating: POST", `${API_BASE}/chat/admin/reply`);
 
     try {
-      const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("glowgoodly_token") || localStorage.getItem("gg_token")) : "");
-      await fetch(`${API_BASE}/chat/admin/reply`, {
+      const res = await fetch(`${API_BASE}/chat/admin/reply`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getAuthHeader(activeToken) },
         body: JSON.stringify({ chatId: selectedChatId, message: text }),
       });
-    } catch (e) {}
-    setIsSending(false);
+
+      console.log("[Native Support Admin] API response status:", res.status);
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        alert(`❌ Reply failed (${res.status}): ${errData.error || "Permission denied or session expired. Please log in again."}`);
+        setIsSending(false);
+        return;
+      }
+
+      const savedMsg = await res.json();
+      setReplyText("");
+      setChatHistory(prev => {
+        if (prev.some(m => m.id === savedMsg.id)) return prev;
+        return [...prev, savedMsg];
+      });
+
+      setThreads(prev => {
+        const idx = prev.findIndex(t => t.chatId === selectedChatId);
+        if (idx !== -1) {
+          const updated = [...prev];
+          updated[idx] = { ...updated[idx], lastMessage: text, lastSender: "Admin", updatedAt: savedMsg.createdAt || new Date().toISOString() };
+          return updated.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        }
+        return prev;
+      });
+    } catch (err: any) {
+      alert(`❌ Network error sending reply: ${err?.message || "Failed to reach backend."}`);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const formatTime = (dateStr?: string) => {
@@ -13030,192 +13910,528 @@ function LiveChatPanel({ token, staffList }: { token: string | null; staffList?:
     return d.toLocaleDateString("en-BD", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
   };
 
+  // Metrics calculation
+  const totalCount = threads.length;
+  const openCount = threads.filter(t => (threadStatuses[t.chatId] || "Open") === "Open").length;
+  const pendingCount = threads.filter(t => threadStatuses[t.chatId] === "Pending").length;
+  const resolvedCount = threads.filter(t => threadStatuses[t.chatId] === "Resolved").length;
+  const unreadCount = threads.filter(t => t.lastSender === "Customer").length;
+
+  // Filtered threads
+  const filteredThreads = useMemo(() => {
+    return threads.filter(t => {
+      const status = threadStatuses[t.chatId] || "Open";
+      if (statusFilter !== "All" && status !== statusFilter) return false;
+      if (searchFilter.trim()) {
+        const q = searchFilter.toLowerCase().trim();
+        const name = (t.customerName || t.displayName || "").toLowerCase();
+        const phone = (t.customerPhone || "").toLowerCase();
+        const msg = (t.lastMessage || "").toLowerCase();
+        const id = (t.chatId || "").toLowerCase();
+        return name.includes(q) || phone.includes(q) || msg.includes(q) || id.includes(q);
+      }
+      return true;
+    });
+  }, [threads, threadStatuses, statusFilter, searchFilter]);
+
   const selectedThread = threads.find(t => t.chatId === selectedChatId);
+  const currentStatus = selectedChatId ? (threadStatuses[selectedChatId] || "Open") : "Open";
 
   return (
-    <div style={{ display: "flex", height: "calc(100vh - 132px)", gap: "0", backgroundColor: "#fff", borderRadius: "8px", border: "1px solid #e2e8f0", overflow: "hidden" }}>
-
-      {/* Left: Thread List */}
-      <div style={{ width: "320px", flexShrink: 0, borderRight: "1px solid #e2e8f0", display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid #e2e8f0", backgroundColor: "#e63b7a" }}>
-          <h2 style={{ margin: 0, fontSize: "15px", fontWeight: "800", color: "#fff", display: "flex", alignItems: "center", gap: "8px" }}>
-            <MessageSquare size={18} /> Live Customer Chat
-          </h2>
-          <p style={{ margin: "4px 0 0 0", fontSize: "11.5px", color: "#ffffff", fontWeight: "600" }}>
-            {threads.length} active customer conversation{threads.length !== 1 ? "s" : ""}
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px", height: "calc(100vh - 120px)" }}>
+      {/* Top Header Metrics & Tawk.to Launch Bar */}
+      <div style={{ backgroundColor: "#ffffff", borderRadius: "8px", border: "1px solid #e2e8f0", padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", borderTop: "4px solid #e63b7a" }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <h1 style={{ fontSize: "18px", fontWeight: "800", color: "#0f172a", margin: 0 }}>
+              🎧 Customer Support Center
+            </h1>
+            <span style={{ backgroundColor: "#dcfce7", color: "#166534", fontSize: "11px", fontWeight: "800", padding: "2px 8px", borderRadius: "12px" }}>
+              ● Live Realtime Sync
+            </span>
+          </div>
+          <p style={{ color: "#64748b", fontSize: "12px", margin: "4px 0 0 0" }}>
+            Centralized customer live chats, Tawk.to integration management, and instant response auto-replies.
           </p>
         </div>
-        <div style={{ flex: 1, overflowY: "auto" }}>
-          {isLoading && threads.length === 0 ? (
-            <div style={{ padding: "40px 20px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>Loading conversations...</div>
-          ) : threads.length === 0 ? (
-            <div style={{ padding: "60px 20px", textAlign: "center" }}>
-              <div style={{ fontSize: "36px", marginBottom: "10px" }}>💬</div>
-              <div style={{ color: "#475569", fontSize: "13px", fontWeight: "700" }}>No conversations yet</div>
-              <div style={{ color: "#94a3b8", fontSize: "11px", marginTop: "4px" }}>Customer live chats will appear here with customer names</div>
-            </div>
-          ) : (
-            threads.map((thread) => {
-              const custName = thread.customerName || thread.displayName || ("Customer #" + (thread.customerPhone || thread.chatId.replace(/^chat_/, "").slice(-5).toUpperCase()));
-              const initial = (thread.customerName ? thread.customerName.trim().charAt(0) : "C").toUpperCase();
-              const isSelected = selectedChatId === thread.chatId;
 
-              return (
-                <div
-                  key={thread.chatId}
-                  onClick={() => setSelectedChatId(thread.chatId)}
-                  style={{
-                    padding: "14px 16px",
-                    cursor: "pointer",
-                    backgroundColor: isSelected ? "#fff0f5" : "#ffffff",
-                    borderLeft: isSelected ? "4px solid #e63b7a" : "4px solid transparent",
-                    borderBottom: "1px solid #f1f5f9",
-                    transition: "background-color 0.1s ease",
-                  }}
-                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.backgroundColor = "#f8fafc"; }}
-                  onMouseLeave={e => { if (!isSelected) e.currentTarget.style.backgroundColor = "#ffffff"; }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <div style={{ width: "36px", height: "36px", borderRadius: "50%", backgroundColor: isSelected ? "#e63b7a" : "#0f172a", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "800", flexShrink: 0 }}>
-                      {initial}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: "800", fontSize: "13px", color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {custName}
-                      </div>
-                      <div style={{ fontSize: "11px", color: thread.lastSender === "Customer" ? "#334155" : "#059669", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: "2px" }}>
-                        {thread.lastSender === "Admin" ? "You: " : ""}
-                        {thread.lastMessage?.startsWith("data:image") ? "📷 Image" : thread.lastMessage?.substring(0, 40)}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: "10px", color: "#64748b", fontWeight: "600", flexShrink: 0 }}>
-                      {formatDate(thread.updatedAt)}
-                    </div>
-                  </div>
-                  {thread.lastSender === "Customer" && (
-                    <div style={{ marginTop: "6px", marginLeft: "46px" }}>
-                      <span style={{ backgroundColor: "#e63b7a", color: "#fff", fontSize: "9px", fontWeight: "800", padding: "2px 7px", borderRadius: "4px" }}>NEW</span>
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
+        {/* Tawk.to Controls & Quick Actions */}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+          {/* Chat Mode Switcher */}
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", backgroundColor: "#f8fafc", padding: "4px 8px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+            <span style={{ fontSize: "11px", fontWeight: "700", color: "#64748b" }}>Storefront Chat:</span>
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  localStorage.setItem("gg_chat_mode", "tawk");
+                  alert("✓ Storefront set to Tawk.to Free Live Chat!\nCustomers will see the Tawk.to widget, and messages will arrive on your Android Tawk.to app.");
+                }
+              }}
+              style={{
+                padding: "4px 10px",
+                borderRadius: "6px",
+                fontSize: "11px",
+                fontWeight: "800",
+                border: "none",
+                cursor: "pointer",
+                backgroundColor: "#059669",
+                color: "#fff"
+              }}
+            >
+              🟢 Tawk.to (App)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  localStorage.setItem("gg_chat_mode", "native");
+                  alert("✓ Storefront set to Native GlowGoodly Chat (Socket.IO)!\nCustomers will chat directly with this Admin Support Inbox in real time.");
+                }
+              }}
+              style={{
+                padding: "4px 10px",
+                borderRadius: "6px",
+                fontSize: "11px",
+                fontWeight: "800",
+                border: "none",
+                cursor: "pointer",
+                backgroundColor: "#e63b7a",
+                color: "#fff"
+              }}
+            >
+              🟣 Native Socket.IO
+            </button>
+          </div>
+
+          <button
+            onClick={() => window.open("https://dashboard.tawk.to", "_blank")}
+            style={{
+              backgroundColor: "#059669",
+              color: "#ffffff",
+              padding: "8px 16px",
+              borderRadius: "6px",
+              border: "none",
+              fontSize: "12.5px",
+              fontWeight: "800",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              boxShadow: "0 2px 6px rgba(5,150,105,0.2)"
+            }}
+          >
+            <ExternalLink size={14} /> Open Tawk.to Live Inbox
+          </button>
+          <button
+            onClick={() => setShowTawkGuide(!showTawkGuide)}
+            style={{
+              backgroundColor: "#f1f5f9",
+              color: "#334155",
+              padding: "8px 14px",
+              borderRadius: "6px",
+              border: "1px solid #cbd5e1",
+              fontSize: "12px",
+              fontWeight: "700",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px"
+            }}
+          >
+            📱 Mobile App Guide
+          </button>
         </div>
       </div>
 
-      {/* Right: Conversation */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", backgroundColor: "#f8fafc" }}>
-        {!selectedChatId ? (
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px" }}>
-            <div style={{ fontSize: "56px" }}>💬</div>
-            <div style={{ fontSize: "16px", fontWeight: "800", color: "#1e293b" }}>Select a customer conversation</div>
-            <div style={{ fontSize: "13px", color: "#64748b", fontWeight: "600" }}>Click on a customer thread on the left to start live messaging</div>
+      {/* Tawk.to Mobile Guide Banner (Collapsible) */}
+      {showTawkGuide && (
+        <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px", padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px" }}>
+          <div style={{ fontSize: "12.5px", color: "#166534", lineHeight: "1.6" }}>
+            <div style={{ fontWeight: "800", fontSize: "13px", marginBottom: "4px" }}>📱 Tawk.to Mobile Agent Setup (100% Free Plan)</div>
+            1. Install <b>Tawk.to</b> from Google Play Store or Apple App Store.<br/>
+            2. Log in with your GlowGoodly support email.<br/>
+            3. Select property: <b>GlowGoodly</b> (Property ID: <code style={{ backgroundColor: "#dcfce7", padding: "1px 5px", borderRadius: "4px" }}>6b069014398c563cb23977c4</code>, Widget: <code style={{ backgroundColor: "#dcfce7", padding: "1px 5px", borderRadius: "4px" }}>1k88q5k7e</code>).<br/>
+            4. Enable push notifications to instantly reply to customer questions from your phone 24/7 without opening this Admin Panel!
           </div>
-        ) : (
-          <>
-            {/* Chat Header */}
-            <div style={{ padding: "14px 20px", backgroundColor: "#fff", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", gap: "12px" }}>
-              <div style={{ width: "38px", height: "38px", borderRadius: "50%", backgroundColor: "#e63b7a", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: "800" }}>
-                {(selectedThread?.customerName ? selectedThread.customerName.trim().charAt(0) : "C").toUpperCase()}
-              </div>
-              <div>
-                <div style={{ fontWeight: "800", fontSize: "14px", color: "#0f172a" }}>
-                  {selectedThread?.customerName || selectedThread?.displayName || "Customer"}
-                </div>
-                <div style={{ fontSize: "11px", color: "#059669", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ width: "7px", height: "7px", borderRadius: "50%", backgroundColor: "#059669", display: "inline-block" }} />
-                  {selectedThread?.customerPhone ? `Mobile: ${selectedThread.customerPhone}` : "Customer Online"}
-                </div>
-              </div>
-              <div style={{ marginLeft: "auto", display: "flex", gap: "10px", alignItems: "center" }}>
-                <select
-                  value={assignedAgents[selectedChatId || ""] || ""}
-                  style={{ padding: "6px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", fontWeight: "700", backgroundColor: "#fff" }}
-                  onChange={(e) => {
-                    if (e.target.value && selectedChatId) {
-                      setAssignedAgents(prev => ({ ...prev, [selectedChatId]: e.target.value }));
-                      alert(`Chat assigned to staff member: ${e.target.value}`);
-                    }
-                  }}
-                >
-                  <option value="">👤 Assign Staff Member</option>
-                  {staffList && staffList.length > 0 ? (
-                    staffList.map((s: any) => (
-                      <option key={s.id || s.email} value={s.name}>{s.name} ({s.role || "Staff"})</option>
-                    ))
-                  ) : (
-                    <>
-                      <option value="Sabrina (Beauty Specialist)">Sabrina (Beauty Specialist)</option>
-                      <option value="Tariq (Customer Support)">Tariq (Customer Support)</option>
-                      <option value="Nusrat (Skincare Consultant)">Nusrat (Skincare Consultant)</option>
-                    </>
-                  )}
-                </select>
-                <button
-                  onClick={() => setSelectedChatId(null)}
-                  style={{ background: "#f1f5f9", border: "1px solid #cbd5e1", padding: "6px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer", color: "#475569" }}
-                >
-                  ✕ Close
-                </button>
-              </div>
-            </div>
+          <button onClick={() => setShowTawkGuide(false)} style={{ border: "none", background: "none", fontSize: "14px", cursor: "pointer", color: "#166534", fontWeight: "800" }}>✕</button>
+        </div>
+      )}
 
-            {/* Messages */}
-            <div style={{ flex: 1, overflowY: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
-              {chatHistory.length === 0 ? (
-                <div style={{ textAlign: "center", marginTop: "60px", color: "#94a3b8", fontSize: "13px", fontWeight: "600" }}>No messages yet in this conversation</div>
-              ) : (
-                chatHistory.map((msg, idx) => {
-                  const isAdmin = msg.sender === "Admin";
-                  const isImg = msg.message?.startsWith("data:image/");
-                  return (
-                    <div key={msg.id || idx} style={{ display: "flex", flexDirection: "column", alignItems: isAdmin ? "flex-end" : "flex-start" }}>
-                      <div style={{ fontSize: "10px", color: "#64748b", fontWeight: "700", marginBottom: "3px", padding: "0 4px" }}>
-                        {isAdmin ? "You (Admin)" : (selectedThread?.customerName || "Customer")} • {formatTime(msg.createdAt)}
+      {/* Metrics Row */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "12px" }}>
+        <div style={{ backgroundColor: "#ffffff", padding: "12px 16px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+          <div style={{ fontSize: "11px", fontWeight: "700", color: "#64748b" }}>TOTAL CONVERSATIONS</div>
+          <div style={{ fontSize: "20px", fontWeight: "800", color: "#0f172a", marginTop: "4px" }}>{totalCount}</div>
+        </div>
+        <div style={{ backgroundColor: "#ffffff", padding: "12px 16px", borderRadius: "8px", border: "1px solid #e2e8f0", borderLeft: "4px solid #3b82f6" }}>
+          <div style={{ fontSize: "11px", fontWeight: "700", color: "#2563eb" }}>OPEN INQUIRIES</div>
+          <div style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a8a", marginTop: "4px" }}>{openCount}</div>
+        </div>
+        <div style={{ backgroundColor: "#ffffff", padding: "12px 16px", borderRadius: "8px", border: "1px solid #e2e8f0", borderLeft: "4px solid #f59e0b" }}>
+          <div style={{ fontSize: "11px", fontWeight: "700", color: "#d97706" }}>PENDING FOLLOW-UP</div>
+          <div style={{ fontSize: "20px", fontWeight: "800", color: "#78350f", marginTop: "4px" }}>{pendingCount}</div>
+        </div>
+        <div style={{ backgroundColor: "#ffffff", padding: "12px 16px", borderRadius: "8px", border: "1px solid #e2e8f0", borderLeft: "4px solid #10b981" }}>
+          <div style={{ fontSize: "11px", fontWeight: "700", color: "#059669" }}>RESOLVED</div>
+          <div style={{ fontSize: "20px", fontWeight: "800", color: "#064e3b", marginTop: "4px" }}>{resolvedCount}</div>
+        </div>
+        <div style={{ backgroundColor: "#ffffff", padding: "12px 16px", borderRadius: "8px", border: "1px solid #e2e8f0", borderLeft: "4px solid #ec4899" }}>
+          <div style={{ fontSize: "11px", fontWeight: "700", color: "#db2777" }}>NEW CUSTOMER MSGS</div>
+          <div style={{ fontSize: "20px", fontWeight: "800", color: "#831843", marginTop: "4px" }}>{unreadCount}</div>
+        </div>
+      </div>
+
+      {/* Three-Panel Support Center Layout */}
+      <div style={{ display: "flex", flex: 1, minHeight: 0, backgroundColor: "#ffffff", borderRadius: "8px", border: "1px solid #e2e8f0", overflow: "hidden" }}>
+        
+        {/* PANEL 1: FOLDERS & SEARCH (Leftmost - 220px) */}
+        <div style={{ width: "220px", flexShrink: 0, borderRight: "1px solid #e2e8f0", display: "flex", flexDirection: "column", backgroundColor: "#f8fafc" }}>
+          <div style={{ padding: "14px 14px", borderBottom: "1px solid #e2e8f0" }}>
+            <input
+              type="text"
+              placeholder="🔍 Search chat..."
+              value={searchFilter}
+              onChange={e => setSearchFilter(e.target.value)}
+              style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", outline: "none", backgroundColor: "#ffffff" }}
+            />
+          </div>
+          <div style={{ padding: "10px", display: "flex", flexDirection: "column", gap: "4px", flex: 1, overflowY: "auto" }}>
+            <div style={{ fontSize: "10px", fontWeight: "800", color: "#94a3b8", padding: "6px 10px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Status Inboxes</div>
+            {[
+              { id: "All", label: "All Inquiries", count: totalCount, icon: "📁" },
+              { id: "Open", label: "Open Chats", count: openCount, icon: "💬" },
+              { id: "Pending", label: "Pending", count: pendingCount, icon: "⏳" },
+              { id: "Resolved", label: "Resolved", count: resolvedCount, icon: "✅" }
+            ].map(f => (
+              <button
+                key={f.id}
+                onClick={() => setStatusFilter(f.id as any)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "8px 12px",
+                  borderRadius: "6px",
+                  border: "none",
+                  backgroundColor: statusFilter === f.id ? "#e63b7a" : "transparent",
+                  color: statusFilter === f.id ? "#ffffff" : "#334155",
+                  fontWeight: statusFilter === f.id ? "800" : "600",
+                  fontSize: "12.5px",
+                  cursor: "pointer",
+                  textAlign: "left"
+                }}
+              >
+                <span>{f.icon} {f.label}</span>
+                <span style={{ fontSize: "10.5px", padding: "1px 6px", borderRadius: "8px", backgroundColor: statusFilter === f.id ? "rgba(255,255,255,0.25)" : "#e2e8f0", color: statusFilter === f.id ? "#ffffff" : "#475569" }}>
+                  {f.count}
+                </span>
+              </button>
+            ))}
+
+            <div style={{ fontSize: "10px", fontWeight: "800", color: "#94a3b8", padding: "14px 10px 4px 10px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Channels</div>
+            <div style={{ padding: "6px 10px", fontSize: "12px", color: "#475569", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
+              <span>🌐</span> Website Chat <span style={{ marginLeft: "auto", fontSize: "10px", color: "#059669", fontWeight: "800" }}>Active</span>
+            </div>
+            <div style={{ padding: "6px 10px", fontSize: "12px", color: "#475569", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
+              <span>🟢</span> Tawk.to Widget <span style={{ marginLeft: "auto", fontSize: "10px", color: "#059669", fontWeight: "800" }}>Free</span>
+            </div>
+          </div>
+        </div>
+
+        {/* PANEL 2: THREAD LIST (Middle - 300px) */}
+        <div style={{ width: "300px", flexShrink: 0, borderRight: "1px solid #e2e8f0", display: "flex", flexDirection: "column" }}>
+          <div style={{ padding: "12px 16px", borderBottom: "1px solid #e2e8f0", backgroundColor: "#ffffff", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "13px", fontWeight: "800", color: "#0f172a" }}>
+              {statusFilter === "All" ? "All Conversations" : `${statusFilter} Conversations`}
+            </span>
+            <span style={{ fontSize: "11px", color: "#64748b", fontWeight: "700" }}>{filteredThreads.length}</span>
+          </div>
+
+          <div style={{ flex: 1, overflowY: "auto" }}>
+            {isLoading && filteredThreads.length === 0 ? (
+              <div style={{ padding: "40px 20px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>Loading conversations...</div>
+            ) : filteredThreads.length === 0 ? (
+              <div style={{ padding: "60px 20px", textAlign: "center" }}>
+                <div style={{ fontSize: "32px", marginBottom: "8px" }}>💬</div>
+                <div style={{ color: "#475569", fontSize: "13px", fontWeight: "700" }}>No conversations found</div>
+                <div style={{ color: "#94a3b8", fontSize: "11px", marginTop: "4px" }}>Customer live chats will appear here</div>
+              </div>
+            ) : (
+              filteredThreads.map((thread) => {
+                const custName = thread.customerName || thread.displayName || ("Customer #" + (thread.customerPhone || thread.chatId.replace(/^chat_/, "").slice(-5).toUpperCase()));
+                const initial = (thread.customerName ? thread.customerName.trim().charAt(0) : "C").toUpperCase();
+                const isSelected = selectedChatId === thread.chatId;
+                const status = threadStatuses[thread.chatId] || "Open";
+
+                return (
+                  <div
+                    key={thread.chatId}
+                    onClick={() => setSelectedChatId(thread.chatId)}
+                    style={{
+                      padding: "12px 14px",
+                      cursor: "pointer",
+                      backgroundColor: isSelected ? "#fff0f5" : "#ffffff",
+                      borderLeft: isSelected ? "4px solid #e63b7a" : "4px solid transparent",
+                      borderBottom: "1px solid #f1f5f9",
+                      transition: "background-color 0.1s ease",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <div style={{ width: "34px", height: "34px", borderRadius: "50%", backgroundColor: isSelected ? "#e63b7a" : "#1e293b", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: "800", flexShrink: 0 }}>
+                        {initial}
                       </div>
-                      <div style={{
-                        backgroundColor: isAdmin ? "#e63b7a" : "#ffffff",
-                        color: isAdmin ? "#ffffff" : "#1e293b",
-                        padding: isImg ? "6px" : "10px 14px",
-                        borderRadius: isAdmin ? "12px 2px 12px 12px" : "2px 12px 12px 12px",
-                        maxWidth: "70%",
-                        fontSize: "13px",
-                        fontWeight: "500",
-                        lineHeight: "1.5",
-                        border: isAdmin ? "none" : "1px solid #e2e8f0",
-                        wordBreak: "break-word",
-                      }}>
-                        {isImg ? (
-                          <img src={msg.message} alt="Attachment" style={{ maxWidth: "200px", maxHeight: "200px", borderRadius: "6px", display: "block", objectFit: "cover" }} />
-                        ) : msg.message}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontWeight: "800", fontSize: "12.5px", color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {custName}
+                          </span>
+                          <span style={{ fontSize: "10px", color: "#64748b", fontWeight: "600" }}>
+                            {formatDate(thread.updatedAt)}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: "11px", color: thread.lastSender === "Customer" ? "#334155" : "#059669", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: "2px" }}>
+                          {thread.lastSender === "Admin" ? "You: " : ""}
+                          {thread.lastMessage?.startsWith("data:image") ? "📷 Image" : thread.lastMessage?.substring(0, 35)}
+                        </div>
+                        <div style={{ display: "flex", gap: "6px", alignItems: "center", marginTop: "4px" }}>
+                          <span style={{ fontSize: "9px", fontWeight: "800", padding: "1px 5px", borderRadius: "4px", backgroundColor: status === "Resolved" ? "#dcfce7" : status === "Pending" ? "#fef3c7" : "#dbeafe", color: status === "Resolved" ? "#166534" : status === "Pending" ? "#92400e" : "#1e40af" }}>
+                            {status}
+                          </span>
+                          {thread.lastSender === "Customer" && (
+                            <span style={{ backgroundColor: "#e63b7a", color: "#fff", fontSize: "9px", fontWeight: "800", padding: "1px 5px", borderRadius: "4px" }}>
+                              NEW
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  );
-                })
-              )}
-              <div ref={chatBottomRef} />
-            </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
 
-            {/* Reply Input */}
-            <form onSubmit={handleSendReply} style={{ padding: "12px 16px", backgroundColor: "#fff", borderTop: "1px solid #e2e8f0", display: "flex", gap: "10px", alignItems: "center" }}>
-              <input
-                type="text"
-                placeholder="Type your reply to customer..."
-                value={replyText}
-                onChange={e => setReplyText(e.target.value)}
-                style={{ flex: 1, padding: "10px 16px", borderRadius: "6px", border: "1.5px solid #cbd5e1", fontSize: "13px", fontWeight: "500", outline: "none", backgroundColor: "#ffffff", color: "#1e293b" }}
-              />
-              <button
-                type="submit"
-                disabled={isSending || !replyText.trim()}
-                style={{ height: "40px", padding: "0 18px", borderRadius: "6px", backgroundColor: replyText.trim() ? "#e63b7a" : "#e2e8f0", color: replyText.trim() ? "#ffffff" : "#94a3b8", border: "none", cursor: replyText.trim() ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontWeight: "700", fontSize: "13px" }}
-              >
-                <Send size={15} /> Send
-              </button>
-            </form>
-          </>
-        )}
+        {/* PANEL 3: CONVERSATION & CUSTOMER PROFILE (Right - Flex 1) */}
+        <div style={{ flex: 1, display: "flex", minWidth: 0, backgroundColor: "#f8fafc" }}>
+          {!selectedChatId ? (
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", padding: "40px" }}>
+              <div style={{ fontSize: "48px" }}>💬</div>
+              <div style={{ fontSize: "16px", fontWeight: "800", color: "#1e293b" }}>Select a conversation to reply</div>
+              <div style={{ fontSize: "13px", color: "#64748b", textAlign: "center", maxWidth: "340px" }}>
+                Choose any customer from the list on the left to start live messaging or view their support profile.
+              </div>
+            </div>
+          ) : (
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+              {/* Conversation Top Header */}
+              <div style={{ padding: "12px 18px", backgroundColor: "#fff", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                <div style={{ width: "36px", height: "36px", borderRadius: "50%", backgroundColor: "#e63b7a", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "800" }}>
+                  {(selectedThread?.customerName ? selectedThread.customerName.trim().charAt(0) : "C").toUpperCase()}
+                </div>
+                <div>
+                  <div style={{ fontWeight: "800", fontSize: "13.5px", color: "#0f172a" }}>
+                    {selectedThread?.customerName || selectedThread?.displayName || "Customer"}
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#059669", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ width: "7px", height: "7px", borderRadius: "50%", backgroundColor: "#059669", display: "inline-block" }} />
+                    {selectedThread?.customerPhone ? `Mobile: ${selectedThread.customerPhone}` : "Customer Session Active"}
+                  </div>
+                </div>
+
+                <div style={{ marginLeft: "auto", display: "flex", gap: "8px", alignItems: "center" }}>
+                  {/* Status Dropdown */}
+                  <select
+                    value={currentStatus}
+                    onChange={e => updateThreadStatus(selectedChatId, e.target.value as any)}
+                    style={{ padding: "5px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", fontWeight: "700", backgroundColor: "#fff", cursor: "pointer" }}
+                  >
+                    <option value="Open">Status: Open</option>
+                    <option value="Pending">Status: Pending</option>
+                    <option value="Resolved">Status: Resolved</option>
+                  </select>
+
+                  {/* Assign Staff */}
+                  <select
+                    value={assignedAgents[selectedChatId || ""] || ""}
+                    onChange={e => updateAssignedAgent(selectedChatId, e.target.value)}
+                    style={{ padding: "5px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", fontWeight: "700", backgroundColor: "#fff", cursor: "pointer" }}
+                  >
+                    <option value="">👤 Assign Agent</option>
+                    {staffList && staffList.length > 0 ? (
+                      staffList.map((s: any) => (
+                        <option key={s.id || s.email} value={s.name}>{s.name} ({s.role || "Staff"})</option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="Sabrina (Beauty Specialist)">Sabrina (Beauty Specialist)</option>
+                        <option value="Tariq (Customer Support)">Tariq (Customer Support)</option>
+                        <option value="Nusrat (Skincare Consultant)">Nusrat (Skincare Consultant)</option>
+                      </>
+                    )}
+                  </select>
+
+                  <button
+                    onClick={() => setSelectedChatId(null)}
+                    style={{ background: "#f1f5f9", border: "1px solid #cbd5e1", padding: "5px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer", color: "#475569" }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              {/* Messages Body */}
+              <div style={{ flex: 1, overflowY: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                {chatHistory.length === 0 ? (
+                  <div style={{ textAlign: "center", marginTop: "50px", color: "#94a3b8", fontSize: "13px", fontWeight: "600" }}>No messages yet in this conversation</div>
+                ) : (
+                  chatHistory.map((msg, idx) => {
+                    const isAdmin = msg.sender === "Admin";
+                    const isImg = msg.message?.startsWith("data:image/");
+                    return (
+                      <div key={msg.id || idx} style={{ display: "flex", flexDirection: "column", alignItems: isAdmin ? "flex-end" : "flex-start" }}>
+                        <div style={{ fontSize: "10px", color: "#64748b", fontWeight: "700", marginBottom: "3px", padding: "0 4px" }}>
+                          {isAdmin ? "You (Admin)" : (selectedThread?.customerName || "Customer")} • {formatTime(msg.createdAt)}
+                        </div>
+                        <div style={{
+                          backgroundColor: isAdmin ? "#e63b7a" : "#ffffff",
+                          color: isAdmin ? "#ffffff" : "#1e293b",
+                          padding: isImg ? "6px" : "10px 14px",
+                          borderRadius: isAdmin ? "12px 2px 12px 12px" : "2px 12px 12px 12px",
+                          maxWidth: "70%",
+                          fontSize: "13px",
+                          fontWeight: "500",
+                          lineHeight: "1.5",
+                          border: isAdmin ? "none" : "1px solid #e2e8f0",
+                          wordBreak: "break-word",
+                          boxShadow: "0 1px 2px rgba(0,0,0,0.04)"
+                        }}>
+                          {isImg ? (
+                            <img src={msg.message} alt="Attachment" style={{ maxWidth: "200px", maxHeight: "200px", borderRadius: "6px", display: "block", objectFit: "cover" }} />
+                          ) : msg.message}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+                <div ref={chatBottomRef} />
+              </div>
+
+              {/* Quick Reply / Auto Reply Templates Bar (Including Sub-Area) */}
+              <div style={{ padding: "8px 16px", backgroundColor: "#fdf2f8", borderTop: "1px solid #fbcfe8", display: "flex", gap: "8px", overflowX: "auto", alignItems: "center" }}>
+                <span style={{ fontSize: "11px", fontWeight: "800", color: "#e63b7a", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "4px" }}>
+                  ⚡ Auto Replies:
+                </span>
+                {[
+                  { label: "🚚 ডেলিভারি চার্জ ও সময় (সব এরিয়া)", text: "আসসালামু আলাইকুম। ঢাকার ভেতরে ডেলিভারি চার্জ ৭০ টাকা (১-২ দিন), সাব-এরিয়া (সাভার, গাজীপুর, কেরানীগঞ্জ, নারায়ণগঞ্জ) ১০০ টাকা (২-৩ দিন) এবং ঢাকার বাইরে ১৩০ টাকা (২-৩ দিন)। ক্যাশ অন ডেলিভারি (Cash on Delivery) সুবিধা আছে।" },
+                  { label: "💯 ১০০% অরিজিনাল কিনা", text: "জি, GlowGoodly-এর প্রতিটি পণ্য শতভাগ আসল ও অথেন্টিক। আমরা সরাসরি অফিসিয়াল ব্র্যান্ড ও অনুমোদিত সোর্স থেকে পণ্য আমদানি করি।" },
+                  { label: "💳 পেমেন্ট পদ্ধতি", text: "আমরা ক্যাশ অন ডেলিভারি (Cash on Delivery) এবং বিকাশ (bKash) পেমেন্ট সুবিধা দিচ্ছি।" },
+                  { label: "📦 অর্ডার করার নিয়ম", text: "অর্ডার নিশ্চিত করতে অনুগ্রহ করে আপনার নাম, সম্পূর্ণ ঠিকানা এবং সচল মোবাইল নম্বরটি লিখে পাঠিয়ে দিন।" },
+                  { label: "🌸 অর্ডার কনফার্মেশন", text: "আপনার অর্ডারটি সফলভাবে গ্রহণ করা হয়েছে। খুব শীঘ্রই আমাদের প্রতিনিধি আপনার সাথে যোগাযোগ করবেন। ধন্যবাদ!" },
+                  { label: "👋 বিদায় / ধন্যবাদ", text: "GlowGoodly-এর সাথে থাকার জন্য ধন্যবাদ! আপনার আর কোনো জিজ্ঞাসা থাকলে নির্দ্বিধায় জানান।" }
+                ].map((tpl, tIdx) => (
+                  <button
+                    key={tIdx}
+                    type="button"
+                    onClick={() => setReplyText(tpl.text)}
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: "16px",
+                      border: "1px solid #f472b6",
+                      backgroundColor: "#ffffff",
+                      color: "#9d174d",
+                      fontSize: "11px",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                      transition: "all 0.15s ease"
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = "#e63b7a"; e.currentTarget.style.color = "#ffffff"; }}
+                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = "#ffffff"; e.currentTarget.style.color = "#9d174d"; }}
+                    title="Click to insert auto reply template"
+                  >
+                    {tpl.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Reply Input Form */}
+              <form onSubmit={handleSendReply} style={{ padding: "12px 16px", backgroundColor: "#fff", borderTop: "1px solid #e2e8f0", display: "flex", gap: "10px", alignItems: "center" }}>
+                <input
+                  type="text"
+                  placeholder="Type your reply to customer..."
+                  value={replyText}
+                  onChange={e => setReplyText(e.target.value)}
+                  style={{ flex: 1, padding: "10px 16px", borderRadius: "6px", border: "1.5px solid #cbd5e1", fontSize: "13px", fontWeight: "500", outline: "none", backgroundColor: "#ffffff", color: "#1e293b" }}
+                />
+                <button
+                  type="submit"
+                  disabled={isSending || !replyText.trim()}
+                  style={{ height: "40px", padding: "0 18px", borderRadius: "6px", backgroundColor: replyText.trim() ? "#e63b7a" : "#e2e8f0", color: replyText.trim() ? "#ffffff" : "#94a3b8", border: "none", cursor: replyText.trim() ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontWeight: "700", fontSize: "13px" }}
+                >
+                  <Send size={15} /> Send
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* Customer Dossier Drawer (Rightmost Column when thread selected) */}
+          {selectedChatId && selectedThread && (
+            <div style={{ width: "240px", flexShrink: 0, borderLeft: "1px solid #e2e8f0", backgroundColor: "#ffffff", padding: "16px", display: "flex", flexDirection: "column", gap: "16px", overflowY: "auto" }}>
+              <div>
+                <div style={{ fontSize: "11px", fontWeight: "800", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>Customer Profile</div>
+                <div style={{ fontSize: "14px", fontWeight: "800", color: "#0f172a", marginTop: "4px" }}>
+                  {selectedThread.customerName || selectedThread.displayName || "Anonymous Customer"}
+                </div>
+                {selectedThread.customerPhone && (
+                  <div style={{ fontSize: "12px", color: "#2563eb", fontWeight: "700", marginTop: "2px" }}>
+                    📞 {selectedThread.customerPhone}
+                  </div>
+                )}
+                <div style={{ fontSize: "10px", color: "#64748b", marginTop: "2px", fontFamily: "monospace" }}>
+                  ID: {selectedThread.chatId}
+                </div>
+              </div>
+
+              {selectedThread.customerPhone && (
+                <div style={{ display: "flex", gap: "6px" }}>
+                  <a
+                    href={`tel:${selectedThread.customerPhone}`}
+                    style={{ flex: 1, textAlign: "center", padding: "6px 8px", borderRadius: "6px", backgroundColor: "#eff6ff", color: "#1d4ed8", fontSize: "11px", fontWeight: "800", textDecoration: "none" }}
+                  >
+                    Call Customer
+                  </a>
+                  <a
+                    href={`https://wa.me/880${selectedThread.customerPhone.replace(/^0+/, "")}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ flex: 1, textAlign: "center", padding: "6px 8px", borderRadius: "6px", backgroundColor: "#ecfdf5", color: "#047857", fontSize: "11px", fontWeight: "800", textDecoration: "none" }}
+                  >
+                    WhatsApp
+                  </a>
+                </div>
+              )}
+
+              <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: "12px" }}>
+                <div style={{ fontSize: "11px", fontWeight: "800", color: "#94a3b8", textTransform: "uppercase" }}>Channel Info</div>
+                <div style={{ fontSize: "12px", color: "#334155", fontWeight: "600", marginTop: "4px" }}>
+                  🌐 GlowGoodly Storefront Chat
+                </div>
+                <div style={{ fontSize: "11px", color: "#059669", marginTop: "2px" }}>
+                  Socket.IO Active Room: <code style={{ fontSize: "10px" }}>chat_{selectedThread.chatId}</code>
+                </div>
+              </div>
+
+              <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: "12px" }}>
+                <div style={{ fontSize: "11px", fontWeight: "800", color: "#94a3b8", textTransform: "uppercase" }}>Assigned Agent</div>
+                <div style={{ fontSize: "12px", fontWeight: "700", color: "#0f172a", marginTop: "4px" }}>
+                  {assignedAgents[selectedThread.chatId] || "Unassigned"}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -13234,7 +14450,7 @@ function AbandonedCartsPanel({ token }: { token: string | null }) {
         headers: getAuthHeader(token)
       });
       if (res.ok) setCarts(await res.json());
-    } catch (e) {}
+    } catch (e) { }
     setLoading(false);
   };
 
@@ -13318,7 +14534,7 @@ function UpsellOffersPanel({ token }: { token: string | null }) {
     try {
       const res = await fetch(`${API_BASE}/admin/upsells`);
       if (res.ok) setRules(await res.json());
-    } catch (e) {}
+    } catch (e) { }
   };
 
   useEffect(() => { fetchUpsells(); }, []);
@@ -13336,7 +14552,7 @@ function UpsellOffersPanel({ token }: { token: string | null }) {
         setForm({ triggerProduct: "", suggestedProduct: "", discountPercentage: "15", offerMessage: "" });
         fetchUpsells();
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   return (
@@ -13402,7 +14618,7 @@ function InfluencersPanel({ token }: { token: string | null }) {
         headers: getAuthHeader(token)
       });
       if (res.ok) setList(await res.json());
-    } catch (e) {}
+    } catch (e) { }
   };
 
   useEffect(() => { fetchInfluencers(); }, [token]);
@@ -13420,7 +14636,7 @@ function InfluencersPanel({ token }: { token: string | null }) {
         setForm({ name: "", email: "", promoCode: "", commissionRate: "10" });
         fetchInfluencers();
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   return (
@@ -13472,7 +14688,7 @@ function TopCustomersPanel({ customerList, orders }: { customerList: any[]; orde
       try {
         const saved = localStorage.getItem("glowgoodly_available_offers");
         if (saved) return JSON.parse(saved);
-      } catch (e) {}
+      } catch (e) { }
     }
     return [];
   });
@@ -13480,7 +14696,7 @@ function TopCustomersPanel({ customerList, orders }: { customerList: any[]; orde
   const topList = useMemo(() => {
     // Group and aggregate real customer purchase history strictly from orders!
     const custMap = new Map<string, { id: string; name: string; phone: string; email: string; orderCount: number; totalSpend: number }>();
-    
+
     orders.forEach((o, idx) => {
       const phone = o.customerPhone || o.phone || "";
       const email = o.customerEmail || o.email || "";
@@ -13603,7 +14819,7 @@ function DamageProductsPanel({ logs, setLogs }: { logs: Array<any>; setLogs: Rea
     if (typeof window !== "undefined") {
       try {
         localStorage.setItem("gg_damaged_products_log", JSON.stringify(updated));
-      } catch (e) {}
+      } catch (e) { }
     }
     setForm({ productName: "", qty: "1", type: "Damaged in Shipping", lossAmount: "" });
     setShowModal(false);
@@ -13617,7 +14833,7 @@ function DamageProductsPanel({ logs, setLogs }: { logs: Array<any>; setLogs: Rea
     if (typeof window !== "undefined") {
       try {
         localStorage.setItem("gg_damaged_products_log", JSON.stringify(updated));
-      } catch (e) {}
+      } catch (e) { }
     }
   };
 
@@ -13727,7 +14943,7 @@ function SupportTicketsPanel({ token }: { token: string | null }) {
         headers: getAuthHeader(token)
       });
       if (res.ok) setTickets(await res.json());
-    } catch (e) {}
+    } catch (e) { }
   };
 
   useEffect(() => { fetchTickets(); }, [token]);
@@ -13740,7 +14956,7 @@ function SupportTicketsPanel({ token }: { token: string | null }) {
         body: JSON.stringify({ status })
       });
       if (res.ok) { fetchTickets(); }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   return (
@@ -13842,9 +15058,9 @@ function MenuBuilderPanel() {
   const [newFooterTitle, setNewFooterTitle] = useState("");
   const [newFooterUrl, setNewFooterUrl] = useState("");
 
-  const [localCategories, setLocalCategories] = useState<{id: string; name: string; parentId?: string; slug?: string}[]>([]);
+  const [localCategories, setLocalCategories] = useState<{ id: string; name: string; parentId?: string; slug?: string }[]>([]);
   React.useEffect(() => {
-    fetch(`${API_BASE}/categories`).then(r => r.json()).then(d => setLocalCategories(d.data || d || [])).catch(() => {});
+    fetch(`${API_BASE}/categories`).then(r => r.json()).then(d => setLocalCategories(d.data || d || [])).catch(() => { });
   }, []);
 
   const handleAddHeaderLink = (e: React.FormEvent) => {
@@ -14005,7 +15221,7 @@ function AuditLogsPanel({ token }: { token: string | null }) {
           headers: getAuthHeader(token)
         });
         if (res.ok) setLogs(await res.json());
-      } catch (e) {}
+      } catch (e) { }
     };
     fetchLogs();
   }, [token]);
@@ -14088,7 +15304,7 @@ function BatchExpiryPanel({ token }: { token: string | null }) {
         headers: getAuthHeader(token)
       });
       if (res.ok) setBatches(await res.json());
-    } catch (e) {}
+    } catch (e) { }
   };
 
   useEffect(() => { fetchBatches(); }, [token]);
@@ -14106,7 +15322,7 @@ function BatchExpiryPanel({ token }: { token: string | null }) {
         setForm({ productName: "", brandName: "", quantityReceived: "50", expiryDate: "" });
         fetchBatches();
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   return (
@@ -14169,7 +15385,7 @@ function SubscriptionsPanel({ token }: { token: string | null }) {
           headers: getAuthHeader(token)
         });
         if (res.ok) setSubs(await res.json());
-      } catch (e) {}
+      } catch (e) { }
     };
     fetchSubs();
   }, [token]);
@@ -14248,7 +15464,7 @@ function CustomerWalletPanel({ token, customerList }: { token: string | null; cu
         headers: getAuthHeader(token)
       });
       if (res.ok) setWallets(await res.json());
-    } catch (e) {}
+    } catch (e) { }
   };
 
   useEffect(() => { fetchWallets(); }, [token]);
@@ -14266,7 +15482,7 @@ function CustomerWalletPanel({ token, customerList }: { token: string | null; cu
         setCreditForm({ customerPhone: "", customerName: "", amount: "", reason: "Store Credit Refund" });
         fetchWallets();
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   return (
@@ -14320,7 +15536,7 @@ function SystemHealthPanel({ token }: { token: string | null }) {
           headers: getAuthHeader(token)
         });
         if (res.ok) setHealth(await res.json());
-      } catch (e) {}
+      } catch (e) { }
     };
     fetchHealth();
   }, [token]);
@@ -14328,7 +15544,7 @@ function SystemHealthPanel({ token }: { token: string | null }) {
   return (
     <div style={{ backgroundColor: "#fff", borderRadius: "10px", border: "1px solid #e2e8f0", padding: "24px" }}>
       <h2 style={{ fontSize: "18px", fontWeight: "800", marginBottom: "16px" }}>🖥️ Server Health & Technical Error Logs</h2>
-      
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "16px", marginBottom: "24px" }}>
         <div style={{ padding: "16px", backgroundColor: "#f0fdf4", borderRadius: "8px", border: "1px solid #bbf7d0" }}>
           <div style={{ fontSize: "12px", fontWeight: "700", color: "#166534" }}>CPU Load</div>
@@ -14370,7 +15586,7 @@ function RmaWorkflowPanel({ token }: { token: string | null }) {
         headers: getAuthHeader(token)
       });
       if (res.ok) setRmas(await res.json());
-    } catch (e) {}
+    } catch (e) { }
   };
 
   useEffect(() => { fetchRMA(); }, [token]);
@@ -14383,7 +15599,7 @@ function RmaWorkflowPanel({ token }: { token: string | null }) {
         body: JSON.stringify({ rmaStep })
       });
       if (res.ok) fetchRMA();
-    } catch (e) {}
+    } catch (e) { }
   };
 
   return (

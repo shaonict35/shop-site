@@ -57,23 +57,29 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       : "/placeholder-product.svg";
 
   const productSlug = product.slug || id;
+  const pageTitle = product.metaTitle?.trim() || `${product.name} — Authentic in Bangladesh`;
+  const pageDescription = product.metaDescription?.trim() || description;
+
+  const keywordsList = product.metaKeywords
+    ? (Array.isArray(product.metaKeywords) ? product.metaKeywords : String(product.metaKeywords).split(",").map((k: string) => k.trim()).filter(Boolean))
+    : [
+        product.name,
+        `${product.name} price in bd`,
+        `${product.brand?.name || "cosmetics"} bangladesh`,
+        "buy authentic skincare bd",
+        "glowgoodly",
+      ];
 
   return {
-    title: `${product.name} — Authentic in Bangladesh`,
-    description,
-    keywords: [
-      product.name,
-      `${product.name} price in bd`,
-      `${product.brand?.name || "cosmetics"} bangladesh`,
-      "buy authentic skincare bd",
-      "glowgoodly",
-    ],
+    title: pageTitle,
+    description: pageDescription,
+    keywords: keywordsList,
     alternates: {
       canonical: `https://shop.glowgoodly.com/product/${productSlug}`,
     },
     openGraph: {
-      title: `${product.name} | GlowGoodly Bangladesh`,
-      description,
+      title: `${pageTitle} | GlowGoodly Bangladesh`,
+      description: pageDescription,
       url: `https://shop.glowgoodly.com/product/${productSlug}`,
       siteName: "GlowGoodly",
       images: [
@@ -88,8 +94,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     twitter: {
       card: "summary_large_image",
-      title: `${product.name} | GlowGoodly BD`,
-      description,
+      title: pageTitle,
+      description: pageDescription,
       images: [primaryImage],
     },
   };

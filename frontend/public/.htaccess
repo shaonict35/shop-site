@@ -60,3 +60,17 @@
   Header set X-XSS-Protection "1; mode=block"
   Header set Referrer-Policy "strict-origin-when-cross-origin"
 </IfModule>
+
+# ─── LITESPEED CACHE CONTROLS & INSTANT PURGE ──────────────────────────────
+<IfModule LiteSpeed>
+  CacheLookup public on
+  RewriteEngine On
+
+  # Pass LiteSpeed Purge header transparently to flush cache immediately
+  RewriteCond %{HTTP:X-LiteSpeed-Purge} !^$
+  RewriteRule .* - [E=Cache-Control:no-cache]
+
+  # Never cache dynamic admin, cart, checkout, or account pages
+  RewriteCond %{REQUEST_URI} ^/(valobasa|admin|checkout|cart|account|bkash-portal) [NC]
+  RewriteRule .* - [E=Cache-Control:no-cache]
+</IfModule>

@@ -9,10 +9,10 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "postinstall": "prisma generate && prisma db push",
+    "postinstall": "prisma generate",
     "db:push": "prisma db push --schema=./prisma/schema.prisma",
     "seed": "node dist/auto-seed.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "tsx src/__tests__/phase1_7_safety.test.ts"
   },
   "keywords": [],
   "author": "",

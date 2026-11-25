@@ -31,21 +31,25 @@ export function createMulterUpload(subfolder: string = "general", prefix: string
       "image/png",
       "image/webp",
       "image/gif",
-      "image/svg+xml",
       "video/mp4",
       "video/webm",
     ];
 
     const ext = path.extname(file.originalname).toLowerCase();
-    const disallowedExts = [".php", ".phtml", ".php3", ".php4", ".php5", ".phps", ".exe", ".sh", ".bash", ".bat", ".cmd", ".js", ".vbs", ".jar", ".html", ".htm"];
-    if (disallowedExts.includes(ext) || file.originalname.includes(".php")) {
-      return cb(new Error("Security violation: Executable scripts or potentially dangerous files are strictly prohibited."));
+    // Security Pentest Hardening: Disallow SVGs and executable extensions to prevent Stored XSS and remote script execution
+    const disallowedExts = [
+      ".php", ".phtml", ".php3", ".php4", ".php5", ".phps", 
+      ".exe", ".sh", ".bash", ".bat", ".cmd", ".js", ".vbs", 
+      ".jar", ".html", ".htm", ".svg"
+    ];
+    if (disallowedExts.includes(ext) || file.originalname.toLowerCase().includes(".php") || ext === ".svg") {
+      return cb(new Error("Security violation: Executable scripts, SVGs, or potentially dangerous files are strictly prohibited."));
     }
 
     if (allowedMimes.includes(file.mimetype.toLowerCase())) {
       cb(null, true);
     } else {
-      cb(new Error("Unsupported file format. Please upload an image (JPG, PNG, WEBP, GIF, SVG) or video (MP4, WEBM)."));
+      cb(new Error("Unsupported file format. Please upload a valid image (JPG, PNG, WEBP, GIF) or video (MP4, WEBM)."));
     }
   };
 

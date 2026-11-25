@@ -31,11 +31,13 @@ import inventoryRouter from "./routes/inventory";
 import heroBannersRouter from "./routes/hero-banners";
 import sectionsRouter from "./routes/sections";
 import combosRouter from "./routes/combos";
+import aiSupportRouter from "./routes/aiSupport";
 import { ensureDefaultSectionsSeeded } from "./controllers/sectionController";
 import db from "./firebase";
+import prisma from "./prisma";
 import { autoSeedDatabase } from "./auto-seed";
 import { initMySQLTables } from "./config/db";
-import { cleanAllDummyData } from "./clean-dummy-products";
+
 import { globalRateLimiter, authRateLimiter, orderRateLimiter, sanitizeInput, securityHeaders } from "./middleware/security";
 
 dotenv.config();
@@ -99,16 +101,113 @@ app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 app.use("/uploads", express.static(path.join(process.cwd(), "backend", "uploads")));
 
+// ─── STRICT CORS TRUSTED-ORIGIN ALLOWLIST ───
+export const TRUSTED_ORIGINS = [
+  "https://glowgoodly.com",
+  "https://www.glowgoodly.com",
+  "https://shop.glowgoodly.com",
+  "https://api.glowgoodly.com",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "http://localhost:5000",
+  "http://127.0.0.1:5000"
+];
+
+export function isTrustedOrigin(origin?: string): boolean {
+  if (!origin) return false;
+  const clean = origin.trim().toLowerCase();
+  // Exact Trusted-Origin Allowlist enforcement (wildcard subdomains strictly disallowed)
+  return TRUSTED_ORIGINS.includes(clean);
+}
+
 const httpServer = createServer(app);
 const io = new SocketIOServer(httpServer, {
   cors: {
-    origin: "*",
+    origin: (origin, callback) => {
+      if (!origin || isTrustedOrigin(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Socket.IO CORS policy violation: Untrusted origin."));
+      }
+    },
+    credentials: true,
     methods: ["GET", "POST"]
   }
 });
 
 // Provide Socket.io instance to Express routes
 app.set("io", io);
+
+// Security Pentest Hardening: Authenticated rooms & Isolated Customer Chat namespaces
+io.on("connection", (socket) => {
+  // 1. Authenticate staff socket if Bearer token is provided in handshake
+  const rawAuthToken = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.replace("Bearer ", "");
+  if (rawAuthToken) {
+    try {
+      const decoded: any = jwt.verify(rawAuthToken, process.env.JWT_SECRET || "glowgoodly_secret_jwt_key_123456");
+      const role = (decoded.role || "").toLowerCase();
+      if (["superadmin", "admin", "manager", "staff", "salesman"].includes(role)) {
+        socket.data.user = decoded;
+        socket.join("admin_staff");
+      }
+    } catch (_) { }
+  }
+
+  // 2. Allow customer to join only their dedicated isolated chat room with verified ownership
+  socket.on("join_chat", (payload: any) => {
+    const targetChatId = typeof payload === "string" ? payload.trim() : (payload?.chatId || "").trim();
+    const token = typeof payload === "object" ? payload?.token : (socket.handshake.auth?.token || socket.handshake.headers?.authorization?.replace("Bearer ", ""));
+
+    if (!targetChatId) return;
+
+    let isAuthorized = false;
+    // Check if socket user is authorized staff
+    if (socket.data?.user?.role) {
+      const role = (socket.data.user.role || "").toLowerCase();
+      if (["superadmin", "admin", "manager", "staff", "salesman"].includes(role)) {
+        isAuthorized = true;
+      }
+    }
+
+    // Verify token ownership against targetChatId
+    if (!isAuthorized && token) {
+      try {
+        const decoded: any = jwt.verify(token, process.env.JWT_SECRET || "glowgoodly_secret_jwt_key_123456");
+        const role = (decoded.role || "").toLowerCase();
+        if (["superadmin", "admin", "manager", "staff", "salesman"].includes(role)) {
+          isAuthorized = true;
+        } else if (decoded.chatId === targetChatId || decoded.id === targetChatId || decoded.userId === targetChatId) {
+          isAuthorized = true;
+        }
+      } catch (_) { }
+    }
+
+    if (isAuthorized) {
+      const safeRoom = `chat_${targetChatId}`;
+      const cleanBase = targetChatId.replace(/^chat_/, "");
+      socket.join(targetChatId);
+      socket.join(safeRoom);
+      socket.join(`chat_${cleanBase}`);
+      socket.emit("join_chat_success", { chatId: targetChatId });
+    } else {
+      socket.emit("chat_error", { error: "Access Denied: You are not authorized to join this customer chat room." });
+    }
+  });
+
+  // 3. Post-connection staff authentication event
+  socket.on("auth_staff", (authToken) => {
+    if (!authToken || typeof authToken !== "string") return;
+    try {
+      const decoded: any = jwt.verify(authToken, process.env.JWT_SECRET || "glowgoodly_secret_jwt_key_123456");
+      const role = (decoded.role || "").toLowerCase();
+      if (["superadmin", "admin", "manager", "staff", "salesman"].includes(role)) {
+        socket.data.user = decoded;
+        socket.join("admin_staff");
+        socket.emit("auth_staff_success", { role: decoded.role });
+      }
+    } catch (_) { }
+  });
+});
 
 const PORT = process.env.PORT || 5000;
 
@@ -147,22 +246,14 @@ app.use(compression({
   }
 }));
 
-// 6. Explicit CORS Middleware configured for production domains & local development
-const allowedOrigins = [
-  "https://glowgoodly.com",
-  "https://shop.glowgoodly.com",
-  "https://api.glowgoodly.com",
-  "http://localhost:3000",
-  "http://localhost:5000",
-  "http://127.0.0.1:3000"
-];
-
+// 6. Explicit CORS Security Hardening: Strict Trusted-Origin Allowlist
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin) || origin.endsWith("glowgoodly.com")) {
+    // Non-browser or server-to-server requests without Origin header are allowed
+    if (!origin || isTrustedOrigin(origin)) {
       callback(null, true);
     } else {
-      callback(null, true); // Fallback allows all origins seamlessly
+      callback(new Error("CORS policy violation: Untrusted origin."));
     }
   },
   credentials: true,
@@ -171,14 +262,45 @@ app.use(cors({
     "Content-Type",
     "Authorization",
     "X-Requested-With",
+    "x-requested-with",
+    "x-chat-token",
+    "X-Chat-Token",
     "Accept",
     "Cache-Control",
     "Pragma",
     "Expires",
     "Origin",
-    "X-Custom-Header"
-  ]
+    "X-Custom-Header",
+    "baggage",
+    "sentry-trace"
+  ],
+  exposedHeaders: ["x-chat-token", "X-Chat-Token", "X-LiteSpeed-Purge"],
+  optionsSuccessStatus: 204
 }));
+
+// Express 5 compatible preflight OPTIONS handler with strict Trusted-Origin enforcement
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") {
+    const origin = req.headers.origin;
+    if (origin && isTrustedOrigin(origin)) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+    } else if (!origin) {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+    } else {
+      return res.status(403).json({ error: "CORS policy violation: Untrusted origin." });
+    }
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization, X-Requested-With, x-requested-with, x-chat-token, X-Chat-Token, Accept, Cache-Control, Pragma, Expires, Origin, X-Custom-Header, baggage, sentry-trace"
+    );
+    res.setHeader("Access-Control-Expose-Headers", "x-chat-token, X-Chat-Token, X-LiteSpeed-Purge");
+    res.setHeader("Access-Control-Max-Age", "86400");
+    return res.sendStatus(204);
+  }
+  next();
+});
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -194,13 +316,44 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 // 7. XSS & Malicious Script Injection Sanitizer
 app.use(sanitizeInput);
 
-// Ensure all dynamic API routes never serve stale data
+// Ensure all dynamic API routes never serve stale data & Auto LiteSpeed Cache Clean
 app.use("/api", (req, res, next) => {
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   res.setHeader("Pragma", "no-cache");
   res.setHeader("Expires", "0");
   res.setHeader("Surrogate-Control", "no-store");
+
+  // Auto LiteSpeed Cache Clean: whenever a mutation happens (POST, PUT, PATCH, DELETE),
+  // emit LiteSpeed Purge header to instantly flush server HTML/API cache
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+    res.setHeader("X-LiteSpeed-Purge", "*");
+    res.setHeader("X-LiteSpeed-Cache-Control", "no-cache");
+  }
+
   next();
+});
+
+// Dedicated LiteSpeed Cache Clean / Purge Endpoint
+app.all(["/api/admin/litespeed-purge", "/api/litespeed/purge", "/api/litespeed-purge"], (req, res) => {
+  res.setHeader("X-LiteSpeed-Purge", "*");
+  res.setHeader("X-LiteSpeed-Cache-Control", "no-cache");
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+
+  try {
+    // Also send PURGE request locally if web server reverse-proxies through LiteSpeed
+    fetch("http://127.0.0.1/", {
+      method: "PURGE",
+      headers: { "X-LiteSpeed-Purge": "*" }
+    }).catch(() => { });
+  } catch (e) { }
+
+  console.log(`[LiteSpeed] ⚡ Purge signal triggered at ${new Date().toISOString()}`);
+
+  return res.json({
+    success: true,
+    message: "LiteSpeed Cache successfully purged (*). All updated products and banners will appear immediately.",
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Request logger
@@ -238,6 +391,7 @@ app.use("/api/combos", combosRouter);
 app.use("/api/admin/combos", combosRouter);
 app.use("/api", heroBannersRouter);
 app.use("/api", sectionsRouter);
+app.use("/api", aiSupportRouter);
 
 // ─── GLOWGOODLY WP-JSON & WOOCOMMERCE COMPATIBILITY MIRROR ENDPOINTS ───
 app.use("/wp-json/wp/v2/posts", (req, res) => res.redirect("/api/blogs"));
@@ -592,7 +746,7 @@ app.get("/api/coupons/validate", async (req: express.Request, res: express.Respo
     if (Array.isArray(cData.tiers) && cData.tiers.length > 0) {
       const sortedTiers = [...cData.tiers].sort((a, b) => Number(b.minSpend) - Number(a.minSpend));
       const lowestTier = sortedTiers[sortedTiers.length - 1];
-      
+
       if (subtotal > 0 && subtotal < Number(lowestTier.minSpend)) {
         return res.status(400).json({
           valid: false,
@@ -651,7 +805,7 @@ app.get("/api/coupons/public", async (req: express.Request, res: express.Respons
         const minOrder = Number(data.minOrderValue || data.minOrder || 0);
         const disc = Number(data.discountValue || data.discount || 0);
         const hasTiers = Array.isArray(data.tiers) && data.tiers.length > 0;
-        
+
         let subtitle = "";
         if (hasTiers) {
           subtitle = data.tiers.map((t: any) => `৳${t.minSpend}→৳${t.discount}`).join(", ");
@@ -701,7 +855,7 @@ app.get("/", (req, res) => {
         }
       }
     }
-  } catch (e) {}
+  } catch (e) { }
 
   res.send(`<!DOCTYPE html>
 <html lang="en">
@@ -1224,7 +1378,34 @@ process.on("unhandledRejection", (reason, promise) => {
 });
 
 httpServer.listen(PORT, async () => {
-  console.log(`🚀 GlowGoodly Custom Backend & Socket.io Server running at http://localhost:${PORT}`);
+  console.log("==================================================");
+  console.log("GlowGoodly Backend Starting...");
+  console.log(`Environment: ${process.env.NODE_ENV === "production" ? "Production" : "Development"}`);
+
+  let dbConnected = false;
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    console.log("Database: Connected");
+    dbConnected = true;
+  } catch (dbErr: any) {
+    try {
+      const userCount = await prisma.user.count();
+      console.log(`Database: Connected (${userCount} users found)`);
+      dbConnected = true;
+    } catch (e: any) {
+      console.error("Database: Connection Failed:", dbErr?.message || dbErr);
+    }
+  }
+
+  console.log(`Express API: http://localhost:${PORT}`);
+  console.log("Socket.IO: Initialized");
+  if (dbConnected) {
+    console.log("Backend Status: READY");
+  } else {
+    console.warn("Backend Status: DEGRADED (Database initialization failed)");
+  }
+  console.log("==================================================");
+
   try {
     await autoSeedDatabase();
   } catch (err: any) {
@@ -1235,11 +1416,7 @@ httpServer.listen(PORT, async () => {
   } catch (err: any) {
     console.warn("⚠️ initMySQLTables warning:", err?.message || err);
   }
-  try {
-    await cleanAllDummyData();
-  } catch (err: any) {
-    console.warn("⚠️ cleanAllDummyData warning:", err?.message || err);
-  }
+
   try {
     await ensureDefaultSectionsSeeded();
   } catch (err: any) {

@@ -5,6 +5,8 @@ echo    Launching GlowGoodly (Backend + Frontend)
 echo ========================================================
 echo.
 
+cd /d "%~dp0"
+
 echo 1. Launching Backend on http://localhost:5000 ...
 start "GlowGoodly Backend (Port 5000)" cmd /k "cd /d %~dp0backend && npm run dev"
 
@@ -14,11 +16,12 @@ start "GlowGoodly Frontend (Port 3000)" cmd /k "cd /d %~dp0frontend && npm run d
 echo.
 echo Both servers are starting up in separate terminal windows!
 echo Waiting for servers to initialize...
-timeout /t 6 >nul
+timeout /t 5 >nul
 
 echo Opening browser at http://localhost:3000 ...
 start http://localhost:3000
 
 echo.
-echo Done! Keep the opened terminal windows running while working.
+echo Done! Both Backend (Port 5000) and Frontend (Port 3000) are running.
+echo Keep the opened terminal windows open while working.
 pause

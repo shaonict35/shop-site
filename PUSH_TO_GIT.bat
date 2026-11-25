@@ -13,7 +13,7 @@ git config user.email "shaonict35@gmail.com"
 git add .
 
 echo [2/3] Committing changes...
-git commit -m "Update GlowGoodly: Live chat customer name & persistence, damage profit loss tracking, careers delete fix, inventory stock control, and flat solid UI"
+git commit -m "Phase 2: Critical security and data integrity fixes (admin backdoor removed, live chat privacy rooms, CAPTCHA hardening, atomic orders, negative stock guard, bKash idempotency, JWT revocation)"
 
 echo [3/3] Pushing to GitHub (git push origin main)...
 git push origin main

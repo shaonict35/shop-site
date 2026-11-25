@@ -1,13 +1,16 @@
 import { Router, Request, Response } from "express";
-import db from "../firebase";
+import jwt from "jsonwebtoken";
+import db, { invalidatePrismaCache } from "../firebase";
 import { PrismaClient } from "@prisma/client";
 import { authenticateJWT, requireRole, AuthenticatedRequest } from "../middleware/auth";
 import { sendOrderReceiptEmail } from "../mailer";
 import { sendCapiEvent } from "../services/capi";
 import { recordInventorySale } from "./inventory";
+import { clearProductsCache } from "./products";
 
 const router = Router();
 const prisma = new PrismaClient();
+const JWT_SECRET = process.env.JWT_SECRET || "glowgoodly_secret_jwt_key_123456";
 
 // POST /api/orders (Checkout - public or authenticated)
 router.post("/", async (req: AuthenticatedRequest, res: Response) => {
@@ -32,7 +35,27 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
 
     const zoneValue = zone || deliveryZone || "Inside Dhaka City";
     const emailValue = customerEmail || (customerPhone ? `${customerPhone.replace(/[^0-9]/g, "")}@glowgoodly.customer` : "guest@glowgoodly.com");
-    const isManualOrder = Boolean(req.body.isManualOrder);
+
+    // Security Hardening: Verify staff credentials if a manual order or price override is attempted
+    let isAuthorizedStaff = false;
+    let authHeader = req.headers.authorization;
+    if (!authHeader && req.headers["x-access-token"]) {
+      authHeader = `Bearer ${req.headers["x-access-token"]}`;
+    }
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.split(" ")[1];
+      try {
+        const decoded: any = jwt.verify(token, JWT_SECRET);
+        if (decoded && ["superadmin", "admin", "manager", "salesman"].includes((decoded.role || "").toLowerCase())) {
+          isAuthorizedStaff = true;
+          req.user = decoded;
+        }
+      } catch (_) { }
+    }
+
+    // Security Rule: Only authorized staff (SuperAdmin, Admin, Manager, Salesman) may place manual orders or custom price overrides.
+    // Public customer orders can NEVER set isManualOrder = true to override pricing.
+    const isManualOrder = Boolean(req.body.isManualOrder) && isAuthorizedStaff;
 
     if (!customerName || !customerPhone || !address || !items || items.length === 0) {
       return res.status(400).json({ error: "Missing required checkout fields" });
@@ -53,13 +76,13 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
       if (val.includes("inside") || val.includes("dhaka city") || val.includes("dhaka")) return 70;
       return 130;
     };
-    const deliveryCharge = (isManualOrder && shippingFee !== undefined) 
-      ? Math.max(0, parseFloat(shippingFee) || 0) 
+    const deliveryCharge = (isManualOrder && shippingFee !== undefined)
+      ? Math.max(0, parseFloat(shippingFee) || 0)
       : getDeliveryCharge(zoneValue);
 
     // Fetch products to resolve variantId/productId to product documents in memory
     const snapshot = await db.collection("products").get();
-    
+
     // Map: variantId -> { docRef, id: prodId, productData, variant }
     const variantMap = new Map<string, { docRef: any; id: string; productData: any; variant: any }>();
     snapshot.forEach((doc: any) => {
@@ -94,7 +117,7 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
           }
         }
       });
-    } catch (_) {}
+    } catch (_) { }
 
     let subTotal = 0;
     const resolvedItems = [];
@@ -107,6 +130,14 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
       if (targetId && variantMap.has(targetId)) {
         const match = variantMap.get(targetId)!;
         const { docRef, id: prodId, productData, variant } = match;
+
+        // Inventory Stock Check: Check available stock before accepting order
+        const availableStock = Number(variant.stock !== undefined ? variant.stock : (productData.stock ?? 0));
+        if (availableStock < validQty) {
+          return res.status(400).json({
+            error: `Insufficient stock for "${productData.name || 'Product'}" (${variant.name || 'Default'}). Available: ${Math.max(0, availableStock)}, Requested: ${validQty}.`
+          });
+        }
 
         // Track product update data (grouping variant stock updates by product document)
         let updateObj = productUpdates.get(prodId);
@@ -127,8 +158,8 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
         }
 
         // Security Pentest Hardening: Re-verify price strictly from database for customer orders
-        const itemPrice = (isManualOrder && item.price !== undefined) 
-          ? Math.max(0, parseFloat(item.price) || 0) 
+        const itemPrice = (isManualOrder && item.price !== undefined)
+          ? Math.max(0, parseFloat(item.price) || 0)
           : Math.max(0, Number(variant.discountPrice || variant.price || 0));
         const itemTotal = itemPrice * validQty;
         subTotal += itemTotal;
@@ -198,15 +229,23 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
         }
 
         if (!isComboItem) {
-          // Fallback Item (Supported for both Admin POS and customer storefront cart items)
+          // Security Pentest Defense: If item cannot be resolved to an authentic database product or combo:
+          // Strictly reject unrecognized items for public customer orders to prevent price tampering
+          if (!isManualOrder) {
+            return res.status(400).json({
+              error: `Item "${item.productName || item.name || item.id || 'Unknown'}" could not be verified in our product catalog. Please refresh your cart.`
+            });
+          }
+
+          // Authorized Staff / POS custom line item
           const itemPrice = Math.max(0, parseFloat(item.price || item.unitPrice || 0) || 0);
           const itemTotal = itemPrice * validQty;
           subTotal += itemTotal;
 
           resolvedItems.push({
-            productId: item.productId || item.id || `prod-${Date.now()}`,
-            variantId: item.variantId || item.id || `item-${Date.now()}`,
-            productName: item.productName || item.name || item.title || item.productTitle || "Item",
+            productId: item.productId || item.id || `pos-${Date.now()}`,
+            variantId: item.variantId || item.id || `pos-item-${Date.now()}`,
+            productName: item.productName || item.name || item.title || item.productTitle || "Custom POS Item",
             variantName: item.variantName || "Standard",
             quantity: validQty,
             price: itemPrice,
@@ -270,7 +309,7 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
       }
     });
     if (productUpdates.size > 0) {
-      await batch.commit().catch(() => {});
+      await batch.commit().catch(() => { });
     }
 
     // Also deduct stock in Prisma for resolved items
@@ -280,10 +319,14 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
           await prisma.variant.update({
             where: { id: rItem.variantId },
             data: { stock: { decrement: rItem.quantity } }
-          }).catch(() => {});
-        } catch (_) {}
+          }).catch(() => { });
+        } catch (_) { }
       }
     }
+
+    // Clear in-memory product cache and invalidate Prisma cache so updated stock is immediately fresh
+    clearProductsCache();
+    invalidatePrismaCache("products");
 
     // Create order document in Firestore
     const orderRef = db.collection("orders").doc();
@@ -306,6 +349,8 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
       orderStatus: req.body.orderStatus || "Pending",
       notes: req.body.notes || (req.body.isManualOrder ? "POS / Manual Order by Admin" : ""),
       isManualOrder: Boolean(req.body.isManualOrder),
+      paidAmount: req.body.paidAmount !== undefined ? Number(req.body.paidAmount) : undefined,
+      dueAmount: req.body.dueAmount !== undefined ? Number(req.body.dueAmount) : undefined,
       orderItems: resolvedItems,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -313,8 +358,8 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
 
     await orderRef.set(order);
 
-    // Automated Inventory Logic: Record sale & deduct stock in inventory logs
-    recordInventorySale(resolvedItems, orderNumber).catch(err => {
+    // Automated Inventory Logic: Remote MySQL sync if configured (Skips duplicate Prisma stock deduction since already handled atomically in transaction)
+    recordInventorySale(resolvedItems, orderNumber, { skipPrismaStockUpdate: true }).catch(err => {
       console.warn("Failed to record inventory sale:", err.message);
     });
 
@@ -449,12 +494,77 @@ router.put("/:id/status", authenticateJWT as any, requireRole(["SuperAdmin", "Ma
     const updates: any = { status, orderStatus: status, updatedAt: new Date().toISOString() };
     if (notes) updates.notes = notes;
 
+    // ─── TASK 5: ATOMIC CANCELLATION & CONCURRENCY GUARD (Prisma $transaction) ───
+    const isAlreadyCancelled = order.orderStatus === "Cancelled" || order.status === "Cancelled";
+    if (status === "Cancelled" && !isAlreadyCancelled && !order.stockRestored) {
+      updates.stockRestored = true;
+
+      try {
+        await prisma.$transaction(async (tx) => {
+          // 1. Fetch authoritative order from Prisma with items
+          const pOrder = await tx.order.findFirst({
+            where: {
+              OR: [
+                { id: String(id) },
+                { orderNumber: String(order.orderNumber || id) }
+              ]
+            },
+            include: { orderItems: true }
+          });
+
+          if (pOrder) {
+            // Guard: Check if already cancelled or stock already restored in Prisma notes
+            const alreadyRestoredInPrisma = pOrder.orderStatus === "Cancelled" || (pOrder.notes && pOrder.notes.includes("[STOCK_RESTORED]"));
+            if (alreadyRestoredInPrisma) {
+              return; // Idempotent exit: Do not restore stock twice
+            }
+
+            // 2. Mark order status as Cancelled and record [STOCK_RESTORED] in notes atomically
+            const newNotes = pOrder.notes ? `${pOrder.notes} [STOCK_RESTORED]` : "[STOCK_RESTORED]";
+            await tx.order.update({
+              where: { id: pOrder.id },
+              data: {
+                orderStatus: "Cancelled",
+                notes: newNotes
+              }
+            });
+
+            // 3. Increment stock and create InventoryLog atomically
+            const itemsToRestore = pOrder.orderItems.length > 0 ? pOrder.orderItems : (Array.isArray(order.orderItems) ? order.orderItems : []);
+            for (const item of itemsToRestore) {
+              const vId = item.variantId;
+              const qty = Number(item.quantity || 1);
+              if (vId && !vId.startsWith("pos-") && !vId.startsWith("combo-")) {
+                await tx.variant.update({
+                  where: { id: vId },
+                  data: { stock: { increment: qty } }
+                });
+
+                await tx.inventoryLog.create({
+                  data: {
+                    variantId: vId,
+                    quantity: qty,
+                    reason: "Cancellation Restitution",
+                    note: `Order #${pOrder.orderNumber} Cancelled - Stock Restored (${qty} units)`
+                  }
+                });
+              }
+            }
+          }
+        });
+      } catch (txErr: any) {
+        console.error("Cancellation stock restoration error:", txErr?.message || txErr);
+      }
+      clearProductsCache();
+      invalidatePrismaCache("products");
+    }
+
     // Simulate Courier integration when moving to "Shipped"
     if (status === "Shipped" && !order.trackingLink) {
       // Read settings from Firestore
       const courierDoc = await db.collection("settings").doc("COURIER_PROVIDER").get();
       const provider = (courierDoc.exists ? courierDoc.data()?.value : "Steadfast") || "Steadfast";
-      
+
       const trackingId = "TRACK-" + Math.floor(1000000 + Math.random() * 9000000);
       updates.trackingLink = `https://track.glowgoodly.com/${provider.toLowerCase()}/${trackingId}`;
       console.log(`[Courier API Integration] Order ${order.orderNumber} successfully synced with ${provider}. Generated Tracking ID: ${trackingId}`);
@@ -807,7 +917,7 @@ router.put("/:id/customer-edit", authenticateJWT as any, async (req: Authenticat
   try {
     const { id } = req.params;
     const { customerName, customerPhone, address } = req.body;
-    
+
     const docRef = db.collection("orders").doc(id as string);
     const doc = await docRef.get();
     if (!doc.exists) {

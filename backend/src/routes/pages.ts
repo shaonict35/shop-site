@@ -4,6 +4,7 @@ import { PrismaClient } from "@prisma/client";
 import db from "../firebase";
 import { uploadCmsImage } from "../config/multer";
 import { deleteUploadedFile } from "../utils/file-cleanup";
+import { authenticateJWT, requireRole } from "../middleware/auth";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -190,13 +191,13 @@ async function ensureCleanPagesInDb() {
             metaTitle: data.title,
             metaDescription: `Read about ${data.title} on GlowGoodly.`
           }
-        }).catch(() => {});
+        }).catch(() => { });
       }
       const docRef = db.collection("cms_pages").doc(slug);
       const existing = await docRef.get();
       if (!existing.exists) {
         const pageItem = { slug, title: data.title, contentHtml: data.contentHtml, updatedAt: new Date().toISOString() };
-        await docRef.set(pageItem).catch(() => {});
+        await docRef.set(pageItem).catch(() => { });
       }
     }
   } catch (e) {
@@ -243,7 +244,7 @@ router.get("/pages/:slug", async (req: Request, res: Response) => {
         contentHtml: defaultPage.contentHtml,
         updatedAt: new Date().toISOString(),
       };
-      await docRef.set(pagePayload).catch(() => {});
+      await docRef.set(pagePayload).catch(() => { });
       return res.json(pagePayload);
     }
 
@@ -291,7 +292,7 @@ router.get(["/admin/pages", "/api/admin/pages"], async (req: Request, res: Respo
 });
 
 // POST /api/admin/pages (and /admin/pages) — Admin: Save/Update CMS page content
-router.post(["/admin/pages", "/api/admin/pages"], async (req: Request, res: Response) => {
+router.post(["/admin/pages", "/api/admin/pages"], authenticateJWT as any, requireRole(["SuperAdmin", "Admin", "Manager"]) as any, async (req: Request, res: Response) => {
   try {
     const { slug, title, contentHtml, metaTitle, metaDescription } = req.body;
     if (!slug || !title) {
@@ -330,7 +331,7 @@ router.post(["/admin/pages", "/api/admin/pages"], async (req: Request, res: Resp
     });
 
     const docRef = db.collection("cms_pages").doc(cleanSlug);
-    await docRef.set(pageData).catch(() => {});
+    await docRef.set(pageData).catch(() => { });
     emitStorefrontUpdate(req, "pages", { action: "save", slug: cleanSlug });
 
     res.json({ success: true, page: pageData });
@@ -340,7 +341,7 @@ router.post(["/admin/pages", "/api/admin/pages"], async (req: Request, res: Resp
 });
 
 // PUT /api/admin/pages/:slug
-router.put(["/admin/pages/:slug", "/api/admin/pages/:slug"], async (req: Request, res: Response) => {
+router.put(["/admin/pages/:slug", "/api/admin/pages/:slug"], authenticateJWT as any, requireRole(["SuperAdmin", "Admin", "Manager"]) as any, async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
     const { title, contentHtml, metaTitle, metaDescription } = req.body;
@@ -376,7 +377,7 @@ router.put(["/admin/pages/:slug", "/api/admin/pages/:slug"], async (req: Request
     });
 
     const docRef = db.collection("cms_pages").doc(cleanSlug);
-    await docRef.set(pageData, { merge: true }).catch(() => {});
+    await docRef.set(pageData, { merge: true }).catch(() => { });
 
     res.json({ success: true, page: pageData });
   } catch (err: any) {
@@ -387,6 +388,8 @@ router.put(["/admin/pages/:slug", "/api/admin/pages/:slug"], async (req: Request
 // POST /api/admin/pages/upload-image — Upload image directly from PC for CMS WYSIWYG Editor
 router.post(
   ["/admin/pages/upload-image", "/api/admin/pages/upload-image"],
+  authenticateJWT as any,
+  requireRole(["SuperAdmin", "Admin", "Manager"]) as any,
   uploadCmsImage.single("image"),
   (req: Request, res: Response) => {
     try {
@@ -407,7 +410,7 @@ router.post(
 );
 
 // DELETE /api/admin/pages/:slug — Delete a single CMS page
-router.delete(["/admin/pages/:slug", "/api/admin/pages/:slug"], async (req: Request, res: Response) => {
+router.delete(["/admin/pages/:slug", "/api/admin/pages/:slug"], authenticateJWT as any, requireRole(["SuperAdmin", "Admin", "Manager"]) as any, async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
     const cleanSlug = String(slug).toLowerCase().trim();
@@ -425,7 +428,7 @@ router.delete(["/admin/pages/:slug", "/api/admin/pages/:slug"], async (req: Requ
 });
 
 // POST /api/admin/pages/bulk-delete — Bulk Delete CMS pages
-router.post(["/admin/pages/bulk-delete", "/api/admin/pages/bulk-delete"], async (req: Request, res: Response) => {
+router.post(["/admin/pages/bulk-delete", "/api/admin/pages/bulk-delete"], authenticateJWT as any, requireRole(["SuperAdmin", "Admin", "Manager"]) as any, async (req: Request, res: Response) => {
   try {
     const { slugs, ids } = req.body || {};
     const targetSlugs: string[] = Array.isArray(slugs) ? slugs : (Array.isArray(ids) ? ids : []);

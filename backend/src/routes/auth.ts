@@ -2,7 +2,7 @@ import { Router, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import db from "../firebase";
-import { authenticateJWT, AuthenticatedRequest } from "../middleware/auth";
+import { authenticateJWT, AuthenticatedRequest, revokeToken } from "../middleware/auth";
 import prisma from "../prisma";
 import { sendVerificationOtpEmail } from "../mailer";
 
@@ -244,21 +244,45 @@ function clearFailedLogin(key: string) {
 }
 
 async function verifyGoogleRecaptcha(token?: string, remoteIp?: string): Promise<boolean> {
-  if (!token) return false;
-  const str = String(token).trim();
-  if (str.length < 3) return false;
+  if (!token || typeof token !== "string") return false;
+  const cleanToken = token.trim();
+  if (!cleanToken) return false;
 
-  // Cloudflare Turnstile token or client verification
-  if (str.startsWith("cf_turnstile") || str.startsWith("0.") || str.length >= 10) {
+  // Strict Development-only bypass (Can NEVER be triggered in production)
+  const isDev = process.env.NODE_ENV !== "production";
+  if (isDev && process.env.ALLOW_DEV_CAPTCHA_BYPASS === "true" && cleanToken === "DEV_BYPASS_TOKEN_TEST") {
     return true;
   }
 
-  // If a dedicated Google secret is configured
-  if (process.env.RECAPTCHA_SECRET_KEY && process.env.RECAPTCHA_SECRET_KEY !== "6LfFxbMtAAAAAEYjy9I2zALRD-VTo6mOsjEWl-vd") {
+  // 1. Cloudflare Turnstile verification
+  const turnstileSecret = process.env.TURNSTILE_SECRET_KEY;
+  if (turnstileSecret) {
+    try {
+      const formData = new URLSearchParams();
+      formData.append("secret", turnstileSecret);
+      formData.append("response", cleanToken);
+      if (remoteIp) formData.append("remoteip", remoteIp);
+
+      const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: formData.toString()
+      });
+      const data: any = await res.json();
+      return Boolean(data && data.success);
+    } catch (err) {
+      console.error("[Turnstile Verification Error]:", err);
+      return false;
+    }
+  }
+
+  // 2. Google reCAPTCHA verification
+  const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY;
+  if (recaptchaSecret && recaptchaSecret !== "6LfFxbMtAAAAAEYjy9I2zALRD-VTo6mOsjEWl-vd") {
     try {
       const params = new URLSearchParams();
-      params.append("secret", process.env.RECAPTCHA_SECRET_KEY);
-      params.append("response", str);
+      params.append("secret", recaptchaSecret);
+      params.append("response", cleanToken);
       if (remoteIp) params.append("remoteip", remoteIp);
 
       const res = await fetch("https://www.google.com/recaptcha/api/siteverify", {
@@ -266,12 +290,16 @@ async function verifyGoogleRecaptcha(token?: string, remoteIp?: string): Promise
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: params.toString()
       });
-      const data = await res.json();
-      if (data.success) return true;
-    } catch (err) {}
+      const data: any = await res.json();
+      return Boolean(data && data.success);
+    } catch (err) {
+      console.error("[reCAPTCHA Verification Error]:", err);
+      return false;
+    }
   }
 
-  return true;
+  // In local development without configured third-party keys, allow request; fail secure in production
+  return isDev;
 }
 
 // POST /api/auth/login
@@ -348,10 +376,8 @@ router.post("/login", async (req: any, res: Response) => {
       }
     }
 
-    let isMatch = await bcrypt.compare(password, user.passwordHash);
-    if (!isMatch && user.email === "admin@glowgoodly.com" && (password === "admin123" || password === "YourStrongAdminPassword123!")) {
-      isMatch = true;
-    }
+    // Secure bcrypt verification against stored passwordHash (Backdoors removed)
+    const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
       recordFailedLogin(rateLimitKey);
       return res.status(401).json({ error: "Incorrect password. Please try again." });
@@ -482,6 +508,53 @@ router.put("/profile", authenticateJWT as any, async (req: AuthenticatedRequest,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/auth/logout — Terminate session & revoke JWT token
+router.post("/logout", authenticateJWT as any, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    let authHeader = req.headers.authorization;
+    if (!authHeader && req.headers["x-access-token"]) {
+      authHeader = `Bearer ${req.headers["x-access-token"]}`;
+    }
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.split(" ")[1];
+      if (token) {
+        revokeToken(token);
+      }
+    }
+    res.json({ success: true, message: "Logged out successfully. Session revoked." });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to logout" });
+  }
+});
+
+// POST /api/auth/refresh-token — Refresh current token with signature rotation
+router.post("/refresh-token", authenticateJWT as any, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (!req.user) return res.status(401).json({ error: "Unauthorized" });
+
+    // Revoke old token
+    let authHeader = req.headers.authorization;
+    if (!authHeader && req.headers["x-access-token"]) {
+      authHeader = `Bearer ${req.headers["x-access-token"]}`;
+    }
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const oldToken = authHeader.split(" ")[1];
+      if (oldToken) revokeToken(oldToken);
+    }
+
+    // Issue refreshed token
+    const newToken = jwt.sign(
+      { id: req.user.id, email: req.user.email, role: req.user.role },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.json({ success: true, token: newToken, user: req.user });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to refresh token" });
   }
 });
 

@@ -13,3 +13,17 @@
   RewriteCond %{HTTP:Upgrade} !=websocket [NC]
   RewriteRule /(.*)           http://127.0.0.1:5000/$1 [P,L]
 </IfModule>
+
+# ─── LITESPEED WEB SERVER CACHE & AUTO PURGE PASS-THROUGH ───────────────────
+<IfModule LiteSpeed>
+  CacheLookup public on
+  RewriteEngine On
+
+  # Pass through LiteSpeed Purge headers transparently
+  RewriteCond %{HTTP:X-LiteSpeed-Purge} !^$
+  RewriteRule .* - [E=Cache-Control:no-cache]
+
+  # Never cache sensitive admin, auth, and order mutations
+  RewriteCond %{REQUEST_URI} ^/api/(admin|auth|orders|bkash|payments|inventory) [NC]
+  RewriteRule .* - [E=Cache-Control:no-cache]
+</IfModule>

@@ -156,7 +156,6 @@ function sanitizeForStorage(data: any) {
           id: v.id,
           price: v.price,
           discountPrice: v.discountPrice,
-          costPrice: v.costPrice,
           stock: v.stock ?? v.inventoryQuantity ?? 50,
           imageUrl: safeImageUrl(v.imageUrl, cleanImgUrl)
         })) : [],
@@ -335,8 +334,31 @@ export function clearAllCache() {
   }
 }
 
+export async function purgeLiteSpeedCache(): Promise<{ success: boolean; message: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/admin/litespeed-purge`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    const json = await res.json().catch(() => ({}));
+    return {
+      success: res.ok,
+      message: json.message || (res.ok ? "LiteSpeed Cache successfully purged (*)" : "Failed to purge LiteSpeed Cache")
+    };
+  } catch (e: any) {
+    try {
+      const fallback = await fetch(`${API_BASE}/litespeed/purge`);
+      return { success: fallback.ok, message: "LiteSpeed cache purge signal sent" };
+    } catch (err: any) {
+      return { success: false, message: e?.message || "Failed to contact LiteSpeed purge endpoint" };
+    }
+  }
+}
+
 export function triggerGlobalDataSync() {
   clearAllCache();
+  // Auto LiteSpeed Cache Clean: automatically purge LiteSpeed reverse proxy cache on every update
+  purgeLiteSpeedCache().catch(() => {});
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("glowgoodly_data_updated"));
     try {

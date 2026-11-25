@@ -1,7 +1,92 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import fs from "fs";
+import path from "path";
+import crypto from "crypto";
 
 const JWT_SECRET = process.env.JWT_SECRET || "glowgoodly_secret_jwt_key_123456";
+
+// ─── TASK 4: PERSISTENT TOKEN REVOCATION / BLACKLIST REGISTRY ─────────────
+// Stores one-way SHA-256 hashes with expiry to survive restarts & multi-process workers
+const REVOCATION_FILE = path.join(__dirname, "../../data/revoked_tokens.json");
+export const revokedTokenHashes = new Set<string>();
+
+function loadRevocationRegistry(): Map<string, number> {
+  const map = new Map<string, number>();
+  try {
+    const dir = path.dirname(REVOCATION_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    if (fs.existsSync(REVOCATION_FILE)) {
+      const data = JSON.parse(fs.readFileSync(REVOCATION_FILE, "utf-8"));
+      const now = Date.now();
+      if (Array.isArray(data)) {
+        for (const item of data) {
+          if (item?.hash && item?.expiresAt && item.expiresAt > now) {
+            map.set(item.hash, item.expiresAt);
+            revokedTokenHashes.add(item.hash);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[Revocation Registry Load Warning]:", err);
+  }
+  return map;
+}
+
+function persistRevocationRegistry(map: Map<string, number>) {
+  try {
+    const dir = path.dirname(REVOCATION_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const array = Array.from(map.entries()).map(([hash, expiresAt]) => ({ hash, expiresAt }));
+    fs.writeFileSync(REVOCATION_FILE, JSON.stringify(array, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("[Revocation Registry Persist Warning]:", err);
+  }
+}
+
+// Initialize on module load
+loadRevocationRegistry();
+
+export function hashToken(token: string): string {
+  return crypto.createHash("sha256").update(token.trim()).digest("hex");
+}
+
+export function revokeToken(token: string) {
+  if (!token || typeof token !== "string") return;
+  const cleanToken = token.trim();
+  const tokenHash = hashToken(cleanToken);
+
+  // Extract token expiration
+  let expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000; // default 7 days
+  try {
+    const decoded: any = jwt.decode(cleanToken);
+    if (decoded?.exp) {
+      expiresAt = decoded.exp * 1000;
+    }
+  } catch (_) { }
+
+  revokedTokenHashes.add(tokenHash);
+
+  // Load existing, prune expired, and save
+  const registry = loadRevocationRegistry();
+  registry.set(tokenHash, expiresAt);
+  persistRevocationRegistry(registry);
+}
+
+export function isTokenRevoked(token: string): boolean {
+  if (!token || typeof token !== "string") return false;
+  const tokenHash = hashToken(token.trim());
+  return revokedTokenHashes.has(tokenHash);
+}
+
+// Helper to reload from disk (simulates server restart for testing)
+export function reloadRevokedTokensFromDisk() {
+  revokedTokenHashes.clear();
+  return loadRevocationRegistry();
+}
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -22,24 +107,25 @@ export function authenticateJWT(req: AuthenticatedRequest, res: Response, next: 
     authHeader = `Bearer ${req.query.token}`;
   }
 
-  // Security Check: Real local loopback IP check
+  // Security Check: Explicit loopback check for optional dev testing only
   const remoteIp = String(req.ip || req.socket.remoteAddress || "");
-  const isLoopbackIp = 
-    remoteIp === "127.0.0.1" || 
-    remoteIp === "::1" || 
-    remoteIp === "::ffff:127.0.0.1" ||
-    remoteIp.startsWith("127.") ||
-    remoteIp.startsWith("::ffff:127.") ||
-    remoteIp.includes("192.168.") ||
-    remoteIp.includes("10.") ||
-    remoteIp === "localhost";
+  const isStrictLoopback =
+    remoteIp === "127.0.0.1" ||
+    remoteIp === "::1" ||
+    remoteIp === "::ffff:127.0.0.1";
   const isDevMode = process.env.NODE_ENV !== "production";
-  const allowDevBypass = (isDevMode && isLoopbackIp) || (isDevMode && process.env.ALLOW_DEV_AUTH_BYPASS === "true");
+  // Strict Security Rule: Never bypass authentication for LAN IPs (192.168.x or 10.x).
+  // Require explicit ALLOW_DEV_AUTH_BYPASS flag and strictly local loopback.
+  const allowDevBypass = isDevMode && process.env.ALLOW_DEV_AUTH_BYPASS === "true" && isStrictLoopback;
 
   if (authHeader && authHeader.startsWith("Bearer ")) {
     const token = authHeader.split(" ")[1];
 
     if (token && token !== "null" && token !== "undefined" && token !== '""') {
+      if (isTokenRevoked(token)) {
+        return res.status(401).json({ error: "Session revoked: Token has been invalidated. Please log in again." });
+      }
+
       jwt.verify(token, JWT_SECRET, (err, decoded: any) => {
         if (!err && decoded) {
           req.user = {

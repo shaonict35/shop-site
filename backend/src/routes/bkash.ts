@@ -60,6 +60,22 @@ router.post(["/create", "/bkash/create", "/create-payment"], async (req: Request
       return res.status(400).json({ error: "Order ID (invoice number) is required" });
     }
 
+    // Security Pentest Defense: Verify amount against stored order in database to prevent client tampering
+    let verifiedAmount = Number(amount);
+    try {
+      const existingOrder = await prisma.order.findFirst({
+        where: {
+          OR: [
+            { orderNumber: String(orderId) },
+            { id: String(orderId) }
+          ]
+        }
+      });
+      if (existingOrder && Number(existingOrder.total) > 0) {
+        verifiedAmount = Number(existingOrder.total);
+      }
+    } catch (_) {}
+
     const config = await bkashService.getConfig();
 
     // If Manual mode, return instructions immediately
@@ -68,9 +84,9 @@ router.post(["/create", "/bkash/create", "/create-payment"], async (req: Request
         success: true,
         mode: "manual",
         merchantNumber: config.merchantNumber,
-        amount,
+        amount: verifiedAmount,
         orderId,
-        message: `Please send BDT ${amount} to bKash Merchant Number ${config.merchantNumber} and provide your TrxID.`
+        message: `Please send BDT ${verifiedAmount} to bKash Merchant Number ${config.merchantNumber} and provide your TrxID.`
       });
     }
 
@@ -79,7 +95,7 @@ router.post(["/create", "/bkash/create", "/create-payment"], async (req: Request
     const callbackUrl = `${backendBase}/api/payments/bkash/callback`;
 
     const payment = await bkashService.createPayment({
-      amount,
+      amount: verifiedAmount,
       orderId,
       payerReference: customerPhone || "Customer",
       callbackUrl
@@ -91,7 +107,7 @@ router.post(["/create", "/bkash/create", "/create-payment"], async (req: Request
       paymentID: payment.paymentID,
       bkashURL: payment.bkashURL,
       merchantNumber: config.merchantNumber,
-      amount
+      amount: verifiedAmount
     });
   } catch (err: any) {
     console.error("[bKash Create Error]:", err);
@@ -111,13 +127,52 @@ router.get(["/callback", "/bkash/callback"], async (req: Request, res: Response)
     }
 
     if (status === "success" && paymentID) {
+      // ─── TASK 6: IDEMPOTENCY CHECK (Prevents duplicate processing & replay attacks) ───
+      const alreadyPaidOrder = await prisma.order.findFirst({
+        where: {
+          OR: [
+            { paymentId: paymentID },
+            { transactionId: paymentID }
+          ],
+          paymentStatus: "PAID"
+        }
+      });
+
+      if (alreadyPaidOrder) {
+        console.log(`[bKash Idempotency] Payment ${paymentID} already verified for Order ${alreadyPaidOrder.orderNumber}. Fast-forwarding to confirmation.`);
+        return res.redirect(`${frontendUrl}/thank-you?orderNumber=${encodeURIComponent(alreadyPaidOrder.orderNumber)}&total=${alreadyPaidOrder.total}&paymentMethod=bKash&status=success&trxId=${encodeURIComponent(alreadyPaidOrder.transactionId || paymentID)}`);
+      }
+
       const executeResult = await bkashService.executePayment(paymentID);
 
       const isCompleted = executeResult.transactionStatus === "Completed" || executeResult.statusCode === "0000";
       const trxID = executeResult.trxID || `TRX${Date.now()}`;
       const orderNumber = executeResult.merchantInvoiceNumber || "";
 
+      // Validate Currency (Must be BDT)
+      if (executeResult.currency && executeResult.currency.toUpperCase() !== "BDT") {
+        console.warn(`[Security Alert] bKash invalid currency: ${executeResult.currency}`);
+        return res.redirect(`${frontendUrl}/checkout?payment=error&message=${encodeURIComponent("Invalid payment currency")}`);
+      }
+
       if (isCompleted && orderNumber) {
+        // Prevent transaction ID reuse across multiple orders
+        const trxCollision = await prisma.order.findFirst({
+          where: {
+            OR: [
+              { transactionId: trxID },
+              { trxId: trxID }
+            ],
+            paymentStatus: "PAID",
+            NOT: { orderNumber: orderNumber }
+          }
+        });
+
+        if (trxCollision) {
+          console.error(`[Security Alert] bKash TrxID ${trxID} already applied to order #${trxCollision.orderNumber}! Replay rejected.`);
+          return res.redirect(`${frontendUrl}/checkout?payment=error&message=${encodeURIComponent("Transaction ID has already been claimed.")}`);
+        }
+
         // Update Prisma Order
         const updatedOrders = await prisma.order.findMany({
           where: {
@@ -131,6 +186,26 @@ router.get(["/callback", "/bkash/callback"], async (req: Request, res: Response)
 
         if (updatedOrders.length > 0) {
           const targetOrder = updatedOrders[0];
+          const paidAmount = Number(executeResult.amount);
+          const expectedTotal = Number(targetOrder.total);
+
+          // Security Verification: Ensure the paid amount covers the order total
+          if (!isNaN(paidAmount) && expectedTotal > 0 && paidAmount < expectedTotal) {
+            console.warn(`[Security Alert] bKash underpayment detected! Paid: ${paidAmount}, Expected: ${expectedTotal} for Order ${targetOrder.orderNumber}`);
+            await prisma.order.update({
+              where: { id: targetOrder.id },
+              data: {
+                paymentStatus: "PARTIAL_PAID",
+                paymentMethod: "bKash Tokenized (Underpaid)",
+                transactionId: trxID,
+                trxId: trxID,
+                paymentId: paymentID,
+                notes: `Security Warning: Paid BDT ${paidAmount} but total is BDT ${expectedTotal}`
+              }
+            });
+            return res.redirect(`${frontendUrl}/checkout?payment=mismatch&orderNumber=${encodeURIComponent(targetOrder.orderNumber)}`);
+          }
+
           await prisma.order.update({
             where: { id: targetOrder.id },
             data: {
@@ -141,6 +216,31 @@ router.get(["/callback", "/bkash/callback"], async (req: Request, res: Response)
               paymentId: paymentID
             }
           });
+
+          // Dual-sync payment status to Firestore
+          try {
+            const fsDoc = db.collection("orders").doc(targetOrder.id);
+            await fsDoc.update({
+              paymentStatus: "PAID",
+              paymentMethod: "bKash Tokenized",
+              transactionId: trxID,
+              trxId: trxID,
+              paymentId: paymentID,
+              updatedAt: new Date().toISOString()
+            }).catch(async () => {
+              const snap = await db.collection("orders").where("orderNumber", "==", targetOrder.orderNumber).limit(1).get();
+              if (!snap.empty) {
+                await snap.docs[0].ref.update({
+                  paymentStatus: "PAID",
+                  paymentMethod: "bKash Tokenized",
+                  transactionId: trxID,
+                  trxId: trxID,
+                  paymentId: paymentID,
+                  updatedAt: new Date().toISOString()
+                });
+              }
+            });
+          } catch (_) {}
 
           // Trigger automated Order Receipt Email
           try {

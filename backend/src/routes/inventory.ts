@@ -12,27 +12,28 @@ const router = Router();
  */
 export async function recordInventorySale(
   items: Array<{ productId?: string; variantId?: string; quantity: number; productName?: string }>,
-  orderNumber: string
+  orderNumber: string,
+  options?: { skipPrismaStockUpdate?: boolean }
 ) {
   try {
     for (const item of items) {
       const qty = Math.max(1, Number(item.quantity) || 1);
       const note = `Order #${orderNumber} Sale`;
 
-      // 1. Prisma / SQLite record & stock deduction
-      if (item.variantId) {
+      // 1. Prisma / SQLite record & stock deduction (Skip if already performed inside atomic transaction)
+      if (item.variantId && !options?.skipPrismaStockUpdate) {
         await prisma.inventoryLog.create({
           data: {
             variantId: item.variantId,
             quantity: -qty,
             reason: `Sale (${note})`
           }
-        }).catch(() => {});
+        }).catch(() => { });
 
         await prisma.variant.update({
           where: { id: item.variantId },
           data: { stock: { decrement: qty } }
-        }).catch(() => {});
+        }).catch(() => { });
       }
 
       // 2. Remote MySQL record (if configured & active)
@@ -177,7 +178,7 @@ router.get("/low-stock", async (req: Request, res: Response) => {
           [threshold]
         );
         return res.json({ lowStockItems: rows });
-      } catch (e) {}
+      } catch (e) { }
     }
 
     const variants = await prisma.variant.findMany({
@@ -226,7 +227,7 @@ router.get(["/logs", "/admin/logs"], async (req: Request, res: Response) => {
         if (Array.isArray(rows) && rows.length > 0) {
           return res.json({ source: "mysql", logs: rows });
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     // Prisma logs
@@ -261,7 +262,7 @@ router.get(["/logs", "/admin/logs"], async (req: Request, res: Response) => {
  * POST /api/inventory/restock
  * Admin: Manually restock product or adjust stock
  */
-router.post("/restock", async (req: Request, res: Response) => {
+router.post("/restock", authenticateJWT as any, requireRole(["SuperAdmin", "Admin", "Manager"]) as any, async (req: Request, res: Response) => {
   try {
     const { productId, variantId, quantity, note, changeType = "restock" } = req.body;
 
@@ -351,7 +352,7 @@ router.post("/restock", async (req: Request, res: Response) => {
  * POST /api/inventory/adjust
  * Stock adjustment (+ or -) with mandatory/optional note
  */
-router.post("/adjust", async (req: Request, res: Response) => {
+router.post("/adjust", authenticateJWT as any, requireRole(["SuperAdmin", "Admin", "Manager"]) as any, async (req: Request, res: Response) => {
   try {
     const { productId, variantId, quantity, note, reason = "Stock Adjustment" } = req.body;
     const qty = parseInt(quantity, 10);
@@ -411,7 +412,7 @@ router.post("/adjust", async (req: Request, res: Response) => {
  * PATCH /api/inventory/log/:id/note
  * Quick inline edit for log note
  */
-router.patch("/log/:id/note", async (req: Request, res: Response) => {
+router.patch("/log/:id/note", authenticateJWT as any, requireRole(["SuperAdmin", "Admin", "Manager"]) as any, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { note } = req.body;
@@ -429,7 +430,7 @@ router.patch("/log/:id/note", async (req: Request, res: Response) => {
  * PATCH /api/inventory/product/:id/note
  * Quick inline edit for product internal note
  */
-router.patch("/product/:id/note", async (req: Request, res: Response) => {
+router.patch("/product/:id/note", authenticateJWT as any, requireRole(["SuperAdmin", "Admin", "Manager"]) as any, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { note } = req.body;

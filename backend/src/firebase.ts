@@ -20,6 +20,48 @@ export function generateSlug(text: string): string {
 let db: any;
 const inMemoryCollections = new Map<string, Map<string, any>>();
 
+// ─── EXTENDED PRODUCT METADATA PERSISTENCE BACKUP ─────────────────────────
+// Ensures 100% of cosmetic specs, INCI, SEO, and flags survive backend restarts
+const PRODUCTS_BACKUP_FILE = path.join(__dirname, "../../data/products_extended_metadata.json");
+
+function loadProductsExtendedMetadata(): Record<string, any> {
+  try {
+    const dir = path.dirname(PRODUCTS_BACKUP_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    if (fs.existsSync(PRODUCTS_BACKUP_FILE)) {
+      const content = fs.readFileSync(PRODUCTS_BACKUP_FILE, "utf-8");
+      return JSON.parse(content) || {};
+    }
+  } catch (err) {
+    console.warn("[Extended Metadata Load Warning]:", err);
+  }
+  return {};
+}
+
+function saveProductExtendedMetadata(id: string, metadata: any) {
+  try {
+    const dir = path.dirname(PRODUCTS_BACKUP_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const current = loadProductsExtendedMetadata();
+    current[id] = { ...(current[id] || {}), ...metadata, updatedAt: new Date().toISOString() };
+    fs.writeFileSync(PRODUCTS_BACKUP_FILE, JSON.stringify(current, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("[Extended Metadata Save Warning]:", err);
+  }
+}
+
+function deleteProductExtendedMetadata(id: string) {
+  try {
+    if (fs.existsSync(PRODUCTS_BACKUP_FILE)) {
+      const current = loadProductsExtendedMetadata();
+      if (current[id]) {
+        delete current[id];
+        fs.writeFileSync(PRODUCTS_BACKUP_FILE, JSON.stringify(current, null, 2), "utf-8");
+      }
+    }
+  } catch (err) { }
+}
+
 // ─── FIRESTORE PRISMA MOCK IMPLEMENTATION ──────────────────────────────────
 
 class MockFirestore {
@@ -103,338 +145,356 @@ class MockCollection {
         const items = await prisma.product.findMany({
           include: { brand: true, category: { include: { parent: true } }, variants: true, images: true }
         });
-      const DEFAULT_FALLBACK_IMAGE = "/placeholder-product.svg";
-      data = items.map((p, idx) => {
-        let validImages = (p.images || []).filter(img => 
-          img.url && 
-          img.url.length > 5 && 
-          !img.url.includes("placeholder")
-        );
-        if (validImages.length === 0) {
-          validImages = [{ id: `img-${p.id}`, productId: p.id, url: DEFAULT_FALLBACK_IMAGE, isPrimary: true, createdAt: new Date() }];
-        }
-        const cleanedVariants = (p.variants || []).map(v => {
-          let vImg = v.imageUrl;
-          if (!vImg || vImg.includes("placeholder")) {
-            vImg = validImages[0]?.url || DEFAULT_FALLBACK_IMAGE;
+        const extendedMap = loadProductsExtendedMetadata();
+        const DEFAULT_FALLBACK_IMAGE = "/placeholder-product.svg";
+        data = items.map((p, idx) => {
+          const ext = extendedMap[p.id] || {};
+          let validImages = (p.images || []).filter(img =>
+            img.url &&
+            img.url.length > 5 &&
+            !img.url.includes("placeholder")
+          );
+          if (validImages.length === 0) {
+            validImages = [{ id: `img-${p.id}`, productId: p.id, url: DEFAULT_FALLBACK_IMAGE, isPrimary: true, createdAt: new Date() }];
           }
-          return { ...v, imageUrl: vImg };
-        });
-        const primaryVariant = cleanedVariants[0];
-        const primaryImg = validImages.find(img => img.isPrimary)?.url || validImages[0]?.url || DEFAULT_FALLBACK_IMAGE;
-        const totalStock = cleanedVariants.reduce((sum, v) => sum + (v.stock || 0), 0);
-        const activeStatus = (p.status || "Active").toLowerCase() === "active" || p.status === "ACTIVE";
+          const cleanedVariants = (p.variants || []).map(v => {
+            let vImg = v.imageUrl;
+            if (!vImg || vImg.includes("placeholder")) {
+              vImg = validImages[0]?.url || DEFAULT_FALLBACK_IMAGE;
+            }
+            return { ...v, imageUrl: vImg };
+          });
+          const primaryVariant = cleanedVariants[0];
+          const primaryImg = validImages.find(img => img.isPrimary)?.url || validImages[0]?.url || DEFAULT_FALLBACK_IMAGE;
+          const totalStock = cleanedVariants.reduce((sum, v) => sum + (v.stock || 0), 0);
+          const activeStatus = (p.status || "Active").toLowerCase() === "active" || p.status === "ACTIVE";
 
-        return {
-          id: p.id,
-          name: p.name,
-          slug: (p as any).slug || (p.name ? generateSlug(p.name) : p.id),
-          description: p.description,
-          brandId: p.brandId,
-          brand: p.brand,
-          categoryId: p.categoryId,
-          category: p.category,
-          campaignName: p.campaignName,
-          status: p.status || "Active",
-          isActive: activeStatus,
-          inStock: totalStock > 0 || cleanedVariants.length === 0,
-          price: primaryVariant ? Number(primaryVariant.price) : 0,
-          discountPrice: primaryVariant?.discountPrice !== null && primaryVariant?.discountPrice !== undefined ? Number(primaryVariant.discountPrice) : null,
-          stock: totalStock > 0 ? totalStock : (primaryVariant?.stock ?? 50),
-          imageUrl: primaryImg,
-          variants: cleanedVariants,
-          images: validImages,
-          createdAt: p.createdAt.toISOString(),
-          updatedAt: p.updatedAt.toISOString(),
-        };
-      });
-    } else if (this.colName === "categories") {
-      const items = await prisma.category.findMany();
-      data = items.map(cat => ({
-        id: cat.id,
-        name: cat.name,
-        imageUrl: cat.imageUrl || null,
-        parentId: cat.parentId || null,
-        createdAt: cat.createdAt.toISOString(),
-        updatedAt: cat.updatedAt.toISOString(),
-      }));
-    } else if (this.colName === "brands") {
-      const items = await prisma.brand.findMany();
-      data = items.map(b => ({
-        id: b.id,
-        name: b.name,
-        logoUrl: b.logoUrl || null,
-        createdAt: b.createdAt.toISOString(),
-        updatedAt: b.updatedAt.toISOString(),
-      }));
-    } else if (this.colName === "banners") {
-      let items: any[] = [];
-      try {
-        items = await prisma.promoBanner.findMany();
-      } catch (e) {
-        items = [];
-      }
-      data = items.map((b, idx) => {
-        let safeImg = b.imageUrl;
-        if (safeImg && safeImg.includes("shop.glowgoodly.com")) {
-          safeImg = `/images/sliders/slider-${(idx % 3) + 1}.png`;
+          return {
+            id: p.id,
+            name: p.name,
+            slug: (p as any).slug || ext.slug || (p.name ? generateSlug(p.name) : p.id),
+            description: p.description,
+            shortDescription: (p as any).shortDescription || ext.shortDescription || null,
+            ingredients: p.ingredients || ext.ingredients || null,
+            howToUse: p.howToUse || ext.howToUse || null,
+            skinType: (p as any).skinType || ext.skinType || null,
+            countryOfOrigin: (p as any).countryOfOrigin || ext.countryOfOrigin || null,
+            volume: (p as any).volume || ext.volume || null,
+            benefits: (p as any).benefits || ext.benefits || null,
+            lowStockThreshold: (p as any).lowStockThreshold !== undefined ? Number((p as any).lowStockThreshold) : (ext.lowStockThreshold !== undefined ? Number(ext.lowStockThreshold) : 5),
+            isFeatured: (p as any).isFeatured !== undefined ? Boolean((p as any).isFeatured) : Boolean(ext.isFeatured),
+            isNewArrival: (p as any).isNewArrival !== undefined ? Boolean((p as any).isNewArrival) : Boolean(ext.isNewArrival),
+            isBestSeller: (p as any).isBestSeller !== undefined ? Boolean((p as any).isBestSeller) : Boolean(ext.isBestSeller),
+            subcategoryId: (p as any).subcategoryId || ext.subcategoryId || null,
+            brandId: p.brandId,
+            brand: p.brand,
+            categoryId: p.categoryId,
+            category: p.category,
+            campaignName: p.campaignName,
+            status: p.status || "Active",
+            isActive: activeStatus,
+            inStock: totalStock > 0 || cleanedVariants.length === 0,
+            price: primaryVariant ? Number(primaryVariant.price) : 0,
+            discountPrice: primaryVariant?.discountPrice !== null && primaryVariant?.discountPrice !== undefined ? Number(primaryVariant.discountPrice) : null,
+            costPrice: primaryVariant?.costPrice !== null && primaryVariant?.costPrice !== undefined ? Number(primaryVariant.costPrice) : null,
+            stock: totalStock > 0 ? totalStock : (primaryVariant?.stock ?? 50),
+            imageUrl: primaryImg,
+            variants: cleanedVariants,
+            images: validImages,
+            metaTitle: p.metaTitle || ext.metaTitle || null,
+            metaDescription: p.metaDescription || ext.metaDescription || null,
+            metaKeywords: p.metaKeywords || ext.metaKeywords || null,
+            createdAt: p.createdAt.toISOString(),
+            updatedAt: p.updatedAt.toISOString(),
+          };
+        });
+      } else if (this.colName === "categories") {
+        const items = await prisma.category.findMany();
+        data = items.map(cat => ({
+          id: cat.id,
+          name: cat.name,
+          imageUrl: cat.imageUrl || null,
+          parentId: cat.parentId || null,
+          createdAt: cat.createdAt.toISOString(),
+          updatedAt: cat.updatedAt.toISOString(),
+        }));
+      } else if (this.colName === "brands") {
+        const items = await prisma.brand.findMany();
+        data = items.map(b => ({
+          id: b.id,
+          name: b.name,
+          logoUrl: b.logoUrl || null,
+          createdAt: b.createdAt.toISOString(),
+          updatedAt: b.updatedAt.toISOString(),
+        }));
+      } else if (this.colName === "banners") {
+        let items: any[] = [];
+        try {
+          items = await prisma.promoBanner.findMany();
+        } catch (e) {
+          items = [];
         }
-        let safeMobile = b.mobileImageUrl || safeImg;
-        if (safeMobile && safeMobile.includes("shop.glowgoodly.com")) {
-          safeMobile = safeImg;
+        data = items.map((b, idx) => {
+          let safeImg = b.imageUrl;
+          if (safeImg && safeImg.includes("shop.glowgoodly.com")) {
+            safeImg = `/images/sliders/slider-${(idx % 3) + 1}.png`;
+          }
+          let safeMobile = b.mobileImageUrl || safeImg;
+          if (safeMobile && safeMobile.includes("shop.glowgoodly.com")) {
+            safeMobile = safeImg;
+          }
+          let safeTablet = b.tabletImageUrl || safeImg;
+          if (safeTablet && safeTablet.includes("shop.glowgoodly.com")) {
+            safeTablet = safeImg;
+          }
+          return {
+            id: b.id,
+            title: b.title,
+            imageUrl: safeImg,
+            mobileImageUrl: safeMobile,
+            tabletImageUrl: safeTablet,
+            linkUrl: b.linkUrl || null,
+            bgColor: b.bgColor || "#1a1a2e",
+            page: b.page || "Homepage",
+            isActive: b.isActive,
+            sortOrder: b.sortOrder,
+            createdAt: b.createdAt ? b.createdAt.toISOString() : new Date().toISOString(),
+            updatedAt: b.updatedAt ? b.updatedAt.toISOString() : new Date().toISOString(),
+          };
+        });
+      } else if (this.colName === "hero_banners" || this.colName === "heroBanners") {
+        let items: any[] = [];
+        try {
+          if ((prisma as any).heroBanner) {
+            items = await (prisma as any).heroBanner.findMany({ orderBy: { order: "asc" } });
+          }
+        } catch (e) {
+          items = [];
         }
-        let safeTablet = b.tabletImageUrl || safeImg;
-        if (safeTablet && safeTablet.includes("shop.glowgoodly.com")) {
-          safeTablet = safeImg;
+        if (items.length === 0) {
+          try {
+            const setting = await prisma.setting.findUnique({ where: { key: "HERO_BANNERS_DATA" } });
+            if (setting && setting.value) {
+              items = JSON.parse(setting.value);
+            }
+          } catch (e) { }
         }
-        return {
+        data = items.map((b: any) => ({
           id: b.id,
           title: b.title,
-          imageUrl: safeImg,
-          mobileImageUrl: safeMobile,
-          tabletImageUrl: safeTablet,
+          subtitle: b.subtitle || null,
+          mediaUrl: b.mediaUrl,
+          mediaType: b.mediaType || "image",
+          ctaLink: b.ctaLink || null,
+          isActive: b.isActive !== undefined ? Boolean(b.isActive) : true,
+          order: b.order !== undefined ? Number(b.order) : 0,
+          createdAt: b.createdAt ? (typeof b.createdAt === "string" ? b.createdAt : b.createdAt.toISOString()) : new Date().toISOString(),
+          updatedAt: b.updatedAt ? (typeof b.updatedAt === "string" ? b.updatedAt : b.updatedAt.toISOString()) : new Date().toISOString()
+        }));
+      } else if (this.colName === "homepage_sections" || this.colName === "homepageSectionBanners") {
+        let items: any[] = [];
+        try {
+          if ((prisma as any).homepageSectionBanner) {
+            items = await (prisma as any).homepageSectionBanner.findMany({ orderBy: { order: "asc" } });
+          }
+        } catch (e) {
+          items = [];
+        }
+        data = items.map((b: any) => ({
+          id: b.id,
+          sectionKey: b.sectionKey,
+          title: b.title || "",
+          subtitle: b.subtitle || null,
+          imageUrl: b.imageUrl,
           linkUrl: b.linkUrl || null,
-          bgColor: b.bgColor || "#1a1a2e",
-          page: b.page || "Homepage",
-          isActive: b.isActive,
-          sortOrder: b.sortOrder,
-          createdAt: b.createdAt ? b.createdAt.toISOString() : new Date().toISOString(),
-          updatedAt: b.updatedAt ? b.updatedAt.toISOString() : new Date().toISOString(),
-        };
-      });
-    } else if (this.colName === "hero_banners" || this.colName === "heroBanners") {
-      let items: any[] = [];
-      try {
-        if ((prisma as any).heroBanner) {
-          items = await (prisma as any).heroBanner.findMany({ orderBy: { order: "asc" } });
-        }
-      } catch (e) {
-        items = [];
-      }
-      if (items.length === 0) {
-        try {
-          const setting = await prisma.setting.findUnique({ where: { key: "HERO_BANNERS_DATA" } });
-          if (setting && setting.value) {
-            items = JSON.parse(setting.value);
-          }
-        } catch (e) {}
-      }
-      data = items.map((b: any) => ({
-        id: b.id,
-        title: b.title,
-        subtitle: b.subtitle || null,
-        mediaUrl: b.mediaUrl,
-        mediaType: b.mediaType || "image",
-        ctaLink: b.ctaLink || null,
-        isActive: b.isActive !== undefined ? Boolean(b.isActive) : true,
-        order: b.order !== undefined ? Number(b.order) : 0,
-        createdAt: b.createdAt ? (typeof b.createdAt === "string" ? b.createdAt : b.createdAt.toISOString()) : new Date().toISOString(),
-        updatedAt: b.updatedAt ? (typeof b.updatedAt === "string" ? b.updatedAt : b.updatedAt.toISOString()) : new Date().toISOString()
-      }));
-    } else if (this.colName === "homepage_sections" || this.colName === "homepageSectionBanners") {
-      let items: any[] = [];
-      try {
-        if ((prisma as any).homepageSectionBanner) {
-          items = await (prisma as any).homepageSectionBanner.findMany({ orderBy: { order: "asc" } });
-        }
-      } catch (e) {
-        items = [];
-      }
-      data = items.map((b: any) => ({
-        id: b.id,
-        sectionKey: b.sectionKey,
-        title: b.title || "",
-        subtitle: b.subtitle || null,
-        imageUrl: b.imageUrl,
-        linkUrl: b.linkUrl || null,
-        order: b.order !== undefined ? Number(b.order) : 0,
-        isActive: b.isActive !== undefined ? Boolean(b.isActive) : true,
-        createdAt: b.createdAt ? (typeof b.createdAt === "string" ? b.createdAt : b.createdAt.toISOString()) : new Date().toISOString(),
-        updatedAt: b.updatedAt ? (typeof b.updatedAt === "string" ? b.updatedAt : b.updatedAt.toISOString()) : new Date().toISOString()
-      }));
-    } else if (this.colName === "settings") {
-      const items = await prisma.setting.findMany();
-      data = items.map(s => ({
-        id: s.id,
-        key: s.key,
-        value: s.value,
-        updatedAt: s.updatedAt.toISOString(),
-      }));
-    } else if (this.colName === "notifications") {
-      try {
-        const notifSetting = await prisma.setting.findUnique({ where: { key: "NOTIFICATIONS_STORED_DATA" } });
-        if (notifSetting && notifSetting.value) {
-          const parsed = JSON.parse(notifSetting.value);
-          if (Array.isArray(parsed)) {
-            data = parsed;
-          }
-        }
-      } catch (err) {}
-      if (data.length === 0) {
-        // Default Shajgoj-style promotional Bengali notification matching customer requirements
-        data = [
-          {
-            id: "notif-active-1",
-            title: "👉 ৯৯ টাকায় Face Wash+Moisturizer!! 😍",
-            message: "মাত্র ৯৯ টাকায় কিনুন Glow & Hydrate Duo (Rajkonna Glow Booster Wash + Enso Skin Light Gel)!! অর্ডার করুন এখনই!!",
-            imageUrl: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&q=80",
-            linkUrl: "/shop?deal=combo",
-            isActive: true,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          }
-        ];
-      }
-    } else if (this.colName === "users") {
-      let items: any[] = [];
-      try {
-        items = await prisma.user.findMany({ include: { addresses: true } });
-      } catch (e) {
-        try {
-          items = await prisma.user.findMany();
-        } catch (e2) {
-          items = [];
-        }
-      }
-      data = items.map(u => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        passwordHash: u.passwordHash,
-        phone: u.phone,
-        role: u.role,
-        points: u.points,
-        status: u.status,
-        addresses: u.addresses || [],
-        createdAt: u.createdAt ? u.createdAt.toISOString() : new Date().toISOString(),
-        updatedAt: u.updatedAt ? u.updatedAt.toISOString() : new Date().toISOString(),
-      }));
-    } else if (this.colName === "orders") {
-      let items: any[] = [];
-      try {
-        items = await prisma.order.findMany({ include: { orderItems: true } });
-      } catch (e) {
-        try {
-          items = await prisma.order.findMany();
-        } catch (e2) {
-          items = [];
-        }
-      }
-      data = items.map(o => ({
-        id: o.id,
-        orderNumber: o.orderNumber,
-        customerId: o.customerId,
-        customerName: o.customerName,
-        customerEmail: o.customerEmail,
-        customerPhone: o.customerPhone,
-        address: o.address,
-        zone: o.zone,
-        deliveryCharge: o.deliveryCharge,
-        subTotal: o.subTotal,
-        discount: o.discount,
-        total: o.total,
-        paymentStatus: o.paymentStatus,
-        paymentMethod: o.paymentMethod,
-        orderStatus: o.orderStatus,
-        status: o.orderStatus,
-        notes: o.notes,
-        trackingLink: o.trackingLink,
-        salesmanId: o.salesmanId,
-        orderItems: o.orderItems || [],
-        createdAt: o.createdAt ? o.createdAt.toISOString() : new Date().toISOString(),
-        updatedAt: o.updatedAt ? o.updatedAt.toISOString() : new Date().toISOString(),
-      }));
-    } else if (this.colName === "reviews") {
-      const items = await prisma.review.findMany();
-      data = items.map(r => ({
-        id: r.id,
-        productId: r.productId,
-        customerName: r.customerName,
-        rating: r.rating,
-        comment: r.comment,
-        isApproved: r.isApproved,
-        createdAt: r.createdAt.toISOString(),
-      }));
-    } else if (this.colName === "menu_items" || this.colName === "menus" || this.colName === "MenuItem") {
-      try {
-        const items = await prisma.menuItem.findMany({
-          orderBy: { sortOrder: "asc" }
-        });
-        data = items.map(m => ({
-          id: m.id,
-          title: m.title,
-          url: m.url,
-          location: m.location,
-          parentId: m.parentId,
-          sortOrder: m.sortOrder,
-          createdAt: m.createdAt.toISOString(),
-          updatedAt: m.updatedAt.toISOString(),
+          order: b.order !== undefined ? Number(b.order) : 0,
+          isActive: b.isActive !== undefined ? Boolean(b.isActive) : true,
+          createdAt: b.createdAt ? (typeof b.createdAt === "string" ? b.createdAt : b.createdAt.toISOString()) : new Date().toISOString(),
+          updatedAt: b.updatedAt ? (typeof b.updatedAt === "string" ? b.updatedAt : b.updatedAt.toISOString()) : new Date().toISOString()
         }));
-      } catch (err) {
-        // Fallback to in-memory if table does not exist
-      }
-    } else if (this.colName === "cms_pages" || this.colName === "pages" || this.colName === "CmsPage") {
-      try {
-        const items = await prisma.cmsPage.findMany();
-        data = items.map(p => ({
-          id: p.id,
-          slug: p.slug,
-          title: p.title,
-          contentHtml: p.contentHtml,
-          metaTitle: p.metaTitle,
-          metaDescription: p.metaDescription,
-          createdAt: p.createdAt.toISOString(),
-          updatedAt: p.updatedAt.toISOString(),
+      } else if (this.colName === "settings") {
+        const items = await prisma.setting.findMany();
+        data = items.map(s => ({
+          id: s.id,
+          key: s.key,
+          value: s.value,
+          updatedAt: s.updatedAt.toISOString(),
         }));
-      } catch (err) {
-        // Fallback to in-memory
+      } else if (this.colName === "notifications") {
+        try {
+          const notifSetting = await prisma.setting.findUnique({ where: { key: "NOTIFICATIONS_STORED_DATA" } });
+          if (notifSetting && notifSetting.value) {
+            const parsed = JSON.parse(notifSetting.value);
+            if (Array.isArray(parsed)) {
+              data = parsed;
+            }
+          }
+        } catch (err) { }
+        if (data.length === 0) {
+          // Default Shajgoj-style promotional Bengali notification matching customer requirements
+          data = [
+            {
+              id: "notif-active-1",
+              title: "👉 ৯৯ টাকায় Face Wash+Moisturizer!! 😍",
+              message: "মাত্র ৯৯ টাকায় কিনুন Glow & Hydrate Duo (Rajkonna Glow Booster Wash + Enso Skin Light Gel)!! অর্ডার করুন এখনই!!",
+              imageUrl: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&q=80",
+              linkUrl: "/shop?deal=combo",
+              isActive: true,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            }
+          ];
+        }
+      } else if (this.colName === "users") {
+        let items: any[] = [];
+        try {
+          items = await prisma.user.findMany({ include: { addresses: true } });
+        } catch (e) {
+          try {
+            items = await prisma.user.findMany();
+          } catch (e2) {
+            items = [];
+          }
+        }
+        data = items.map(u => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          passwordHash: u.passwordHash,
+          phone: u.phone,
+          role: u.role,
+          points: u.points,
+          status: u.status,
+          addresses: u.addresses || [],
+          createdAt: u.createdAt ? u.createdAt.toISOString() : new Date().toISOString(),
+          updatedAt: u.updatedAt ? u.updatedAt.toISOString() : new Date().toISOString(),
+        }));
+      } else if (this.colName === "orders") {
+        let items: any[] = [];
+        try {
+          items = await prisma.order.findMany({ include: { orderItems: true } });
+        } catch (e) {
+          try {
+            items = await prisma.order.findMany();
+          } catch (e2) {
+            items = [];
+          }
+        }
+        data = items.map(o => ({
+          id: o.id,
+          orderNumber: o.orderNumber,
+          customerId: o.customerId,
+          customerName: o.customerName,
+          customerEmail: o.customerEmail,
+          customerPhone: o.customerPhone,
+          address: o.address,
+          zone: o.zone,
+          deliveryCharge: o.deliveryCharge,
+          subTotal: o.subTotal,
+          discount: o.discount,
+          total: o.total,
+          paymentStatus: o.paymentStatus,
+          paymentMethod: o.paymentMethod,
+          orderStatus: o.orderStatus,
+          status: o.orderStatus,
+          notes: o.notes,
+          trackingLink: o.trackingLink,
+          salesmanId: o.salesmanId,
+          orderItems: o.orderItems || [],
+          createdAt: o.createdAt ? o.createdAt.toISOString() : new Date().toISOString(),
+          updatedAt: o.updatedAt ? o.updatedAt.toISOString() : new Date().toISOString(),
+        }));
+      } else if (this.colName === "reviews") {
+        const items = await prisma.review.findMany();
+        data = items.map(r => ({
+          id: r.id,
+          productId: r.productId,
+          customerName: r.customerName,
+          rating: r.rating,
+          comment: r.comment,
+          isApproved: r.isApproved,
+          createdAt: r.createdAt.toISOString(),
+        }));
+      } else if (this.colName === "menu_items" || this.colName === "menus" || this.colName === "MenuItem") {
+        try {
+          const items = await prisma.menuItem.findMany({
+            orderBy: { sortOrder: "asc" }
+          });
+          data = items.map(m => ({
+            id: m.id,
+            title: m.title,
+            url: m.url,
+            location: m.location,
+            parentId: m.parentId,
+            sortOrder: m.sortOrder,
+            createdAt: m.createdAt.toISOString(),
+            updatedAt: m.updatedAt.toISOString(),
+          }));
+        } catch (err) {
+          // Fallback to in-memory if table does not exist
+        }
+      } else if (this.colName === "cms_pages" || this.colName === "pages" || this.colName === "CmsPage") {
+        try {
+          const items = await prisma.cmsPage.findMany();
+          data = items.map(p => ({
+            id: p.id,
+            slug: p.slug,
+            title: p.title,
+            contentHtml: p.contentHtml,
+            metaTitle: p.metaTitle,
+            metaDescription: p.metaDescription,
+            createdAt: p.createdAt.toISOString(),
+            updatedAt: p.updatedAt.toISOString(),
+          }));
+        } catch (err) {
+          // Fallback to in-memory
+        }
+      } else if (this.colName === "coupons") {
+        try {
+          const couponSetting = await prisma.setting.findUnique({ where: { key: "COUPONS_STORED_DATA" } });
+          if (couponSetting && couponSetting.value) {
+            const parsed = JSON.parse(couponSetting.value);
+            if (Array.isArray(parsed)) {
+              data = parsed;
+            }
+          }
+        } catch (err) { }
+      } else if (this.colName === "blogs") {
+        try {
+          const blogSetting = await prisma.setting.findUnique({ where: { key: "BLOGS_STORED_DATA" } });
+          if (blogSetting && blogSetting.value) {
+            const parsed = JSON.parse(blogSetting.value);
+            if (Array.isArray(parsed)) {
+              data = parsed;
+            }
+          }
+        } catch (err) { }
+      } else if (this.colName === "chatMessages") {
+        try {
+          const chatSetting = await prisma.setting.findUnique({ where: { key: "CHAT_MESSAGES_STORED_DATA" } });
+          if (chatSetting && chatSetting.value) {
+            const parsed = JSON.parse(chatSetting.value);
+            if (Array.isArray(parsed)) {
+              data = parsed;
+            }
+          }
+        } catch (err) { }
       }
-    } else if (this.colName === "coupons") {
-      try {
-        const couponSetting = await prisma.setting.findUnique({ where: { key: "COUPONS_STORED_DATA" } });
-        if (couponSetting && couponSetting.value) {
-          const parsed = JSON.parse(couponSetting.value);
-          if (Array.isArray(parsed)) {
-            data = parsed;
+
+      // Always merge inMemoryCollections to support dynamic memory items
+      const colMap = inMemoryCollections.get(this.colName);
+      if (colMap && colMap.size > 0) {
+        const memoryItems = Array.from(colMap.values());
+        const existingIds = new Set(data.map(d => d.id));
+        for (const mItem of memoryItems) {
+          if (!existingIds.has(mItem.id)) {
+            data.push(mItem);
+          } else {
+            // Update item in data with latest in-memory edits
+            data = data.map(d => d.id === mItem.id ? { ...d, ...mItem } : d);
           }
-        }
-      } catch (err) {}
-    } else if (this.colName === "blogs") {
-      try {
-        const blogSetting = await prisma.setting.findUnique({ where: { key: "BLOGS_STORED_DATA" } });
-        if (blogSetting && blogSetting.value) {
-          const parsed = JSON.parse(blogSetting.value);
-          if (Array.isArray(parsed)) {
-            data = parsed;
-          }
-        }
-      } catch (err) {}
-    } else if (this.colName === "chatMessages") {
-      try {
-        const chatSetting = await prisma.setting.findUnique({ where: { key: "CHAT_MESSAGES_STORED_DATA" } });
-        if (chatSetting && chatSetting.value) {
-          const parsed = JSON.parse(chatSetting.value);
-          if (Array.isArray(parsed)) {
-            data = parsed;
-          }
-        }
-      } catch (err) {}
-    }
-    
-    // Always merge inMemoryCollections to support dynamic memory items
-    const colMap = inMemoryCollections.get(this.colName);
-    if (colMap && colMap.size > 0) {
-      const memoryItems = Array.from(colMap.values());
-      const existingIds = new Set(data.map(d => d.id));
-      for (const mItem of memoryItems) {
-        if (!existingIds.has(mItem.id)) {
-          data.push(mItem);
-        } else {
-          // Update item in data with latest in-memory edits
-          data = data.map(d => d.id === mItem.id ? { ...d, ...mItem } : d);
         }
       }
-    }
 
       // Store in memory cache for 2 minutes (exclude real-time live chat messages)
       if (this.colName !== "chatMessages") {
@@ -587,7 +647,7 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
           update: { value: JSON.stringify(list) },
           create: { key: "HERO_BANNERS_DATA", value: JSON.stringify(list) }
         });
-      } catch (err) {}
+      } catch (err) { }
       if (!inMemoryCollections.has(colName)) {
         inMemoryCollections.set(colName, new Map());
       }
@@ -638,7 +698,7 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
       let list: any[] = [];
       const notifSetting = await prisma.setting.findUnique({ where: { key: "NOTIFICATIONS_STORED_DATA" } });
       if (notifSetting && notifSetting.value) {
-        try { list = JSON.parse(notifSetting.value); } catch {}
+        try { list = JSON.parse(notifSetting.value); } catch { }
       }
       const existingIdx = list.findIndex((n: any) => n.id === id);
       const notifRecord = {
@@ -708,7 +768,7 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
           sortOrder: typeof data.sortOrder === "number" ? data.sortOrder : parseInt(data.sortOrder || "0", 10) || 0,
         }
       });
-    } catch (e) {}
+    } catch (e) { }
   } else if (colName === "cms_pages" || colName === "pages" || colName === "CmsPage") {
     try {
       await prisma.cmsPage.upsert({
@@ -728,7 +788,7 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
           metaDescription: data.metaDescription || null,
         }
       });
-    } catch (e) {}
+    } catch (e) { }
   } else if (colName === "users") {
     await prisma.user.upsert({
       where: { id },
@@ -780,13 +840,13 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
           usageLimit: Number(data.usageLimit || 100),
         }
       });
-    } catch (e) {}
+    } catch (e) { }
 
     try {
       let existingCoupons: any[] = [];
       const couponSetting = await prisma.setting.findUnique({ where: { key: "COUPONS_STORED_DATA" } });
       if (couponSetting && couponSetting.value) {
-        try { existingCoupons = JSON.parse(couponSetting.value); } catch {}
+        try { existingCoupons = JSON.parse(couponSetting.value); } catch { }
       }
       const code = (data.code || id).toUpperCase();
       const idx = existingCoupons.findIndex(c => c.id === id || (c.code && c.code.toUpperCase() === code));
@@ -798,13 +858,13 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
         update: { value: JSON.stringify(existingCoupons) },
         create: { key: "COUPONS_STORED_DATA", value: JSON.stringify(existingCoupons) }
       });
-    } catch (e) {}
+    } catch (e) { }
   } else if (colName === "blogs") {
     try {
       let existingBlogs: any[] = [];
       const blogSetting = await prisma.setting.findUnique({ where: { key: "BLOGS_STORED_DATA" } });
       if (blogSetting && blogSetting.value) {
-        try { existingBlogs = JSON.parse(blogSetting.value); } catch {}
+        try { existingBlogs = JSON.parse(blogSetting.value); } catch { }
       }
       const idx = existingBlogs.findIndex(b => b.id === id);
       const blogItem = { id, ...data, updatedAt: new Date().toISOString() };
@@ -815,7 +875,7 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
         update: { value: JSON.stringify(existingBlogs) },
         create: { key: "BLOGS_STORED_DATA", value: JSON.stringify(existingBlogs) }
       });
-    } catch (e) {}
+    } catch (e) { }
   } else if (colName === "orders") {
     await prisma.order.upsert({
       where: { id },
@@ -890,7 +950,7 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
         update: data.brand?.name ? { name: data.brand.name } : {},
         create: { id: finalBrandId, name: data.brand?.name || "Authentic Brand" }
       });
-    } catch (bErr) {}
+    } catch (bErr) { }
 
     // 2. Ensure valid Category in MySQL to satisfy foreign key
     const finalCategoryId = data.categoryId || "cat-default";
@@ -900,13 +960,15 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
         update: data.category?.name ? { name: data.category.name } : {},
         create: { id: finalCategoryId, name: data.category?.name || "Cosmetics" }
       });
-    } catch (cErr) {}
+    } catch (cErr) { }
 
     await prisma.product.upsert({
       where: { id },
       update: {
         name: data.name,
         description: data.description || "",
+        ingredients: data.ingredients || null,
+        howToUse: data.howToUse || null,
         brandId: finalBrandId,
         categoryId: finalCategoryId,
         status: data.status || "Active",
@@ -919,6 +981,8 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
         id,
         name: data.name,
         description: data.description || "",
+        ingredients: data.ingredients || null,
+        howToUse: data.howToUse || null,
         brandId: finalBrandId,
         categoryId: finalCategoryId,
         status: data.status || "Active",
@@ -927,6 +991,26 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
         metaDescription: data.metaDescription || null,
         metaKeywords: data.metaKeywords || null,
       }
+    });
+
+    // Persist extended cosmetic specs, INCI, How to use, flags to survive restarts
+    saveProductExtendedMetadata(id, {
+      slug: data.slug || (data.name ? generateSlug(data.name) : id),
+      shortDescription: data.shortDescription || null,
+      ingredients: data.ingredients || null,
+      howToUse: data.howToUse || null,
+      skinType: data.skinType || null,
+      countryOfOrigin: data.countryOfOrigin || null,
+      volume: data.volume || null,
+      benefits: data.benefits || null,
+      lowStockThreshold: data.lowStockThreshold !== undefined ? Number(data.lowStockThreshold) : 5,
+      isFeatured: Boolean(data.isFeatured),
+      isNewArrival: Boolean(data.isNewArrival),
+      isBestSeller: Boolean(data.isBestSeller),
+      subcategoryId: data.subcategoryId || null,
+      metaTitle: data.metaTitle || null,
+      metaDescription: data.metaDescription || null,
+      metaKeywords: data.metaKeywords || null,
     });
     if (data.variants && Array.isArray(data.variants)) {
       const keepIds = data.variants.map((v: any) => v.id).filter(Boolean);
@@ -1066,7 +1150,7 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
       const stored = await prisma.setting.findUnique({ where: { key: "COUPONS_STORED_DATA" } });
       let list: any[] = [];
       if (stored && stored.value) {
-        try { list = JSON.parse(stored.value); } catch {}
+        try { list = JSON.parse(stored.value); } catch { }
       }
       const existingIdx = list.findIndex((c: any) => c.id === id || c.code === (data.code || id));
       const couponRecord = { id, ...data };
@@ -1093,7 +1177,7 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
       const stored = await prisma.setting.findUnique({ where: { key: "BLOGS_STORED_DATA" } });
       let list: any[] = [];
       if (stored && stored.value) {
-        try { list = JSON.parse(stored.value); } catch {}
+        try { list = JSON.parse(stored.value); } catch { }
       }
       const existingIdx = list.findIndex((b: any) => b.id === id);
       const blogRecord = { id, ...data };
@@ -1120,7 +1204,7 @@ async function mockSetPrisma(colName: string, id: string, data: any, options?: a
       let list: any[] = [];
       const stored = await prisma.setting.findUnique({ where: { key: "CHAT_MESSAGES_STORED_DATA" } });
       if (stored && stored.value) {
-        try { list = JSON.parse(stored.value); } catch {}
+        try { list = JSON.parse(stored.value); } catch { }
       }
       const existingIdx = list.findIndex((m: any) => m.id === id);
       const msgRecord = { id, ...data };
@@ -1165,7 +1249,7 @@ async function mockUpdatePrisma(colName: string, id: string, data: any) {
       flatData[k] = v;
     }
   }
-  
+
   if (colName === "banners") {
     try {
       await prisma.promoBanner.update({ where: { id }, data: flatData });
@@ -1187,7 +1271,7 @@ async function mockUpdatePrisma(colName: string, id: string, data: any) {
       let list: any[] = [];
       const notifSetting = await prisma.setting.findUnique({ where: { key: "NOTIFICATIONS_STORED_DATA" } });
       if (notifSetting && notifSetting.value) {
-        try { list = JSON.parse(notifSetting.value); } catch {}
+        try { list = JSON.parse(notifSetting.value); } catch { }
       }
       const idx = list.findIndex((n: any) => n.id === id);
       if (idx >= 0) {
@@ -1247,7 +1331,7 @@ async function mockUpdatePrisma(colName: string, id: string, data: any) {
           sortOrder: flatData.sortOrder !== undefined ? (typeof flatData.sortOrder === "number" ? flatData.sortOrder : parseInt(flatData.sortOrder || "0", 10) || 0) : undefined,
         }
       });
-    } catch (e) {}
+    } catch (e) { }
   } else if (colName === "cms_pages" || colName === "pages" || colName === "CmsPage") {
     try {
       await prisma.cmsPage.update({
@@ -1259,7 +1343,7 @@ async function mockUpdatePrisma(colName: string, id: string, data: any) {
           metaDescription: flatData.metaDescription !== undefined ? flatData.metaDescription : undefined,
         }
       });
-    } catch (e) {}
+    } catch (e) { }
   }
 
   // Always keep inMemoryCollections synchronized with latest updates
@@ -1281,7 +1365,7 @@ async function mockDeletePrisma(colName: string, id: string) {
         if ((prisma as any).heroBanner) {
           await (prisma as any).heroBanner.deleteMany({ where: { id } });
         }
-      } catch (e) {}
+      } catch (e) { }
       try {
         const setting = await prisma.setting.findUnique({ where: { key: "HERO_BANNERS_DATA" } });
         if (setting && setting.value) {
@@ -1292,13 +1376,13 @@ async function mockDeletePrisma(colName: string, id: string) {
             create: { key: "HERO_BANNERS_DATA", value: JSON.stringify(list) }
           });
         }
-      } catch (e) {}
+      } catch (e) { }
     } else if (colName === "homepage_sections" || colName === "homepageSectionBanners") {
       try {
         if ((prisma as any).homepageSectionBanner) {
           await (prisma as any).homepageSectionBanner.deleteMany({ where: { id } });
         }
-      } catch (e) {}
+      } catch (e) { }
     } else if (colName === "settings") {
       await prisma.setting.deleteMany({ where: { id } });
     } else if (colName === "notifications") {
@@ -1312,7 +1396,7 @@ async function mockDeletePrisma(colName: string, id: string) {
             create: { key: "NOTIFICATIONS_STORED_DATA", value: JSON.stringify(list) }
           });
         }
-      } catch (e) {}
+      } catch (e) { }
     } else if (colName === "reviews") {
       await prisma.review.deleteMany({ where: { id } });
     } else if (colName === "users") {
@@ -1321,6 +1405,7 @@ async function mockDeletePrisma(colName: string, id: string) {
       await prisma.orderItem.deleteMany({ where: { orderId: id } });
       await prisma.order.deleteMany({ where: { id } });
     } else if (colName === "products") {
+      deleteProductExtendedMetadata(id);
       await prisma.variant.deleteMany({ where: { productId: id } });
       await prisma.productImage.deleteMany({ where: { productId: id } });
       await prisma.product.deleteMany({ where: { id } });
@@ -1335,7 +1420,7 @@ async function mockDeletePrisma(colName: string, id: string) {
     } else if (colName === "coupons") {
       try {
         await prisma.coupon.deleteMany({ where: { OR: [{ id }, { code: id }, { code: id.toUpperCase() }] } });
-      } catch (e) {}
+      } catch (e) { }
       const couponSetting = await prisma.setting.findUnique({ where: { key: "COUPONS_STORED_DATA" } });
       if (couponSetting && couponSetting.value) {
         const existingCoupons = JSON.parse(couponSetting.value).filter((c: any) => c.id !== id && c.code?.toUpperCase() !== id.toUpperCase());

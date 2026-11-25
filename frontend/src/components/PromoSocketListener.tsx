@@ -92,9 +92,49 @@ export default function PromoSocketListener() {
     };
     window.addEventListener("gg_test_promo", handleTestPromo);
 
+    // ── BFCache (Back-Forward Cache) and Page Lifecycle Handling ──
+    const handlePageHide = () => {
+      try {
+        socket.disconnect();
+      } catch (_) {}
+    };
+
+    const handlePageShow = (e: PageTransitionEvent) => {
+      try {
+        if (e.persisted && !socket.connected) {
+          socket.connect();
+        }
+      } catch (_) {}
+    };
+
+    const handleFreeze = () => {
+      try {
+        socket.disconnect();
+      } catch (_) {}
+    };
+
+    const handleResume = () => {
+      try {
+        if (!socket.connected) {
+          socket.connect();
+        }
+      } catch (_) {}
+    };
+
+    window.addEventListener("pagehide", handlePageHide);
+    window.addEventListener("pageshow", handlePageShow);
+    document.addEventListener("freeze", handleFreeze);
+    document.addEventListener("resume", handleResume);
+
     return () => {
-      socket.disconnect();
+      try {
+        socket.disconnect();
+      } catch (_) {}
       window.removeEventListener("gg_test_promo", handleTestPromo);
+      window.removeEventListener("pagehide", handlePageHide);
+      window.removeEventListener("pageshow", handlePageShow);
+      document.removeEventListener("freeze", handleFreeze);
+      document.removeEventListener("resume", handleResume);
     };
   }, []);
 

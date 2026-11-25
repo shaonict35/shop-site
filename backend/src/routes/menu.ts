@@ -1,6 +1,7 @@
 import { emitStorefrontUpdate } from "../utils/socketSync";
 import { Router, Request, Response } from "express";
 import db from "../firebase";
+import { authenticateJWT, requireRole } from "../middleware/auth";
 
 const router = Router();
 
@@ -81,8 +82,8 @@ router.get("/menus", async (req: Request, res: Response) => {
       for (const item of initialList) {
         await db.collection("menu_items").doc(item.id).set(item);
       }
-      const filtered = location 
-        ? initialList.filter(i => i.location.toLowerCase() === String(location).toLowerCase()) 
+      const filtered = location
+        ? initialList.filter(i => i.location.toLowerCase() === String(location).toLowerCase())
         : initialList;
       return res.json(filtered.sort((a, b) => a.sortOrder - b.sortOrder));
     }
@@ -120,7 +121,7 @@ router.get("/admin/menus", async (req: Request, res: Response) => {
 });
 
 // POST /api/admin/menus — Admin: Create new Menu item
-router.post("/admin/menus", async (req: Request, res: Response) => {
+router.post("/admin/menus", authenticateJWT as any, requireRole(["SuperAdmin", "Admin", "Manager"]) as any, async (req: Request, res: Response) => {
   try {
     const { title, url, location, parentId, sortOrder } = req.body;
     if (!title || !url) {
@@ -147,7 +148,7 @@ router.post("/admin/menus", async (req: Request, res: Response) => {
 });
 
 // PUT /api/admin/menus/:id — Admin: Update Menu item
-router.put("/admin/menus/:id", async (req: Request, res: Response) => {
+router.put("/admin/menus/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Admin", "Manager"]) as any, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { title, url, location, parentId, sortOrder } = req.body;
@@ -171,7 +172,7 @@ router.put("/admin/menus/:id", async (req: Request, res: Response) => {
 });
 
 // DELETE /api/admin/menus/:id — Admin: Delete Menu item
-router.delete("/admin/menus/:id", async (req: Request, res: Response) => {
+router.delete("/admin/menus/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Admin", "Manager"]) as any, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const docRef = db.collection("menu_items").doc(id as string);

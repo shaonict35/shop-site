@@ -1,0 +1,340 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "GlowGoodly Product API for Tawk.to AI Assist",
+    "version": "1.0.0",
+    "description": "Real-time, read-only customer support product API for GlowGoodly ecommerce. Provides accurate current prices, discounts, stock availability, shade variants, INCI ingredients, and application instructions to Tawk.to AI Assist without exposing cost prices or internal metrics.",
+    "contact": {
+      "name": "GlowGoodly Support & Operations",
+      "email": "support@glowgoodly.com",
+      "url": "https://glowgoodly.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.glowgoodly.com/api",
+      "description": "Production Public API Server"
+    },
+    {
+      "url": "http://localhost:5000/api",
+      "description": "Local Development Server"
+    }
+  ],
+  "paths": {
+    "/ai-support/products": {
+      "get": {
+        "summary": "List active products with prices and stock",
+        "description": "Retrieve a paginated list of active products including selling prices, discount information, stock status, variants, and specifications. Inactive and deleted products are excluded.",
+        "operationId": "listAiSupportProducts",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of products to return (default 20, max 50)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number for pagination (default 1)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "Filter by category name or slug (e.g. 'skincare', 'makeup')",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "brand",
+            "in": "query",
+            "description": "Filter by brand name or slug (e.g. 'cerave', 'cosrx')",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful retrieval of active product list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductListResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (max 120 req/min)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai-support/search": {
+      "get": {
+        "summary": "Search products by keyword, category, or brand",
+        "description": "Perform full-text search across active product names, brands, categories, skin types, and ingredient descriptions.",
+        "operationId": "searchAiSupportProducts",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Search keyword or product name query (e.g. 'sunscreen', 'salicylic acid', 'cerave')",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of search results to return (default 10, max 30)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30,
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful search matching results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing query parameter 'q'",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai-support/products/{id}": {
+      "get": {
+        "summary": "Get full product details by ID or slug",
+        "description": "Retrieve comprehensive product details, variant inventory, ingredients formula, application instructions, and direct store URL.",
+        "operationId": "getAiSupportProductById",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Product ID or SEO slug (e.g. 'prod-123' or 'cerave-foaming-cleanser')",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detailed product record found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SingleProductResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Product not found or currently inactive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Product": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "example": "prod_cerave_cleanser" },
+          "name": { "type": "string", "example": "CeraVe Foaming Facial Cleanser" },
+          "slug": { "type": "string", "example": "cerave-foaming-facial-cleanser" },
+          "brand": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": { "type": "string", "example": "brand-cerave" },
+              "name": { "type": "string", "example": "CeraVe" },
+              "slug": { "type": "string", "example": "cerave" }
+            }
+          },
+          "category": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": { "type": "string", "example": "cat-skincare" },
+              "name": { "type": "string", "example": "Skincare" },
+              "slug": { "type": "string", "example": "skincare" }
+            }
+          },
+          "sellingPrice": { "type": "number", "example": 1850 },
+          "discountPrice": { "type": "number", "nullable": true, "example": 1650 },
+          "hasDiscount": { "type": "boolean", "example": true },
+          "discountPercentage": { "type": "integer", "example": 11 },
+          "inStock": { "type": "boolean", "example": true },
+          "stockQuantity": { "type": "integer", "example": 35 },
+          "description": { "type": "string", "example": "Gentle foaming gel cleanser with ceramides and hyaluronic acid for normal to oily skin." },
+          "shortDescription": { "type": "string", "example": "Daily foaming gel cleanser for normal to oily skin." },
+          "specifications": {
+            "type": "object",
+            "properties": {
+              "volume": { "type": "string", "nullable": true, "example": "236ml / 8 fl oz" },
+              "skinType": { "type": "string", "nullable": true, "example": "Normal to Oily Skin" },
+              "countryOfOrigin": { "type": "string", "nullable": true, "example": "USA / France" },
+              "benefits": { "type": "string", "nullable": true, "example": "Cleanses, removes excess oil, protects skin barrier" }
+            }
+          },
+          "ingredients": { "type": "string", "nullable": true, "example": "Aqua / Water, Cocamidopropyl Hydroxysultaine, Glycerin, Sodium Lauroyl Sarcosinate, Niacinamide, Ceramide NP, Ceramide AP, Ceramide EOP..." },
+          "howToUse": { "type": "string", "nullable": true, "example": "Wet skin with lukewarm water. Massage cleanser into skin in a gentle, circular motion. Rinse." },
+          "variants": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Variant" }
+          },
+          "imageUrl": { "type": "string", "example": "https://api.glowgoodly.com/uploads/products/cerave-cleanser.jpg" },
+          "productUrl": { "type": "string", "example": "https://shop.glowgoodly.com/product/cerave-foaming-facial-cleanser" }
+        }
+      },
+      "Variant": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "example": "var-236ml" },
+          "name": { "type": "string", "example": "236ml" },
+          "price": { "type": "number", "example": 1850 },
+          "discountPrice": { "type": "number", "nullable": true, "example": 1650 },
+          "inStock": { "type": "boolean", "example": true },
+          "stock": { "type": "integer", "example": 20 },
+          "shadeColor": { "type": "string", "nullable": true, "example": null },
+          "sizeValue": { "type": "string", "nullable": true, "example": "236ml" },
+          "sku": { "type": "string", "nullable": true, "example": "GG-CER-236" },
+          "imageUrl": { "type": "string", "nullable": true, "example": null }
+        }
+      },
+      "ProductListResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": true },
+          "total": { "type": "integer", "example": 142 },
+          "page": { "type": "integer", "example": 1 },
+          "limit": { "type": "integer", "example": 20 },
+          "products": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Product" }
+          }
+        }
+      },
+      "SearchResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": true },
+          "query": { "type": "string", "example": "cleanser" },
+          "count": { "type": "integer", "example": 4 },
+          "results": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Product" }
+          }
+        }
+      },
+      "SingleProductResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": true },
+          "product": { "$ref": "#/components/schemas/Product" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": false },
+          "error": { "type": "string", "example": "Product not found or currently inactive" }
+        }
+      }
+    }
+  }
+}

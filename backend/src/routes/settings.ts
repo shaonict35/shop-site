@@ -145,7 +145,7 @@ router.get("/seasonal-offer", async (req, res) => {
 });
 
 // POST /api/settings/seasonal-offer (Admin save)
-router.post("/seasonal-offer", async (req, res) => {
+router.post("/seasonal-offer", authenticateJWT as any, requireRole(["SuperAdmin", "Admin", "Manager"]) as any, async (req, res) => {
   try {
     const payload = req.body;
     if (!payload || typeof payload !== "object") {
@@ -188,7 +188,7 @@ router.get("/pages-config", async (req, res) => {
 });
 
 // POST /api/settings/pages-config (Admin save for all 5 page/section controls)
-router.post("/pages-config", async (req, res) => {
+router.post("/pages-config", authenticateJWT as any, requireRole(["SuperAdmin", "Admin", "Manager"]) as any, async (req, res) => {
   try {
     const payload = req.body;
     if (!payload || typeof payload !== "object") {
@@ -558,7 +558,7 @@ router.get("/available-offers", async (req, res) => {
 });
 
 // POST /api/settings/available-offers
-router.post("/available-offers", async (req, res) => {
+router.post("/available-offers", authenticateJWT as any, requireRole(["SuperAdmin", "Admin", "Manager"]) as any, async (req, res) => {
   try {
     const offers = req.body;
     await prisma.setting.upsert({

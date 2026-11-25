@@ -2,13 +2,58 @@ import { emitStorefrontUpdate } from "../utils/socketSync";
 import { Router, Request, Response } from "express";
 import fs from "fs";
 import path from "path";
+import jwt from "jsonwebtoken";
 import db, { invalidatePrismaCache } from "../firebase";
 import prisma from "../prisma";
-import { authenticateJWT, requireRole } from "../middleware/auth";
+import { authenticateJWT, requireRole, isTokenRevoked } from "../middleware/auth";
 import { deleteUploadedFile } from "../utils/file-cleanup";
 import { uploadCategoryImage, uploadBrandingImage, uploadProductImage } from "../config/multer";
 
 const router = Router();
+const JWT_SECRET = process.env.JWT_SECRET || "glowgoodly_secret_jwt_key_123456";
+
+// Security Helper: Check if requesting client is an authenticated staff member (SuperAdmin, Manager, Admin)
+export function isStaffUser(req: Request): boolean {
+  try {
+    let authHeader = req.headers.authorization;
+    if (!authHeader && req.headers["x-access-token"]) {
+      authHeader = `Bearer ${req.headers["x-access-token"]}`;
+    }
+    if (!authHeader && typeof req.query?.token === "string") {
+      authHeader = `Bearer ${req.query.token}`;
+    }
+    if (!authHeader || !authHeader.startsWith("Bearer ")) return false;
+    const token = authHeader.split(" ")[1];
+    if (!token || token === "null" || token === "undefined") return false;
+    if (typeof isTokenRevoked === "function" && isTokenRevoked(token)) return false;
+    const decoded: any = jwt.verify(token, JWT_SECRET);
+    if (!decoded || !decoded.role) return false;
+    const staffRoles = ["SuperAdmin", "Manager", "Admin"];
+    return staffRoles.includes(decoded.role);
+  } catch (_) {
+    return false;
+  }
+}
+
+// Security Helper: Strip costPrice from product and variants for public consumers
+export function sanitizeProductForPublic(product: any, allowCostPrice: boolean = false): any {
+  if (!product || typeof product !== "object") return product;
+  if (allowCostPrice) return product;
+
+  const clone = { ...product };
+  delete clone.costPrice;
+
+  if (Array.isArray(clone.variants)) {
+    clone.variants = clone.variants.map((v: any) => {
+      if (!v || typeof v !== "object") return v;
+      const vClone = { ...v };
+      delete vClone.costPrice;
+      return vClone;
+    });
+  }
+
+  return clone;
+}
 
 // Helper to decode Base64 data URIs and save directly to backend/uploads/<subfolder>
 function saveBase64Image(dataUri: string, subfolder: string, prefix: string): string {
@@ -862,8 +907,9 @@ function resolveFullUrl(req: Request, url?: string | null): string {
 // GET /api/products and /api/admin/products
 const getProductsHandler = async (req: Request, res: Response) => {
   try {
+    const isStaff = isStaffUser(req);
     const isBypass = req.query.bypass === "true" || req.query.t !== undefined || req.headers["cache-control"]?.includes("no-cache") || req.path.includes("/admin");
-    const cacheKey = JSON.stringify(req.query);
+    const cacheKey = JSON.stringify({ ...req.query, _isStaff: isStaff });
     if (!isBypass) {
       const cached = productsCache.get(cacheKey);
       if (cached && cached.expiry > Date.now()) {
@@ -1068,10 +1114,11 @@ const getProductsHandler = async (req: Request, res: Response) => {
     }
 
     // Strip heavy description/ingredients/howToUse fields for super lightweight list response (35x smaller payload)
+    // and sanitize costPrice for public consumers
     const optimizedList = productsList.map(p => {
       const slug = p.slug || generateSlug(p.name || p.id);
       const { description, ingredients, howToUse, metaDescription, metaKeywords, ...rest } = p;
-      return { ...rest, slug };
+      return sanitizeProductForPublic({ ...rest, slug }, isStaff);
     });
 
     const totalCount = optimizedList.length;
@@ -1082,6 +1129,10 @@ const getProductsHandler = async (req: Request, res: Response) => {
     if (limitNum && limitNum > 0) {
       const startIndex = (pageNum - 1) * limitNum;
       resultList = optimizedList.slice(startIndex, startIndex + limitNum);
+    }
+
+    if (!isBypass) {
+      productsCache.set(cacheKey, { data: resultList, expiry: Date.now() + CACHE_DURATION_MS });
     }
 
     res.setHeader("X-Total-Count", totalCount.toString());
@@ -1109,9 +1160,11 @@ router.get("/products/:id", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Invalid product id" });
     }
 
+    const isStaff = isStaffUser(req);
     const isBypass = req.query.bypass === "true" || req.query.t || req.headers["cache-control"] === "no-cache";
+    const cacheKey = `${prodId}_${isStaff ? "staff" : "pub"}`;
     if (!isBypass) {
-      const cached = productDetailsCache.get(prodId);
+      const cached = productDetailsCache.get(cacheKey);
       if (cached && cached.expiry > Date.now()) {
         return res.json(cached.data);
       }
@@ -1223,16 +1276,20 @@ router.get("/products/:id", async (req: Request, res: Response) => {
       }
     }
 
-    const payload = { product: productData, relatedProducts };
+    const cleanProductData = sanitizeProductForPublic(productData, isStaff);
+    const cleanRelated = Array.isArray(relatedProducts)
+      ? relatedProducts.map((p: any) => sanitizeProductForPublic(p, isStaff))
+      : [];
+    const payload = { product: cleanProductData, relatedProducts: cleanRelated };
 
     if (!isBypass) {
       const expiry = Date.now() + CACHE_DURATION_MS;
-      productDetailsCache.set(prodId, { data: payload, expiry });
-      if (productData.id) {
-        productDetailsCache.set(productData.id, { data: payload, expiry });
+      productDetailsCache.set(cacheKey, { data: payload, expiry });
+      if (cleanProductData.id) {
+        productDetailsCache.set(`${cleanProductData.id}_${isStaff ? "staff" : "pub"}`, { data: payload, expiry });
       }
-      if (productData.slug) {
-        productDetailsCache.set(productData.slug, { data: payload, expiry });
+      if (cleanProductData.slug) {
+        productDetailsCache.set(`${cleanProductData.slug}_${isStaff ? "staff" : "pub"}`, { data: payload, expiry });
       }
     }
 
@@ -1296,15 +1353,84 @@ router.post("/products/:id/reviews", async (req: Request, res: Response) => {
 });
 
 // POST /api/products (Admin only - Create product)
-router.post("/products", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin", "Salesman"]) as any, async (req: Request, res: Response) => {
+router.post("/products", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: Request, res: Response) => {
   try {
-    const { name, description, imageUrl, imageUrl2, imageUrl3, imageUrl4, price, discountPrice, costPrice, stock, metaTitle, metaDescription, metaKeywords, campaignName, variants } = req.body;
+    const {
+      name,
+      description,
+      shortDescription,
+      ingredients,
+      howToUse,
+      skinType,
+      countryOfOrigin,
+      volume,
+      benefits,
+      status,
+      isFeatured,
+      isNewArrival,
+      isBestSeller,
+      sku,
+      lowStockThreshold,
+      tags,
+      imageUrl,
+      imageUrl2,
+      imageUrl3,
+      imageUrl4,
+      price,
+      discountPrice,
+      costPrice,
+      stock,
+      metaTitle,
+      metaDescription,
+      metaKeywords,
+      campaignName,
+      variants
+    } = req.body;
     let brandId = req.body.brandId;
     let categoryId = req.body.categoryId;
     let subcategoryId = req.body.subcategoryId;
     
-    if (!name) {
+    if (!name || typeof name !== "string" || !name.trim()) {
       return res.status(400).json({ error: "Product name is required" });
+    }
+
+    // Input Validation: non-negative numbers
+    if (price !== undefined && price !== null && (isNaN(Number(price)) || Number(price) < 0)) {
+      return res.status(400).json({ error: "Price must be a valid non-negative number" });
+    }
+    if (costPrice !== undefined && costPrice !== null && (isNaN(Number(costPrice)) || Number(costPrice) < 0)) {
+      return res.status(400).json({ error: "Cost price must be a valid non-negative number" });
+    }
+    if (discountPrice !== undefined && discountPrice !== null) {
+      if (isNaN(Number(discountPrice)) || Number(discountPrice) < 0) {
+        return res.status(400).json({ error: "Discount price must be a valid non-negative number" });
+      }
+      if (price !== undefined && Number(discountPrice) > Number(price)) {
+        return res.status(400).json({ error: "Discount price cannot be greater than regular price" });
+      }
+    }
+    if (stock !== undefined && stock !== null && (isNaN(Number(stock)) || Number(stock) < 0)) {
+      return res.status(400).json({ error: "Stock must be a valid non-negative integer" });
+    }
+    if (lowStockThreshold !== undefined && lowStockThreshold !== null && (isNaN(Number(lowStockThreshold)) || Number(lowStockThreshold) < 0)) {
+      return res.status(400).json({ error: "Low stock threshold must be a valid non-negative number" });
+    }
+
+    if (variants && Array.isArray(variants)) {
+      for (const v of variants) {
+        if (v.price !== undefined && v.price !== null && (isNaN(Number(v.price)) || Number(v.price) < 0)) {
+          return res.status(400).json({ error: `Variant "${v.name || 'item'}" price must be non-negative` });
+        }
+        if (v.costPrice !== undefined && v.costPrice !== null && (isNaN(Number(v.costPrice)) || Number(v.costPrice) < 0)) {
+          return res.status(400).json({ error: `Variant "${v.name || 'item'}" cost price must be non-negative` });
+        }
+        if (v.discountPrice !== undefined && v.discountPrice !== null && (isNaN(Number(v.discountPrice)) || Number(v.discountPrice) < 0)) {
+          return res.status(400).json({ error: `Variant "${v.name || 'item'}" discount price must be non-negative` });
+        }
+        if (v.stock !== undefined && v.stock !== null && (isNaN(Number(v.stock)) || Number(v.stock) < 0)) {
+          return res.status(400).json({ error: `Variant "${v.name || 'item'}" stock must be non-negative` });
+        }
+      }
     }
 
     // Resolve Category & Subcategory robustly
@@ -1322,7 +1448,9 @@ router.post("/products", authenticateJWT as any, requireRole(["SuperAdmin", "Man
     const numPrice = price !== undefined && price !== null && !isNaN(Number(price)) ? Number(price) : 0;
     const numCostPrice = costPrice !== undefined && costPrice !== null && !isNaN(Number(costPrice)) ? Number(costPrice) : null;
     const numDiscountPrice = discountPrice !== undefined && discountPrice !== null && !isNaN(Number(discountPrice)) ? Number(discountPrice) : null;
-    const numStock = stock !== undefined && stock !== null && !isNaN(Number(stock)) ? Number(stock) : 50;
+    const numStock = stock !== undefined && stock !== null && !isNaN(Number(stock)) ? Math.max(0, parseInt(stock)) : 50;
+
+    const finalSku = sku || req.body.productCode || `GG-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
 
     let variantCreateList = [];
     if (variants && Array.isArray(variants) && variants.length > 0) {
@@ -1332,11 +1460,11 @@ router.post("/products", authenticateJWT as any, requireRole(["SuperAdmin", "Man
         price: v.price !== undefined && v.price !== null && !isNaN(Number(v.price)) ? parseFloat(v.price) : numPrice,
         discountPrice: v.discountPrice ? parseFloat(v.discountPrice) : numDiscountPrice,
         costPrice: v.costPrice ? parseFloat(v.costPrice) : numCostPrice,
-        stock: v.stock !== undefined && v.stock !== null && !isNaN(Number(v.stock)) ? parseInt(v.stock) : numStock,
+        stock: v.stock !== undefined && v.stock !== null && !isNaN(Number(v.stock)) ? Math.max(0, parseInt(v.stock)) : numStock,
         shadeColor: v.shadeColor || null,
         sizeValue: v.sizeValue || null,
         imageUrl: v.imageUrl || null,
-        sku: v.sku || `SKU-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`
+        sku: v.sku || `${finalSku}-${idx + 1}`
       }));
     } else {
       if (numPrice <= 0 && (!variants || variants.length === 0)) {
@@ -1349,34 +1477,53 @@ router.post("/products", authenticateJWT as any, requireRole(["SuperAdmin", "Man
         discountPrice: numDiscountPrice,
         costPrice: numCostPrice,
         stock: numStock,
-        sku: `SKU-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`
+        sku: finalSku
       }];
     }
 
     const docRef = db.collection("products").doc();
     const cleanSlug = req.body.slug ? generateSlug(req.body.slug) : generateSlug(name);
     const primaryImgUrl = imageUrl || variantCreateList[0]?.imageUrl || "/placeholder-product.svg";
+
+    const regularP = variantCreateList[0]?.price || numPrice;
+    const saleP = variantCreateList[0]?.discountPrice !== undefined ? variantCreateList[0]?.discountPrice : numDiscountPrice;
+    const discountPercent = regularP > 0 && saleP !== null && regularP > saleP ? Math.round(((regularP - saleP) / regularP) * 100) : 0;
+
     const product = {
       name,
       slug: cleanSlug,
+      sku: finalSku,
+      shortDescription: shortDescription || null,
       description: description || "",
+      ingredients: ingredients || null,
+      howToUse: howToUse || null,
+      skinType: skinType || null,
+      countryOfOrigin: countryOfOrigin || null,
+      volume: volume || null,
+      benefits: benefits || null,
       brandId: finalBrandId,
       brand: brandJson,
       categoryId: finalCategoryId,
       subcategoryId: finalSubcategoryId,
       category: categoryJson,
       subcategory: subcategoryJson,
-      price: variantCreateList[0]?.price || numPrice,
-      discountPrice: variantCreateList[0]?.discountPrice !== undefined ? variantCreateList[0]?.discountPrice : numDiscountPrice,
+      price: regularP,
+      discountPrice: saleP,
+      discountPercent,
       costPrice: variantCreateList[0]?.costPrice !== undefined ? variantCreateList[0]?.costPrice : numCostPrice,
       stock: variantCreateList[0]?.stock !== undefined ? variantCreateList[0]?.stock : numStock,
+      lowStockThreshold: lowStockThreshold !== undefined ? Math.max(0, Number(lowStockThreshold)) : 5,
       imageUrl: primaryImgUrl,
       imageUrl2: imageUrl2 || null,
       imageUrl3: imageUrl3 || null,
       imageUrl4: imageUrl4 || null,
-      status: "Active",
-      isActive: true,
-      inStock: true,
+      status: status || "Active",
+      isActive: status ? status === "Active" : true,
+      isFeatured: Boolean(isFeatured),
+      isNewArrival: Boolean(isNewArrival),
+      isBestSeller: Boolean(isBestSeller),
+      tags: tags || "Cruelty-free, Authentic",
+      inStock: (variantCreateList[0]?.stock !== undefined ? variantCreateList[0]?.stock : numStock) > 0,
       metaTitle: metaTitle || null,
       metaDescription: metaDescription || null,
       metaKeywords: metaKeywords || null,
@@ -1416,17 +1563,37 @@ router.post("/products", authenticateJWT as any, requireRole(["SuperAdmin", "Man
         data: {
           id: docRef.id,
           name: product.name,
-          slug: product.slug,
           description: product.description,
-          price: product.price,
-          discountPrice: product.discountPrice,
-          stock: product.stock,
-          imageUrl: product.imageUrl,
+          ingredients: product.ingredients,
+          howToUse: product.howToUse,
           brandId: product.brandId,
           categoryId: product.categoryId,
-          status: product.status || "Active"
+          status: product.status || "Active",
+          metaTitle: product.metaTitle,
+          metaDescription: product.metaDescription,
+          metaKeywords: product.metaKeywords,
+          campaignName: product.campaignName,
         }
       }).catch(() => null);
+
+      if (variantCreateList.length > 0) {
+        await prisma.variant.createMany({
+          data: variantCreateList.map(v => ({
+            id: v.id,
+            productId: docRef.id,
+            name: v.name,
+            shadeColor: v.shadeColor || null,
+            sizeValue: v.sizeValue || null,
+            price: v.price,
+            discountPrice: v.discountPrice || null,
+            costPrice: v.costPrice || null,
+            stock: v.stock,
+            sku: v.sku,
+            imageUrl: v.imageUrl || null
+          })),
+          skipDuplicates: true
+        }).catch(() => null);
+      }
     } catch (_) {}
 
     clearProductsCache();
@@ -1443,7 +1610,40 @@ router.post("/products", authenticateJWT as any, requireRole(["SuperAdmin", "Man
 const updateProductHandler = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, description, brandId, categoryId, subcategoryId, imageUrl, imageUrl2, imageUrl3, imageUrl4, price, discountPrice, costPrice, stock, metaTitle, metaDescription, metaKeywords, campaignName, variants } = req.body;
+    const {
+      name,
+      description,
+      shortDescription,
+      ingredients,
+      howToUse,
+      skinType,
+      countryOfOrigin,
+      volume,
+      benefits,
+      brandId,
+      categoryId,
+      subcategoryId,
+      imageUrl,
+      imageUrl2,
+      imageUrl3,
+      imageUrl4,
+      price,
+      discountPrice,
+      costPrice,
+      stock,
+      metaTitle,
+      metaDescription,
+      metaKeywords,
+      campaignName,
+      status,
+      isFeatured,
+      isNewArrival,
+      isBestSeller,
+      sku,
+      lowStockThreshold,
+      tags,
+      variants
+    } = req.body;
 
     const productDoc = await db.collection("products").doc(id as string).get();
     if (!productDoc.exists) {
@@ -1451,6 +1651,48 @@ const updateProductHandler = async (req: Request, res: Response) => {
     }
 
     const currentProduct = productDoc.data() as any;
+
+    // Input Validation: non-negative numbers
+    if (name !== undefined && (typeof name !== "string" || !name.trim())) {
+      return res.status(400).json({ error: "Product name cannot be empty" });
+    }
+    if (price !== undefined && price !== null && (isNaN(Number(price)) || Number(price) < 0)) {
+      return res.status(400).json({ error: "Price must be a valid non-negative number" });
+    }
+    if (costPrice !== undefined && costPrice !== null && (isNaN(Number(costPrice)) || Number(costPrice) < 0)) {
+      return res.status(400).json({ error: "Cost price must be a valid non-negative number" });
+    }
+    if (discountPrice !== undefined && discountPrice !== null) {
+      if (isNaN(Number(discountPrice)) || Number(discountPrice) < 0) {
+        return res.status(400).json({ error: "Discount price must be a valid non-negative number" });
+      }
+      const effectivePrice = price !== undefined ? Number(price) : Number(currentProduct.price || 0);
+      if (Number(discountPrice) > effectivePrice) {
+        return res.status(400).json({ error: "Discount price cannot be greater than regular price" });
+      }
+    }
+    if (stock !== undefined && stock !== null && (isNaN(Number(stock)) || Number(stock) < 0)) {
+      return res.status(400).json({ error: "Stock must be a valid non-negative integer" });
+    }
+    if (lowStockThreshold !== undefined && lowStockThreshold !== null && (isNaN(Number(lowStockThreshold)) || Number(lowStockThreshold) < 0)) {
+      return res.status(400).json({ error: "Low stock threshold must be a valid non-negative number" });
+    }
+    if (variants && Array.isArray(variants)) {
+      for (const v of variants) {
+        if (v.price !== undefined && v.price !== null && (isNaN(Number(v.price)) || Number(v.price) < 0)) {
+          return res.status(400).json({ error: `Variant "${v.name || 'item'}" price must be non-negative` });
+        }
+        if (v.costPrice !== undefined && v.costPrice !== null && (isNaN(Number(v.costPrice)) || Number(v.costPrice) < 0)) {
+          return res.status(400).json({ error: `Variant "${v.name || 'item'}" cost price must be non-negative` });
+        }
+        if (v.discountPrice !== undefined && v.discountPrice !== null && (isNaN(Number(v.discountPrice)) || Number(v.discountPrice) < 0)) {
+          return res.status(400).json({ error: `Variant "${v.name || 'item'}" discount price must be non-negative` });
+        }
+        if (v.stock !== undefined && v.stock !== null && (isNaN(Number(v.stock)) || Number(v.stock) < 0)) {
+          return res.status(400).json({ error: `Variant "${v.name || 'item'}" stock must be non-negative` });
+        }
+      }
+    }
 
     let brandJson = currentProduct.brand;
     let finalBrandId = currentProduct.brandId;
@@ -1553,11 +1795,23 @@ const updateProductHandler = async (req: Request, res: Response) => {
       ? generateSlug(req.body.slug) 
       : (name ? generateSlug(name) : (currentProduct.slug || generateSlug(currentProduct.name || id)));
 
+    const regularP = updatedVariants[0]?.price || numPrice;
+    const saleP = updatedVariants[0]?.discountPrice !== undefined ? updatedVariants[0]?.discountPrice : numDiscountPrice;
+    const discountPercent = regularP > 0 && saleP !== null && regularP > saleP ? Math.round(((regularP - saleP) / regularP) * 100) : (currentProduct.discountPercent || 0);
+
     const updatedProduct = {
       ...currentProduct,
       name: name !== undefined ? name : currentProduct.name,
       slug: cleanSlug,
+      sku: sku !== undefined ? sku : (currentProduct.sku || `GG-${id}`),
+      shortDescription: shortDescription !== undefined ? shortDescription : currentProduct.shortDescription,
       description: description !== undefined ? description : currentProduct.description,
+      ingredients: ingredients !== undefined ? ingredients : currentProduct.ingredients,
+      howToUse: howToUse !== undefined ? howToUse : currentProduct.howToUse,
+      skinType: skinType !== undefined ? skinType : currentProduct.skinType,
+      countryOfOrigin: countryOfOrigin !== undefined ? countryOfOrigin : currentProduct.countryOfOrigin,
+      volume: volume !== undefined ? volume : currentProduct.volume,
+      benefits: benefits !== undefined ? benefits : currentProduct.benefits,
       brandId: finalBrandId,
       brand: brandJson,
       categoryId: finalCategoryId,
@@ -1570,17 +1824,23 @@ const updateProductHandler = async (req: Request, res: Response) => {
       campaignName: campaignName !== undefined ? campaignName : currentProduct.campaignName,
       status: req.body.status || currentProduct.status || "Active",
       isActive: req.body.isActive !== undefined ? Boolean(req.body.isActive) : (currentProduct.isActive !== undefined ? currentProduct.isActive : true),
-      inStock: req.body.inStock !== undefined ? Boolean(req.body.inStock) : (currentProduct.inStock !== undefined ? currentProduct.inStock : true),
+      isFeatured: isFeatured !== undefined ? Boolean(isFeatured) : Boolean(currentProduct.isFeatured),
+      isNewArrival: isNewArrival !== undefined ? Boolean(isNewArrival) : Boolean(currentProduct.isNewArrival),
+      isBestSeller: isBestSeller !== undefined ? Boolean(isBestSeller) : Boolean(currentProduct.isBestSeller),
+      tags: tags !== undefined ? tags : (currentProduct.tags || "Cruelty-free, Authentic"),
+      inStock: (updatedVariants[0]?.stock !== undefined ? updatedVariants[0]?.stock : numStock) > 0,
+      lowStockThreshold: lowStockThreshold !== undefined ? Math.max(0, Number(lowStockThreshold)) : (currentProduct.lowStockThreshold || 5),
       imageUrl: primaryUrl || currentProduct.imageUrl || "/placeholder-product.svg",
       imageUrl2: finalImg2 || null,
       imageUrl3: finalImg3 || null,
       imageUrl4: finalImg4 || null,
       images: updatedImages,
       variants: updatedVariants,
-      price: numPrice,
-      discountPrice: numDiscountPrice,
-      costPrice: numCostPrice,
-      stock: numStock,
+      price: regularP,
+      discountPrice: saleP,
+      discountPercent,
+      costPrice: updatedVariants[0]?.costPrice !== undefined ? updatedVariants[0]?.costPrice : numCostPrice,
+      stock: updatedVariants[0]?.stock !== undefined ? updatedVariants[0]?.stock : numStock,
       updatedAt: new Date().toISOString(),
     };
 
@@ -1595,25 +1855,37 @@ const updateProductHandler = async (req: Request, res: Response) => {
           name: updatedProduct.name,
           slug: updatedProduct.slug,
           description: updatedProduct.description,
+          ingredients: updatedProduct.ingredients || null,
+          howToUse: updatedProduct.howToUse || null,
           price: updatedProduct.price,
           discountPrice: updatedProduct.discountPrice,
           stock: updatedProduct.stock,
           imageUrl: updatedProduct.imageUrl,
           brandId: updatedProduct.brandId,
           categoryId: updatedProduct.categoryId,
-          status: updatedProduct.status || "Active"
+          status: updatedProduct.status || "Active",
+          metaTitle: updatedProduct.metaTitle,
+          metaDescription: updatedProduct.metaDescription,
+          metaKeywords: updatedProduct.metaKeywords,
+          campaignName: updatedProduct.campaignName,
         },
         update: {
           name: updatedProduct.name,
           slug: updatedProduct.slug,
           description: updatedProduct.description,
+          ingredients: updatedProduct.ingredients || null,
+          howToUse: updatedProduct.howToUse || null,
           price: updatedProduct.price,
           discountPrice: updatedProduct.discountPrice,
           stock: updatedProduct.stock,
           imageUrl: updatedProduct.imageUrl,
           brandId: updatedProduct.brandId,
           categoryId: updatedProduct.categoryId,
-          status: updatedProduct.status || "Active"
+          status: updatedProduct.status || "Active",
+          metaTitle: updatedProduct.metaTitle,
+          metaDescription: updatedProduct.metaDescription,
+          metaKeywords: updatedProduct.metaKeywords,
+          campaignName: updatedProduct.campaignName,
         }
       }).catch(() => null);
     } catch (_) {}
@@ -1628,10 +1900,10 @@ const updateProductHandler = async (req: Request, res: Response) => {
   }
 };
 
-router.put("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin", "Salesman"]) as any, updateProductHandler);
-router.patch("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin", "Salesman"]) as any, updateProductHandler);
-router.put("/admin/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin", "Salesman"]) as any, updateProductHandler);
-router.patch("/admin/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin", "Salesman"]) as any, updateProductHandler);
+router.put("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, updateProductHandler);
+router.patch("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, updateProductHandler);
+router.put("/admin/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, updateProductHandler);
+router.patch("/admin/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, updateProductHandler);
 
 // DELETE /api/products/:id & /api/admin/products/:id (Admin only - Delete product & clean uploaded images)
 const deleteProductHandler = async (req: Request, res: Response) => {
@@ -1709,8 +1981,8 @@ const deleteProductHandler = async (req: Request, res: Response) => {
   }
 };
 
-router.delete("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin", "Salesman"]) as any, deleteProductHandler);
-router.delete("/admin/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin", "Salesman"]) as any, deleteProductHandler);
+router.delete("/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, deleteProductHandler);
+router.delete("/admin/products/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, deleteProductHandler);
 
 // POST /api/products/bulk-delete (Admin only)
 const bulkDeleteProductsHandler = async (req: Request, res: Response) => {

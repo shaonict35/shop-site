@@ -81,12 +81,140 @@ const loadFrontendHeroBanners = () => {
   return [];
 };
 
+// Helper to load cached homepage products directly from localStorage
+const loadCachedProducts = (): Product[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("gg_cached_homepage_products");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) { }
+  return [];
+};
+
+// Helper to load cached categories from localStorage
+const loadCachedCategories = (): any[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("gg_cached_categories");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) { }
+  return [];
+};
+
+// Helper to load cached brands from localStorage
+const loadCachedBrands = (): any[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("gg_cached_brands");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) { }
+  return [];
+};
+
+// Helper to load initial homepage banners directly from master + localStorage
+const loadInitialHomeBanners = () => {
+  const master = Array.isArray(MASTER_HOMEPAGE_BANNERS) ? MASTER_HOMEPAGE_BANNERS : [];
+  if (typeof window === "undefined") return master;
+  try {
+    const deletedRaw = localStorage.getItem("gg_deleted_banner_ids");
+    const deletedIds: string[] = deletedRaw ? JSON.parse(deletedRaw) : [];
+    let storedBanners: any[] = [];
+    const storedBannersRaw = localStorage.getItem("gg_frontend_home_banners") || localStorage.getItem("gg_synced_homepage_banners");
+    if (storedBannersRaw) {
+      try {
+        const parsed = JSON.parse(storedBannersRaw);
+        if (Array.isArray(parsed) && parsed.length > 0) storedBanners = parsed;
+      } catch (e) { }
+    }
+
+    const map = new Map();
+    master.forEach((item) => {
+      const isDeleted = deletedIds.includes(item.id) || deletedIds.includes(item.page);
+      map.set(item.id, {
+        ...item,
+        imageUrl: isDeleted ? "" : item.imageUrl
+      });
+    });
+
+    storedBanners.forEach((b: any) => {
+      if (!b || !b.id) return;
+      const isDeleted = deletedIds.includes(b.id) || (b.page && deletedIds.includes(b.page));
+      if (map.has(b.id)) {
+        const existing = map.get(b.id);
+        map.set(b.id, {
+          ...existing,
+          ...b,
+          imageUrl: isDeleted ? "" : (b.imageUrl ?? existing.imageUrl)
+        });
+      } else {
+        if (!isDeleted) map.set(b.id, b);
+      }
+    });
+
+    return Array.from(map.values());
+  } catch (e) {
+    return master;
+  }
+};
+
+function ProductSectionSkeleton({ title }: { title: string }) {
+  return (
+    <section style={{ margin: "30px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
+      <div style={{ position: "relative", marginBottom: "20px" }}>
+        <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", color: "#000", margin: 0 }}>
+          {title}
+        </h2>
+      </div>
+      <div className="homepage-product-grid mobile-limit-2">
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            style={{
+              backgroundColor: "#ffffff",
+              borderRadius: "12px",
+              border: "1px solid #f1f5f9",
+              minHeight: "360px",
+              display: "flex",
+              flexDirection: "column",
+              padding: "16px",
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                width: "100%",
+                height: "200px",
+                backgroundColor: "#f8fafc",
+                borderRadius: "8px",
+                marginBottom: "16px",
+              }}
+            />
+            <div style={{ height: "14px", width: "80%", backgroundColor: "#f1f5f9", borderRadius: "4px", margin: "0 auto 10px auto" }} />
+            <div style={{ height: "12px", width: "40%", backgroundColor: "#f1f5f9", borderRadius: "4px", margin: "0 auto 12px auto" }} />
+            <div style={{ height: "16px", width: "50%", backgroundColor: "#f1f5f9", borderRadius: "4px", margin: "0 auto" }} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function Home() {
   const { addToCart, wishlist, toggleWishlist } = useApp();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
   const [dynamicSlides, setDynamicSlides] = useState<any[]>([]);
   const [homepageBanners, setHomepageBanners] = useState<any[]>(() => {
     return Array.isArray(MASTER_HOMEPAGE_BANNERS) ? MASTER_HOMEPAGE_BANNERS : [];
@@ -145,6 +273,15 @@ export default function Home() {
       if (cleanTerm.startsWith("category")) {
         const sub = cleanTerm.replace("category", "");
         if (cleanId === `catcard${sub}` || cleanId === `cat${sub}` || cleanP === `category${sub}`) return true;
+
+        // Enhanced Semantic Category Matching (Fixes empty cards for Cosmetics, Skin Care, Bath & Body, Fregnance)
+        if ((sub === "skincare" || sub === "skin") && (cleanId.includes("skin") || cleanP.includes("skin"))) return true;
+        if ((sub === "cosmetics" || sub === "makeup") && (cleanId.includes("makeup") || cleanP.includes("makeup") || cleanId.includes("cosmetic") || cleanP.includes("cosmetic"))) return true;
+        if ((sub === "bathandbody" || sub === "bathbody" || sub === "personalcare") && (cleanId.includes("personal") || cleanP.includes("personal") || cleanId.includes("bath") || cleanP.includes("bath"))) return true;
+        if ((sub === "fragrance" || sub === "fregnance" || sub === "perfume") && (cleanId.includes("fragran") || cleanP.includes("fragran") || cleanId.includes("fregnan") || cleanP.includes("fregnan"))) return true;
+        if ((sub === "haircare" || sub === "hair") && (cleanId.includes("hair") || cleanP.includes("hair"))) return true;
+        if ((sub === "mombaby" || sub === "mombabycare") && (cleanId.includes("mom") || cleanP.includes("mom"))) return true;
+        if (sub.includes("undergarment") && (cleanId.includes("undergarment") || cleanP.includes("undergarment"))) return true;
       }
       // Concerns
       if (cleanTerm.startsWith("concern")) {
@@ -227,6 +364,20 @@ export default function Home() {
     if (local.length > 0) {
       setDynamicSlides(local);
     }
+
+    // Instantly hydrate cached products, categories, and brands on client mount
+    const cachedProds = loadCachedProducts();
+    if (cachedProds.length > 0) {
+      setProducts(cachedProds);
+    } else {
+      setLoading(true);
+    }
+
+    const cachedCats = loadCachedCategories();
+    if (cachedCats.length > 0) setCategories(cachedCats);
+
+    const cachedBr = loadCachedBrands();
+    if (cachedBr.length > 0) setBrands(cachedBr);
     if (typeof window !== "undefined") {
       idbGet("gg_frontend_hero_banners").then((stored) => {
         if (Array.isArray(stored) && stored.length > 0) {
@@ -234,7 +385,7 @@ export default function Home() {
           const deletedIds: string[] = deletedRaw ? JSON.parse(deletedRaw) : [];
           const active = stored.filter((b: any) => b && !deletedIds.includes(b.id) && b.isActive !== false);
           if (active.length > 0) {
-            setDynamicSlides(active.map((b: any, idx: number) => {
+            const mapped = active.map((b: any, idx: number) => {
               const rawUrl = b.mediaUrl || b.imageUrl || b.url || b.img;
               const resolvedUrl = safeImageUrl(rawUrl);
               return {
@@ -248,7 +399,11 @@ export default function Home() {
                 tabletImg: b.tabletImageUrl || resolvedUrl,
                 link: b.ctaLink || b.linkUrl || b.link || "/shop"
               };
-            }));
+            });
+            setDynamicSlides((prev) => {
+              if (JSON.stringify(prev) === JSON.stringify(mapped)) return prev;
+              return mapped;
+            });
           }
         }
       });
@@ -322,7 +477,7 @@ export default function Home() {
           try {
             const parsed = JSON.parse(storedBannersRaw);
             if (Array.isArray(parsed) && parsed.length > 0) storedBanners = parsed;
-          } catch (e) {}
+          } catch (e) { }
         }
         if (storedBanners.length === 0) {
           const cachedRaw = localStorage.getItem("gg_synced_homepage_banners");
@@ -330,7 +485,7 @@ export default function Home() {
             try {
               const parsed = JSON.parse(cachedRaw);
               if (Array.isArray(parsed) && parsed.length > 0) storedBanners = parsed;
-            } catch (e) {}
+            } catch (e) { }
           }
         }
 
@@ -356,7 +511,7 @@ export default function Home() {
                 }
               });
             }
-          } catch (e) {}
+          } catch (e) { }
         }
 
         const map = new Map();
@@ -483,15 +638,17 @@ export default function Home() {
 
         if (Array.isArray(categoriesRes) && categoriesRes.length > 0) {
           setCategories(categoriesRes);
+          try { localStorage.setItem("gg_cached_categories", JSON.stringify(categoriesRes)); } catch (e) { }
         }
         if (Array.isArray(brandsRes) && brandsRes.length > 0) {
           setBrands(brandsRes);
+          try { localStorage.setItem("gg_cached_brands", JSON.stringify(brandsRes)); } catch (e) { }
         }
 
         // Hero banners strictly load from frontend LocalStorage (no backend banner fetch)
         const localHeroSlides = loadFrontendHeroBanners();
         if (localHeroSlides.length > 0) {
-          setDynamicSlides(localHeroSlides);
+          setDynamicSlides((prev) => (JSON.stringify(prev) === JSON.stringify(localHeroSlides) ? prev : localHeroSlides));
         }
 
         const notifRes = await fetchWithCache(`${API_BASE}/notifications/active?t=${timestamp}`, true).catch(() => null);
@@ -511,8 +668,18 @@ export default function Home() {
     fetchMetadata(true);
 
     let socket: any = null;
+    let handlePageHide: any = null;
+    let handlePageShow: any = null;
+    let handleVisibilityChange: any = null;
     try {
-      socket = io(API_ROOT, { transports: ["websocket", "polling"], timeout: 6000 });
+      socket = io(API_ROOT, {
+        transports: ["websocket", "polling"],
+        timeout: 6000,
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 2000,
+        reconnectionDelayMax: 10000,
+      });
       socket.on("homepage_sections:updated", () => {
         fetchMetadata(true);
       });
@@ -522,13 +689,40 @@ export default function Home() {
       socket.on("content_updated", () => {
         fetchMetadata(true);
       });
-    } catch (e) {}
+
+      // BFCache graceful lifecycle handling
+      handlePageHide = () => {
+        try {
+          if (socket) socket.disconnect();
+        } catch (_) { }
+      };
+      handlePageShow = (e: PageTransitionEvent) => {
+        try {
+          if (e.persisted && socket && !socket.connected) {
+            socket.connect();
+          }
+        } catch (_) { }
+      };
+      handleVisibilityChange = () => {
+        try {
+          if (document.visibilityState === "visible" && socket && !socket.connected) {
+            socket.connect();
+          }
+        } catch (_) { }
+      };
+      window.addEventListener("pagehide", handlePageHide);
+      window.addEventListener("pageshow", handlePageShow);
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+    } catch (e) { }
 
     const unsub = subscribeToDataSync(() => fetchMetadata(true));
 
     return () => {
       window.removeEventListener("gg_home_banners_updated", applyFrontendBanners);
       window.removeEventListener("storage", applyFrontendBanners);
+      if (handlePageHide) window.removeEventListener("pagehide", handlePageHide);
+      if (handlePageShow) window.removeEventListener("pageshow", handlePageShow);
+      if (handleVisibilityChange) document.removeEventListener("visibilitychange", handleVisibilityChange);
       unsub();
       if (socket) socket.disconnect();
     };
@@ -547,7 +741,13 @@ export default function Home() {
         if (sortOption) url += `sort=${sortOption}&`;
 
         const data = await fetchWithCache(url, true);
-        setProducts(Array.isArray(data) ? data : []);
+        const valid = Array.isArray(data) ? data : [];
+        setProducts(valid);
+        if (typeof window !== "undefined" && valid.length > 0 && !activeCategory && !activeBrand && !searchQuery) {
+          try {
+            localStorage.setItem("gg_cached_homepage_products", JSON.stringify(valid.slice(0, 80)));
+          } catch (e) { }
+        }
       } catch (e) {
         console.error("Error loading products", e);
       } finally {
@@ -864,7 +1064,7 @@ export default function Home() {
         })()}
 
         {/* NEW ARRIVALS & TRENDING PRODUCTS (Live from database) */}
-        {products && products.length > 0 && (
+        {products && products.length > 0 ? (
           <section style={{ margin: "25px 0 35px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
             <div style={{ position: "relative", marginBottom: "20px" }}>
               <h2 style={{ fontSize: "14px", fontWeight: "800", textAlign: "center", textTransform: "uppercase", letterSpacing: "1.5px", color: "#000", margin: 0 }}>
@@ -956,7 +1156,9 @@ export default function Home() {
               })}
             </div>
           </section>
-        )}
+        ) : isClientMounted && loading ? (
+          <ProductSectionSkeleton title="NEW ARRIVALS & TRENDING" />
+        ) : null}
 
 
 
@@ -966,7 +1168,10 @@ export default function Home() {
             .filter(p => p.category?.name?.toLowerCase().includes("clearance") || p.campaignName?.toLowerCase().includes("clearance") || p.name?.toLowerCase().includes("clearance"))
             .slice(0, 4);
 
-          if (clearanceProducts.length === 0) return null;
+          if (clearanceProducts.length === 0) {
+            if (isClientMounted && loading) return <ProductSectionSkeleton title="CLEARANCE SALE" />;
+            return null;
+          }
 
           return (
             <section style={{ margin: "30px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
@@ -1150,7 +1355,10 @@ export default function Home() {
             .filter(p => p.category?.name?.toLowerCase().includes("skin") || p.name?.toLowerCase().includes("serum") || p.name?.toLowerCase().includes("cream") || p.name?.toLowerCase().includes("sunscreen") || p.name?.toLowerCase().includes("moisturizer") || p.name?.toLowerCase().includes("toner") || p.name?.toLowerCase().includes("face wash"))
             .slice(0, 4);
 
-          if (skincareProducts.length === 0) return null;
+          if (skincareProducts.length === 0) {
+            if (isClientMounted && loading) return <ProductSectionSkeleton title="SKIN CARE" />;
+            return null;
+          }
 
           return (
             <section style={{ margin: "40px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
@@ -1334,7 +1542,10 @@ export default function Home() {
             .filter(p => p.category?.name?.toLowerCase().includes("bogo") || p.name?.toLowerCase().includes("bogo") || p.name?.toLowerCase().includes("buy 1") || p.campaignName === "BOGO")
             .slice(0, 4);
 
-          if (bogoProducts.length === 0) return null;
+          if (bogoProducts.length === 0) {
+            if (isClientMounted && loading) return <ProductSectionSkeleton title="BOGO" />;
+            return null;
+          }
 
           return (
             <section style={{ margin: "40px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
@@ -1433,7 +1644,10 @@ export default function Home() {
             .filter(p => (p.category?.name?.toLowerCase().includes("makeup") && !p.category?.name?.toLowerCase().includes("tool")) || p.name?.toLowerCase().includes("lipstick") || p.name?.toLowerCase().includes("mascara") || p.name?.toLowerCase().includes("powder") || p.name?.toLowerCase().includes("foundation") || p.name?.toLowerCase().includes("primer") || p.name?.toLowerCase().includes("gloss"))
             .slice(0, 4);
 
-          if (makeupProducts.length === 0) return null;
+          if (makeupProducts.length === 0) {
+            if (isClientMounted && loading) return <ProductSectionSkeleton title="MAKEUP" />;
+            return null;
+          }
 
           return (
             <section style={{ margin: "40px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
@@ -1622,7 +1836,10 @@ export default function Home() {
             })
             .slice(0, 4);
 
-          if (comboProducts.length === 0) return null;
+          if (comboProducts.length === 0) {
+            if (isClientMounted && loading) return <ProductSectionSkeleton title="PERFECT MATCH WITH COMBO" />;
+            return null;
+          }
 
           return (
             <section style={{ margin: "40px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
@@ -1721,7 +1938,10 @@ export default function Home() {
             .filter(p => p.category?.name?.toLowerCase().includes("tool") || p.name?.toLowerCase().includes("brush") || p.name?.toLowerCase().includes("sponge") || p.name?.toLowerCase().includes("curler") || p.name?.toLowerCase().includes("applicator"))
             .slice(0, 4);
 
-          if (toolProducts.length === 0) return null;
+          if (toolProducts.length === 0) {
+            if (isClientMounted && loading) return <ProductSectionSkeleton title="MAKEUP TOOLS" />;
+            return null;
+          }
 
           return (
             <section style={{ margin: "40px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
@@ -1816,24 +2036,17 @@ export default function Home() {
 
         {/* SHOP BEAUTY PRODUCTS BY CATEGORY Section */}
         {(() => {
-          const displayCats = (categories && categories.length > 0 ? categories.filter((c: any) => !c.parentId).slice(0, 8) : [
-            { name: "Makeup", slug: "makeup" },
-            { name: "Skin", slug: "skin" },
-            { name: "Hair", slug: "hair" },
-            { name: "Personal Care", slug: "personal-care" },
-            { name: "Mom & Baby", slug: "mom-baby" },
-            { name: "Fragrance", slug: "fragrance" },
-            { name: "Undergarments", slug: "undergarments" },
-            { name: "Combo", slug: "combo" }
-          ]).map((item: any) => {
-            const fromDb = categories.find((c: any) => c.name?.toLowerCase().trim() === item.name.toLowerCase() || c.slug === item.slug) || item;
-            return {
-              id: fromDb?.id || `cat-${item.slug}`,
-              name: fromDb?.name || item.name,
-              slug: fromDb?.slug || item.slug,
-              imageUrl: safeImageUrl(fromDb?.imageUrl || fromDb?.image, "/placeholder-product.svg")
-            };
-          });
+          // 8 Canonical Categories aligned with Admin Panel CARD_SLOTS & Master Banners
+          const CANONICAL_CATEGORY_SLOTS = [
+            { slotId: "cat-card-makeup", name: "Makeup", slug: "makeup", pageName: "Category: Makeup", aliases: ["makeup", "cosmetics", "cat-card-makeup", "cat-makeup"] },
+            { slotId: "cat-card-skin", name: "Skin Care", slug: "skincare", pageName: "Category: Skin", aliases: ["skin", "skincare", "skin care", "cat-card-skin", "cat-skin"] },
+            { slotId: "cat-card-hair", name: "Hair Care", slug: "haircare", pageName: "Category: Hair", aliases: ["hair", "haircare", "hair care", "cat-card-hair", "cat-hair"] },
+            { slotId: "cat-card-personal-care", name: "Bath & Body", slug: "personal-care", pageName: "Category: Personal Care", aliases: ["bath", "bath & body", "bath and body", "personal care", "personal-care", "cat-card-personal-care"] },
+            { slotId: "cat-card-mom-baby", name: "Mom & Baby", slug: "mom-baby", pageName: "Category: Mom & Baby", aliases: ["mom", "mom & baby", "mom and baby", "mombaby", "cat-card-mom-baby"] },
+            { slotId: "cat-card-fragrance", name: "Fragrance", slug: "fragrance", pageName: "Category: Fragrance", aliases: ["fragrance", "fregnance", "perfume", "cat-card-fragrance"] },
+            { slotId: "cat-card-undergarments", name: "Undergarments", slug: "undergarments", pageName: "Category: Undergarments", aliases: ["undergarments", "undergarment", "cat-card-undergarments"] },
+            { slotId: "cat-card-combo", name: "Combo Deals", slug: "combo", pageName: "Category: Combo", aliases: ["combo", "combo deals", "combos", "cat-card-combo"] },
+          ];
 
           return (
             <section style={{ margin: "40px 0" }}>
@@ -1841,27 +2054,56 @@ export default function Home() {
                 SHOP BEAUTY PRODUCTS BY CATEGORY
               </h2>
               <div className="categories-grid" suppressHydrationWarning>
-                {displayCats.map((cat: any) => {
-                  const catLink = `/shop?category=${encodeURIComponent(cat.slug)}`;
-                  const bannerInfo = getBannerForPage(`Category: ${cat.name}`, "", cat.name, catLink);
-                  const catImg = bannerInfo.img ? safeImageUrl(bannerInfo.img, "") : "";
+                {CANONICAL_CATEGORY_SLOTS.map((slot) => {
+                  const defaultLink = `/shop?category=${encodeURIComponent(slot.slug)}`;
+                  // Priority 1: Card Links saved in localStorage
+                  let targetLink = cardLinks[slot.slotId] || defaultLink;
+
+                  // Priority 2: Look up banner image from homepageBanners
+                  const bannerInfo = getBannerForPage(slot.pageName, "", slot.name, targetLink);
+                  if (bannerInfo.link && bannerInfo.link !== "#") {
+                    targetLink = bannerInfo.link;
+                  }
+
+                  // Priority 3: Fallback to category image from database if banner not uploaded
+                  let catImg = bannerInfo.img ? safeImageUrl(bannerInfo.img, "") : "";
+                  if (!catImg) {
+                    const matchedCat = categories.find((c: any) => {
+                      const cName = (c.name || "").toLowerCase().trim();
+                      const cSlug = (c.slug || "").toLowerCase().trim();
+                      return slot.aliases.some(a => cName === a || cSlug === a || cName.includes(a));
+                    });
+                    if (matchedCat && (matchedCat.imageUrl || matchedCat.image)) {
+                      catImg = safeImageUrl(matchedCat.imageUrl || matchedCat.image, "");
+                    }
+                  }
+
+                  // If this slot was explicitly deleted, do not show any image
+                  if (deletedBannerIds.length > 0) {
+                    const isDeleted = slot.aliases.some(a => deletedBannerIds.includes(a)) ||
+                      deletedBannerIds.includes(slot.slotId) ||
+                      deletedBannerIds.includes(slot.pageName) ||
+                      deletedBannerIds.includes(slot.name);
+                    if (isDeleted) catImg = "";
+                  }
+
                   return (
                     <Link
-                      key={cat.id || cat.name}
-                      href={bannerInfo.link || catLink}
+                      key={slot.slotId}
+                      href={targetLink}
                       style={{ display: "block", borderRadius: "10px", overflow: "hidden", cursor: "pointer", textDecoration: "none" }}
                       className="promo-card-hover"
                     >
                       {catImg ? (
                         <img
                           src={catImg}
-                          alt={cat.name}
+                          alt={slot.name}
                           style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block", borderRadius: "10px" }}
                         />
                       ) : (
                         <div style={{ width: "100%", aspectRatio: "1 / 1", background: "linear-gradient(135deg, #fdf2f8, #fbcfe8)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", borderRadius: "10px", padding: "10px" }}>
                           <span style={{ fontSize: "28px", marginBottom: "4px" }}>✨</span>
-                          <span style={{ fontSize: "12px", fontWeight: "800", color: "#db2777", textAlign: "center" }}>{cat.name}</span>
+                          <span style={{ fontSize: "12px", fontWeight: "800", color: "#db2777", textAlign: "center" }}>{slot.name}</span>
                         </div>
                       )}
                     </Link>
@@ -1878,7 +2120,10 @@ export default function Home() {
             .filter(p => p.category?.name?.toLowerCase().includes("hair") || p.name?.toLowerCase().includes("hair") || p.name?.toLowerCase().includes("shampoo") || p.name?.toLowerCase().includes("conditioner"))
             .slice(0, 4);
 
-          if (hairProducts.length === 0) return null;
+          if (hairProducts.length === 0) {
+            if (isClientMounted && loading) return <ProductSectionSkeleton title="HAIR CARE" />;
+            return null;
+          }
 
           return (
             <section style={{ margin: "40px 0", backgroundColor: "#ffffff", padding: "10px 0" }}>
@@ -2012,7 +2257,10 @@ export default function Home() {
         {(() => {
           const sorted = [...products].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
           const newArrivals = sorted.slice(0, 4);
-          if (newArrivals.length === 0) return null;
+          if (newArrivals.length === 0) {
+            if (isClientMounted && loading) return <ProductSectionSkeleton title="JUST ARRIVED" />;
+            return null;
+          }
 
           return (
             <section style={{ margin: "35px 0 35px 0" }}>

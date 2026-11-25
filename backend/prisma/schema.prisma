@@ -65,9 +65,20 @@ model Category {
 model Product {
   id              String         @id @default(uuid())
   name            String
+  slug            String?
+  shortDescription String?
   description     String        
   ingredients     String?       
   howToUse        String?       
+  skinType        String?
+  countryOfOrigin String?
+  volume          String?
+  benefits        String?
+  lowStockThreshold Int?         @default(5)
+  isFeatured      Boolean        @default(false)
+  isNewArrival    Boolean        @default(false)
+  isBestSeller    Boolean        @default(false)
+  subcategoryId   String?
   brandId         String
   brand           Brand          @relation(fields: [brandId], references: [id])
   categoryId      String
@@ -86,7 +97,9 @@ model Product {
 
   @@index([brandId])
   @@index([categoryId])
+  @@index([subcategoryId])
   @@index([status])
+  @@index([slug])
   @@index([campaignName])
 }
 

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import db from "../firebase";
+import { authenticateJWT, requireRole } from "../middleware/auth";
 
 const router = Router();
 
@@ -77,7 +78,7 @@ router.get("/notifications", getNotificationsList);
 router.get("/", getNotificationsList);
 
 // POST /api/notifications — Admin: create and broadcast daily notification
-router.post("/notifications", async (req: Request, res: Response) => {
+router.post("/notifications", authenticateJWT as any, requireRole(["SuperAdmin", "Admin", "Manager"]) as any, async (req: Request, res: Response) => {
   try {
     const { title, message, linkUrl, isActive } = req.body;
     if (!title || !message) {
@@ -151,8 +152,8 @@ const patchNotificationHandler = async (req: Request, res: Response) => {
   }
 };
 
-router.patch("/notifications/:id", patchNotificationHandler);
-router.patch("/:id", patchNotificationHandler);
+router.patch("/notifications/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Admin", "Manager"]) as any, patchNotificationHandler);
+router.patch("/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Admin", "Manager"]) as any, patchNotificationHandler);
 
 // DELETE /api/notifications/:id — Admin: delete notification log
 const deleteNotificationHandler = async (req: Request, res: Response) => {
@@ -173,8 +174,8 @@ const deleteNotificationHandler = async (req: Request, res: Response) => {
   }
 };
 
-router.delete("/notifications/:id", deleteNotificationHandler);
-router.delete("/:id", deleteNotificationHandler);
+router.delete("/notifications/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Admin", "Manager"]) as any, deleteNotificationHandler);
+router.delete("/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Admin", "Manager"]) as any, deleteNotificationHandler);
 
 // POST /api/notifications/subscribe-fcm — Client: Subscribe FCM Device Token
 router.post("/notifications/subscribe-fcm", async (req: Request, res: Response) => {
@@ -198,7 +199,7 @@ router.post("/notifications/subscribe-fcm", async (req: Request, res: Response) 
 });
 
 // POST /api/notifications/push — Admin: Trigger Rich Web Push Notification via FCM
-router.post("/notifications/push", async (req: Request, res: Response) => {
+router.post("/notifications/push", authenticateJWT as any, requireRole(["SuperAdmin", "Admin", "Manager"]) as any, async (req: Request, res: Response) => {
   try {
     const { title, message, imageUrl, linkUrl } = req.body;
     if (!title || !message) {

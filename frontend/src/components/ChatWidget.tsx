@@ -14,10 +14,12 @@ interface ChatMessage {
   createdAt?: string;
 }
 
-export default function ChatWidget() {
+export default function ChatWidget({ enabled = true }: { enabled?: boolean }) {
   const pathname = usePathname();
+  const [activeEnabled, setActiveEnabled] = useState(enabled);
   const [isOpen, setIsOpen] = useState(false);
   const [chatId, setChatId] = useState("");
+  const [chatToken, setChatToken] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -30,8 +32,21 @@ export default function ChatWidget() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Initialize Chat ID and User Info
+  // Sync mode with localStorage
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const mode = localStorage.getItem("gg_chat_mode");
+      if (mode === "native") {
+        setActiveEnabled(true);
+      } else if (mode === "tawk") {
+        setActiveEnabled(false);
+      }
+    }
+  }, [enabled]);
+
+  // Initialize Chat ID and User Info + Cryptographic Session Token
+  useEffect(() => {
+    if (!activeEnabled) return;
     if (typeof window !== "undefined") {
       let id = localStorage.getItem("gg_chat_id");
       if (!id) {
@@ -39,6 +54,27 @@ export default function ChatWidget() {
         localStorage.setItem("gg_chat_id", id);
       }
       setChatId(id);
+
+      const savedToken = localStorage.getItem("gg_chat_token") || "";
+      if (savedToken) setChatToken(savedToken);
+
+      // Verify or initialize session token from backend
+      fetch(`${API_BASE}/chat/session`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-chat-token": chatToken || (typeof window !== "undefined" ? localStorage.getItem("gg_chat_token") || "" : "")
+        },
+        body: JSON.stringify({ chatId: id })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data?.chatToken) {
+            localStorage.setItem("gg_chat_token", data.chatToken);
+            setChatToken(data.chatToken);
+          }
+        })
+        .catch(() => { });
 
       const savedName = localStorage.getItem("gg_chat_user_name");
       const savedPhone = localStorage.getItem("gg_chat_user_phone");
@@ -56,10 +92,14 @@ export default function ChatWidget() {
   useEffect(() => {
     if (!chatId || !isOpen || !isRegistered) return;
 
-    // 1. Fetch past conversation history ONCE when opened
+    const currentToken = chatToken || (typeof window !== "undefined" ? localStorage.getItem("gg_chat_token") || "" : "");
+
+    // 1. Fetch past conversation history ONCE when opened with chat authorization token
     const fetchHistory = async () => {
       try {
-        const res = await fetch(`${API_BASE}/chat/history/${chatId}`);
+        const res = await fetch(`${API_BASE}/chat/history/${chatId}`, {
+          headers: { "x-chat-token": currentToken }
+        });
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data)) {
@@ -76,15 +116,25 @@ export default function ChatWidget() {
     let socket: any = null;
     try {
       socket = io(API_ROOT, {
+        auth: { token: currentToken },
         transports: ["websocket", "polling"],
         reconnection: true,
         reconnectionAttempts: 5,
         reconnectionDelay: 2000,
       });
 
+      socket.on("connect", () => {
+        console.log("[Native Support Socket] Customer connected:", socket.id, "Joining conversation room:", chatId);
+      });
+
+      socket.emit("join_chat", { chatId, token: currentToken });
+
+      const normalizeId = (id: string) => String(id || "").replace(/^chat_/, "");
       const handleIncomingMessage = (newMsg: any) => {
         if (!newMsg || !newMsg.message) return;
-        if (newMsg.chatId === chatId) {
+        const msgChatId = newMsg.chatId || "";
+        if (msgChatId === chatId || normalizeId(msgChatId) === normalizeId(chatId)) {
+          console.log("[Native Support] Customer received message:", { id: newMsg.id, chatId: newMsg.chatId, sender: newMsg.sender });
           setMessages((prev) => {
             if (newMsg.id && prev.some((m) => m.id === newMsg.id)) {
               return prev;
@@ -97,6 +147,31 @@ export default function ChatWidget() {
       socket.on("chat:new_message", handleIncomingMessage);
       socket.on("new_chat_message", handleIncomingMessage);
       socket.on("admin_reply", handleIncomingMessage);
+      socket.on("receive_message", handleIncomingMessage);
+
+      // BFCache graceful lifecycle handling
+      const handlePageHide = () => {
+        try {
+          if (socket) socket.disconnect();
+        } catch (_) { }
+      };
+      const handlePageShow = (e: PageTransitionEvent) => {
+        try {
+          if (e.persisted && socket && !socket.connected) {
+            socket.connect();
+          }
+        } catch (_) { }
+      };
+      window.addEventListener("pagehide", handlePageHide);
+      window.addEventListener("pageshow", handlePageShow);
+
+      return () => {
+        window.removeEventListener("pagehide", handlePageHide);
+        window.removeEventListener("pageshow", handlePageShow);
+        if (socket) {
+          socket.disconnect();
+        }
+      };
     } catch (err) {
       console.warn("Socket.io chat connection failed:", err);
     }
@@ -141,7 +216,10 @@ export default function ChatWidget() {
     try {
       await fetch(`${API_BASE}/chat/send`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-chat-token": chatToken || (typeof window !== "undefined" ? localStorage.getItem("gg_chat_token") || "" : "")
+        },
         body: JSON.stringify({
           chatId,
           message: autoReplyText,
@@ -150,7 +228,7 @@ export default function ChatWidget() {
           customerPhone: phone,
         }),
       });
-    } catch (err) {}
+    } catch (err) { }
   };
 
   // Auto-scroll to bottom
@@ -170,6 +248,7 @@ export default function ChatWidget() {
     const msgText = inputValue.trim();
     setInputValue("");
     setIsSending(true);
+    console.log("[Native Support] Customer initiating send for conversation:", chatId);
 
     // Optimistic UI — show message immediately
     const optimisticMsg: ChatMessage = {
@@ -184,7 +263,10 @@ export default function ChatWidget() {
     try {
       const res = await fetch(`${API_BASE}/chat/send`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-chat-token": chatToken || (typeof window !== "undefined" ? localStorage.getItem("gg_chat_token") || "" : "")
+        },
         body: JSON.stringify({
           chatId,
           message: msgText,
@@ -204,6 +286,64 @@ export default function ChatWidget() {
       console.error("Failed to send message", e);
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleSendQuickInquiry = async (question: string, answer: string) => {
+    if (!chatId || isSending) return;
+    const currentToken = chatToken || (typeof window !== "undefined" ? localStorage.getItem("gg_chat_token") || "" : "");
+
+    // 1. Send customer question
+    const customerMsg: ChatMessage = {
+      id: "cust_" + Date.now(),
+      chatId,
+      sender: "Customer",
+      message: question,
+      createdAt: new Date().toISOString(),
+    };
+    // 2. Add automated answer
+    const botMsg: ChatMessage = {
+      id: "bot_" + (Date.now() + 1),
+      chatId,
+      sender: "Admin",
+      message: answer,
+      createdAt: new Date(Date.now() + 500).toISOString(),
+    };
+
+    setMessages((prev) => [...prev, customerMsg, botMsg]);
+
+    try {
+      await fetch(`${API_BASE}/chat/send`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-chat-token": currentToken
+        },
+        body: JSON.stringify({
+          chatId,
+          message: question,
+          sender: "Customer",
+          customerName,
+          customerPhone,
+        }),
+      });
+
+      await fetch(`${API_BASE}/chat/send`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-chat-token": currentToken
+        },
+        body: JSON.stringify({
+          chatId,
+          message: answer,
+          sender: "Admin",
+          customerName,
+          customerPhone,
+        }),
+      });
+    } catch (e) {
+      console.warn("Failed to sync quick inquiry:", e);
     }
   };
 
@@ -233,7 +373,10 @@ export default function ChatWidget() {
       try {
         const res = await fetch(`${API_BASE}/chat/send`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-chat-token": chatToken || (typeof window !== "undefined" ? localStorage.getItem("gg_chat_token") || "" : "")
+          },
           body: JSON.stringify({
             chatId,
             message: base64data,
@@ -263,7 +406,8 @@ export default function ChatWidget() {
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
-  if (pathname?.startsWith("/admin") || pathname?.startsWith("/valobasa")) return null;
+  // Safely prevent duplicate customer-facing chat bubbles while official Tawk.to live chat is active
+  if (!activeEnabled || pathname?.startsWith("/admin") || pathname?.startsWith("/valobasa")) return null;
 
   return (
     <div style={{ position: "fixed", bottom: "20px", right: "20px", zIndex: 9999, fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
@@ -563,6 +707,57 @@ export default function ChatWidget() {
                   );
                 })}
                 <div ref={messagesEndRef} />
+              </div>
+
+              {/* ── Quick Customer Inquiry Chips ── */}
+              <div
+                style={{
+                  padding: "6px 12px",
+                  backgroundColor: "#fff5f8",
+                  borderTop: "1px solid #fed7e2",
+                  display: "flex",
+                  gap: "6px",
+                  overflowX: "auto",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {[
+                  {
+                    q: "🚚 ডেলিভারি চার্জ কত ও সময়?",
+                    a: "🚚 GlowGoodly ডেলিভারি চার্জ ও সময়:\n• ঢাকার ভেতরে: ৭০ টাকা (২৪-৪৮ ঘণ্টা)\n• ঢাকা সাব-এরিয়া (সাভার, গাজীপুর, কেরানীগঞ্জ, নারায়ণগঞ্জ ইত্যাদি): ১০০ টাকা (২-৩ দিন)\n• ঢাকার বাইরে (সকল জেলা): ১৩০ টাকা (৩-৫ দিন)\nসারাদেশে ক্যাশ অন ডেলিভারি (Cash on Delivery) সুবিধা রয়েছে!"
+                  },
+                  {
+                    q: "💯 পণ্যগুলো কি ১০০% আসল?",
+                    a: "জি, শতভাগ নিশ্চিত থাকুন! GlowGoodly-এর প্রতিটি প্রোডাক্ট ১০০% আসল ও অথেন্টিক। আমরা সরাসরি অফিসিয়াল ব্র্যান্ড ও অনুমোদিত গ্লোবাল ডিস্ট্রিবিউটর থেকে পণ্য আমদানি করি।"
+                  },
+                  {
+                    q: "💳 পেমেন্ট পদ্ধতি কি কি?",
+                    a: "আমরা ক্যাশ অন ডেলিভারি (Cash on Delivery) সুবিধা দিচ্ছি—পণ্য হাতে পেয়ে মূল্য পরিশোধ করতে পারবেন। এছাড়াও চাইলে বিকাশ (bKash) ও নগদের মাধ্যমেও পে করতে পারেন।"
+                  },
+                  {
+                    q: "📦 অর্ডার করার নিয়ম কি?",
+                    a: "অর্ডার করতে আপনার নাম, সম্পূর্ণ ঠিকানা (থানা ও জেলা সহ) এবং মোবাইল নম্বরটি লিখে মেসেজ পাঠান। আমাদের টিম দ্রুত আপনার অর্ডারটি কনফার্ম করে দেবে।"
+                  }
+                ].map((chip, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSendQuickInquiry(chip.q, chip.a)}
+                    style={{
+                      padding: "4px 8px",
+                      borderRadius: "12px",
+                      backgroundColor: "#ffffff",
+                      border: "1px solid #f687b3",
+                      color: "#b83280",
+                      fontSize: "11px",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {chip.q}
+                  </button>
+                ))}
               </div>
 
               {/* ── Input Form ── */}

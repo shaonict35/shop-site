@@ -91,14 +91,14 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
     return () => clearInterval(timer);
   }, [isOffersPaused]);
 
-  const rawInitialCover = initialProduct?.images?.find((img: any) => img.isPrimary)?.url 
-    || initialProduct?.images?.[0]?.url 
+  const rawInitialCover = initialProduct?.images?.find((img: any) => img.isPrimary)?.url
+    || initialProduct?.images?.[0]?.url
     || (initialProduct?.variants?.[0] as any)?.imageUrl;
   const initialCoverImg = safeImageUrl(rawInitialCover, "/placeholder-product.svg");
 
   const [activeImage, setActiveImage] = useState(initialCoverImg);
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(initialProduct?.variants?.[0] || null);
-  const [activeTab, setActiveTab] = useState<"desc" | "ingredients" | "howToUse">("desc");
+  const [activeTab, setActiveTab] = useState<"desc" | "ingredients" | "howToUse" | "specs">("desc");
 
   // Review Form States
   const [customerName, setCustomerName] = useState("");
@@ -118,7 +118,7 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
           if (Array.isArray(res) && res.length > 0) {
             serverOffers = res;
           }
-        } catch (e) {}
+        } catch (e) { }
 
         let publicCoupons: any[] = [];
         try {
@@ -134,14 +134,14 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
               discountType: c.discountType === "PERCENTAGE" || c.discountType === "Percentage" ? "percentage" : "fixed"
             }));
           }
-        } catch (e) {}
+        } catch (e) { }
 
         let localOffers: any[] = [];
         if (typeof window !== "undefined") {
           try {
             const raw = localStorage.getItem("glowgoodly_available_offers");
             if (raw) localOffers = JSON.parse(raw);
-          } catch (e) {}
+          } catch (e) { }
         }
 
         const map = new Map<string, any>();
@@ -223,8 +223,8 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
           setRelatedProducts(data.relatedProducts || []);
 
           // Always set Product Main Cover Image as the primary display image when page opens
-          const rawMain = data.product.images?.find((img: any) => img.isPrimary)?.url 
-            || data.product.images?.[0]?.url 
+          const rawMain = data.product.images?.find((img: any) => img.isPrimary)?.url
+            || data.product.images?.[0]?.url
             || (data.product.variants?.[0] as any)?.imageUrl;
           const mainCoverImg = safeImageUrl(rawMain, "/placeholder-product.svg");
 
@@ -254,7 +254,7 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
   useEffect(() => {
     if (product) {
       document.title = `${product.name} | GlowGoodly`;
-      
+
       // Update meta description
       let metaDesc = document.querySelector('meta[name="description"]');
       if (!metaDesc) {
@@ -431,10 +431,10 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
 
   return (
     <>
-<Header />
+      <Header />
 
       <main className="container" style={{ padding: "30px 20px 60px 20px" }}>
-        
+
         {/* Breadcrumbs Navigation Bar */}
         <div style={{ backgroundColor: "#f8fafc", padding: "12px 18px", borderRadius: "10px", border: "1px solid #e2e8f0", fontSize: "13.5px", fontWeight: "600", color: "#64748b", marginBottom: "28px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
           <Link href="/" style={{ color: "#475569", textDecoration: "none" }}>Home</Link>
@@ -460,7 +460,7 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
 
         {/* Product General Layout */}
         <div style={{ display: "flex", gap: "40px", flexWrap: "wrap", marginBottom: "40px" }}>
-          
+
           {/* Images Section */}
           <div style={{ flex: "1.2", minWidth: "300px" }}>
             <div
@@ -482,10 +482,10 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
                 src={activeImage || "/placeholder-product.svg"}
                 alt={product.name}
                 onError={(e) => { e.currentTarget.src = "/placeholder-product.svg"; }}
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                style={{ width: "100%", height: "100%", objectFit: "contain", padding: "16px", backgroundColor: "#ffffff" }}
               />
             </div>
-            
+
             {/* Gallery Thumbnails (All shade pictures side-by-side as highlighted in red boxes) */}
             <div style={{ display: "flex", gap: "10px", overflowX: "auto", paddingBottom: "8px" }}>
               {allGalleryItems.map((item) => {
@@ -513,13 +513,13 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
                       transition: "all 0.2s ease"
                     }}
                   >
-                    <img 
-                      src={item.url || "/placeholder-product.svg"} 
-                      alt="product thumbnail" 
+                    <img
+                      src={item.url || "/placeholder-product.svg"}
+                      alt="product thumbnail"
                       loading="lazy"
                       decoding="async"
                       onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/placeholder-product.svg"; }}
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+                      style={{ width: "100%", height: "100%", objectFit: "contain", padding: "4px", backgroundColor: "#ffffff" }}
                     />
                     {(item.isCover || item.variant) && (
                       <div
@@ -589,7 +589,7 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
                   <span>🎨 Available Shades & Variants:</span>
                   <span style={{ fontSize: "12px", color: "var(--primary)", fontWeight: "700" }}>({product.variants.length} available)</span>
                 </h3>
-                
+
                 {/* Side-by-side flex wrap container */}
                 <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
                   {product.variants.map((v, vIdx) => {
@@ -690,8 +690,8 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
                   disabled={!selectedVariant || selectedVariant.stock === 0 || isAddingToCart}
                   style={{
                     flex: 1,
-                    background: isAddingToCart 
-                      ? "linear-gradient(135deg, #059669, #10b981)" 
+                    background: isAddingToCart
+                      ? "linear-gradient(135deg, #059669, #10b981)"
                       : "linear-gradient(135deg, var(--primary), #ff5e97)",
                     color: "var(--white)",
                     padding: "14px 0",
@@ -708,7 +708,7 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
                 >
                   {isAddingToCart ? "✓ ADDED TO BASKET!" : "🛒 ADD TO BASKET"}
                 </button>
-                
+
                 <button
                   onClick={() => toggleWishlist(product.id)}
                   style={{
@@ -739,41 +739,41 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
                   </svg>
                 </button>
               </div>
-                <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1.5px solid #f1f5f9", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#475569" }}>
-                  <div style={{ display: "flex", gap: "24px" }}>
-                    <span style={{ fontWeight: "700", minWidth: "90px", color: "#334155" }}>SKU</span>
-                    <span style={{ color: "#0f172a", fontWeight: "700" }}>{selectedVariant?.sku || product.variants?.[0]?.sku || `GG-${product.id}`}</span>
-                  </div>
-                  <div style={{ display: "flex", gap: "24px" }}>
-                    <span style={{ fontWeight: "700", minWidth: "90px", color: "#334155" }}>Categories</span>
-                    <span style={{ color: "#0f172a", fontWeight: "700" }}>
-                      {[product.category?.name, product.subcategory, product.childSubcategory].filter(Boolean).join(", ") || "Makeup, Face, Face Primer"}
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", gap: "24px" }}>
-                    <span style={{ fontWeight: "700", minWidth: "90px", color: "#334155" }}>Brands</span>
-                    <span style={{ color: "#e2136e", fontWeight: "800" }}>{product.brand?.name || "GlowGoodly"}</span>
-                  </div>
+              <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1.5px solid #f1f5f9", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#475569" }}>
+                <div style={{ display: "flex", gap: "24px" }}>
+                  <span style={{ fontWeight: "700", minWidth: "90px", color: "#334155" }}>SKU</span>
+                  <span style={{ color: "#0f172a", fontWeight: "700" }}>{selectedVariant?.sku || product.variants?.[0]?.sku || `GG-${product.id}`}</span>
                 </div>
+                <div style={{ display: "flex", gap: "24px" }}>
+                  <span style={{ fontWeight: "700", minWidth: "90px", color: "#334155" }}>Categories</span>
+                  <span style={{ color: "#0f172a", fontWeight: "700" }}>
+                    {[product.category?.name, product.subcategory, product.childSubcategory].filter(Boolean).join(", ") || "Makeup, Face, Face Primer"}
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: "24px" }}>
+                  <span style={{ fontWeight: "700", minWidth: "90px", color: "#334155" }}>Brands</span>
+                  <span style={{ color: "#e2136e", fontWeight: "800" }}>{product.brand?.name || "GlowGoodly"}</span>
+                </div>
+              </div>
 
-                {/* 3 Trust Badges (Matches Image 3) */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginTop: "24px", padding: "16px 12px", backgroundColor: "#f8fafc", borderRadius: "12px", border: "1px solid #e2e8f0", textAlign: "center" }}>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    <span style={{ fontSize: "11px", fontWeight: "800", color: "#334155" }}>100% Genuine Products</span>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-                    <span style={{ fontSize: "11px", fontWeight: "800", color: "#334155" }}>100% Secure Payments</span>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
-                    <span style={{ fontSize: "11px", fontWeight: "800", color: "#334155" }}>Help Center (+8801609013011)</span>
-                  </div>
+              {/* 3 Trust Badges (Matches Image 3) */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginTop: "24px", padding: "16px 12px", backgroundColor: "#f8fafc", borderRadius: "12px", border: "1px solid #e2e8f0", textAlign: "center" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+                  <span style={{ fontSize: "11px", fontWeight: "800", color: "#334155" }}>100% Genuine Products</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
+                  <span style={{ fontSize: "11px", fontWeight: "800", color: "#334155" }}>100% Secure Payments</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6" /><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" /></svg>
+                  <span style={{ fontSize: "11px", fontWeight: "800", color: "#334155" }}>Help Center (+8801609013011)</span>
                 </div>
               </div>
             </div>
           </div>
+        </div>
 
         {/* Frequently Bought Together (Larger) & Available Offers (Compact Square Auto-Slider) */}
         <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: "24px", marginTop: "32px", marginBottom: "36px" }}>
@@ -969,7 +969,7 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
           }}
         >
           {/* Tab headers */}
-          <div style={{ display: "flex", gap: "24px", borderBottom: "1.5px solid var(--gray-200)", paddingBottom: "10px", marginBottom: "20px" }}>
+          <div style={{ display: "flex", gap: "24px", borderBottom: "1.5px solid var(--gray-200)", paddingBottom: "10px", marginBottom: "20px", flexWrap: "wrap" }}>
             <button
               onClick={() => setActiveTab("desc")}
               style={{
@@ -983,6 +983,19 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
             >
               Product Description
             </button>
+            <button
+              onClick={() => setActiveTab("specs")}
+              style={{
+                fontSize: "15px",
+                fontWeight: "800",
+                color: activeTab === "specs" ? "var(--primary)" : "var(--gray-500)",
+                borderBottom: activeTab === "specs" ? "2.5px solid var(--primary)" : "none",
+                paddingBottom: "8px",
+                cursor: "pointer",
+              }}
+            >
+              Specifications & Formula
+            </button>
             {product.ingredients && (
               <button
                 onClick={() => setActiveTab("ingredients")}
@@ -995,7 +1008,7 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
                   cursor: "pointer",
                 }}
               >
-                Ingredients
+                Ingredients (INCI)
               </button>
             )}
             {product.howToUse && (
@@ -1017,15 +1030,52 @@ export default function ProductPage({ initialProduct }: { initialProduct?: any }
 
           {/* Tab Content */}
           <div style={{ fontSize: "14px", lineHeight: "1.7", color: "var(--gray-800)", fontWeight: "500" }}>
-            {activeTab === "desc" && <p>{product.description}</p>}
-            {activeTab === "ingredients" && <p>{product.ingredients}</p>}
-            {activeTab === "howToUse" && <p>{product.howToUse}</p>}
+            {activeTab === "desc" && (
+              <div>
+                {(product as any).shortDescription && (
+                  <div style={{ backgroundColor: "#fdf2f8", border: "1px solid #fbcfe8", borderRadius: "8px", padding: "12px 16px", marginBottom: "16px", color: "#9d174d", fontWeight: "700" }}>
+                    {(product as any).shortDescription}
+                  </div>
+                )}
+                <p style={{ whiteSpace: "pre-line" }}>{product.description}</p>
+              </div>
+            )}
+            {activeTab === "specs" && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px", padding: "6px 0" }}>
+                <div style={{ backgroundColor: "#f8fafc", padding: "14px 18px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+                  <span style={{ fontSize: "12px", color: "#64748b", fontWeight: "700", display: "block", textTransform: "uppercase" }}>Skin Type Compatibility</span>
+                  <strong style={{ fontSize: "14.5px", color: "#0f172a", marginTop: "2px", display: "block" }}>{(product as any).skinType || "All Skin Types"}</strong>
+                </div>
+                <div style={{ backgroundColor: "#f8fafc", padding: "14px 18px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+                  <span style={{ fontSize: "12px", color: "#64748b", fontWeight: "700", display: "block", textTransform: "uppercase" }}>Country of Origin</span>
+                  <strong style={{ fontSize: "14.5px", color: "#0f172a", marginTop: "2px", display: "block" }}>{(product as any).countryOfOrigin || "South Korea / USA (Authentic Import)"}</strong>
+                </div>
+                <div style={{ backgroundColor: "#f8fafc", padding: "14px 18px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+                  <span style={{ fontSize: "12px", color: "#64748b", fontWeight: "700", display: "block", textTransform: "uppercase" }}>Net Volume / Weight</span>
+                  <strong style={{ fontSize: "14.5px", color: "#0f172a", marginTop: "2px", display: "block" }}>{(product as any).volume || "Standard Packaging"}</strong>
+                </div>
+                <div style={{ backgroundColor: "#f8fafc", padding: "14px 18px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+                  <span style={{ fontSize: "12px", color: "#64748b", fontWeight: "700", display: "block", textTransform: "uppercase" }}>Key Benefits & Formula Claims</span>
+                  <strong style={{ fontSize: "14.5px", color: "#0f172a", marginTop: "2px", display: "block" }}>{(product as any).benefits || "Hydrating, Barrier Repair & Radiance"}</strong>
+                </div>
+                <div style={{ backgroundColor: "#f8fafc", padding: "14px 18px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+                  <span style={{ fontSize: "12px", color: "#64748b", fontWeight: "700", display: "block", textTransform: "uppercase" }}>Brand</span>
+                  <strong style={{ fontSize: "14.5px", color: "#0f172a", marginTop: "2px", display: "block" }}>{product.brand?.name || "GlowGoodly Verified"}</strong>
+                </div>
+                <div style={{ backgroundColor: "#f8fafc", padding: "14px 18px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+                  <span style={{ fontSize: "12px", color: "#64748b", fontWeight: "700", display: "block", textTransform: "uppercase" }}>Authenticity Guarantee</span>
+                  <strong style={{ fontSize: "14.5px", color: "#059669", marginTop: "2px", display: "block" }}>✓ 100% Original Genuine Guaranteed</strong>
+                </div>
+              </div>
+            )}
+            {activeTab === "ingredients" && <p style={{ whiteSpace: "pre-line" }}>{product.ingredients}</p>}
+            {activeTab === "howToUse" && <p style={{ whiteSpace: "pre-line" }}>{product.howToUse}</p>}
           </div>
         </section>
 
         {/* Customer Reviews Section */}
         <section style={{ display: "flex", gap: "40px", flexWrap: "wrap", marginBottom: "40px" }}>
-          
+
           {/* Reviews List */}
           <div style={{ flex: 1.5, minWidth: "300px" }}>
             <h2 style={{ fontSize: "20px", fontWeight: "800", marginBottom: "20px" }}>

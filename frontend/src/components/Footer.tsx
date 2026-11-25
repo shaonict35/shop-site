@@ -126,23 +126,76 @@ export default function Footer() {
             }
           }
           @media (max-width: 768px) {
+            .footer-col-help {
+              grid-column: 1 / -1 !important;
+              text-align: center !important;
+              align-items: center !important;
+              width: 100% !important;
+              margin-top: 10px !important;
+              padding-top: 15px !important;
+              border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
+            }
+            .footer-col-help h4 {
+              text-align: center !important;
+              margin-bottom: 12px !important;
+            }
+            .footer-help-links {
+              display: grid !important;
+              grid-template-columns: 1fr 1fr !important;
+              column-gap: 16px !important;
+              row-gap: 10px !important;
+              width: 100% !important;
+              max-width: 350px !important;
+              margin: 0 auto 16px auto !important;
+              padding: 0 4px !important;
+              font-size: 11px !important;
+              line-height: 1.4 !important;
+            }
+            .footer-help-links a {
+              font-size: 11px !important;
+              white-space: normal !important;
+            }
+            .footer-help-links a:nth-child(odd) {
+              text-align: left !important;
+            }
+            .footer-help-links a:nth-child(even) {
+              text-align: right !important;
+            }
             .footer-payments-container {
               margin-left: 0 !important;
               width: 100% !important;
               max-width: 100% !important;
+              text-align: center !important;
+              display: flex !important;
+              flex-direction: column !important;
+              align-items: center !important;
+            }
+            .footer-payments-container h4 {
+              text-align: center !important;
+              width: 100% !important;
             }
             .footer-payments-cards-row {
               margin-left: 0 !important;
               width: 100% !important;
+              max-width: 360px !important;
               display: flex !important;
-              flex-wrap: wrap !important;
-              gap: 8px !important;
+              flex-wrap: nowrap !important;
+              justify-content: center !important;
+              align-items: center !important;
+              gap: 4px !important;
+              overflow-x: auto !important;
+              scrollbar-width: none !important;
+              -ms-overflow-style: none !important;
+            }
+            .footer-payments-cards-row::-webkit-scrollbar {
+              display: none !important;
             }
             .footer-payments-cards-row > div {
-              flex: 1 1 calc(33.333% - 6px) !important;
-              min-width: 50px !important;
-              max-width: calc(33.333% - 6px) !important;
-              height: 36px !important;
+              flex: 1 1 0 !important;
+              min-width: 44px !important;
+              max-width: 56px !important;
+              height: 34px !important;
+              padding: 2px 3px !important;
             }
           }
         ` }} />
@@ -262,7 +315,7 @@ export default function Footer() {
               <h4 style={{ fontSize: "12px", fontWeight: "800", color: "#e52860", textTransform: "uppercase", letterSpacing: "0.5px", cursor: "default", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#ff6ba8")} onMouseLeave={(e) => (e.currentTarget.style.color = "#e52860")}>
                 Help
               </h4>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontWeight: "700" }}>
+              <div className="footer-help-links" style={{ display: "flex", flexDirection: "column", gap: "8px", fontWeight: "700" }}>
                 <Link href="/contact" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>CONTACT US</Link>
                 <Link href="/points" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>POINTS</Link>
                 <Link href="/faq" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>FAQS</Link>

@@ -163,7 +163,7 @@ const productMatchesSubcategory = (p: Product, subName: string) => {
 
   // 2. Fallback: match by product name or description
   const prodName = (p.name || "").toLowerCase();
-  
+
   if (target === "face wash") {
     return prodName.includes("face wash") || prodName.includes("facewash") || prodName.includes("cleanser") || prodName.includes("cleansing");
   }
@@ -212,7 +212,7 @@ const productMatchesSubcategory = (p: Product, subName: string) => {
   if (target === "dandruff") {
     return prodName.includes("dandruff");
   }
-  
+
   return prodName.includes(target);
 };
 
@@ -249,7 +249,36 @@ function ShopPageContent() {
           }
         }
       })
-      .catch(() => {});
+      .catch(() => { });
+  }, []);
+
+  const [categories, setCategories] = useState<{ name: string; slug: string; subs: string[] }[]>(ALL_CATEGORIES);
+
+  useEffect(() => {
+    const loadLiveCategories = async (bypass = false) => {
+      try {
+        const res = await fetchWithCache(`${API_BASE}/categories`, bypass);
+        const list = Array.isArray(res) ? res : (res?.categories || res?.data || []);
+        if (Array.isArray(list) && list.length > 0) {
+          // Authoritative Database Hierarchy: Use database categories as source of truth without resurrecting deleted categories
+          const liveCats = list.map((item: any) => {
+            const s = (item.slug || generateSlug(item.name)).toLowerCase();
+            const rawSubs = Array.isArray(item.subCategories) ? item.subCategories : (Array.isArray(item.subs) ? item.subs : []);
+            const subNames = rawSubs.map((x: any) => typeof x === "string" ? x : (x.name || "")).filter(Boolean);
+            return {
+              name: item.name,
+              slug: s,
+              subs: subNames
+            };
+          }).filter((item: any) => Boolean(item.name));
+          setCategories(liveCats);
+        }
+      } catch (_) { }
+    };
+
+    loadLiveCategories();
+    const unsub = subscribeToDataSync(() => loadLiveCategories(true));
+    return () => { unsub(); };
   }, []);
 
   const [activeCategories, setActiveCategories] = useState<string[]>([]);
@@ -262,7 +291,7 @@ function ShopPageContent() {
   // Pre-calculate counts with useMemo to eliminate render lag
   const categoryCounts = React.useMemo(() => {
     const counts: Record<string, number> = {};
-    ALL_CATEGORIES.forEach((cat) => {
+    categories.forEach((cat) => {
       const target = cat.name.toLowerCase();
       let matchNames = [target];
       if (target === "skin" || target === "skincare") matchNames = ["skin", "skincare"];
@@ -274,17 +303,17 @@ function ShopPageContent() {
       }).length;
     });
     return counts;
-  }, [products]);
+  }, [products, categories]);
 
   const subcategoryCounts = React.useMemo(() => {
     const counts: Record<string, number> = {};
-    ALL_CATEGORIES.forEach((cat) => {
+    categories.forEach((cat) => {
       cat.subs.forEach((sub) => {
         counts[sub] = products.filter((p) => productMatchesSubcategory(p, sub)).length;
       });
     });
     return counts;
-  }, [products]);
+  }, [products, categories]);
 
   const getCategoryCount = (catName: string) => categoryCounts[catName] || 0;
   const getSubcategoryCount = (subName: string) => subcategoryCounts[subName] || 0;
@@ -316,8 +345,8 @@ function ShopPageContent() {
 
     const targetCatQuery = catQuery || (campaignQuery ? (campaignQuery.toUpperCase() === "CLEARANCE" ? "clearance-sale" : campaignQuery) : null);
     if (targetCatQuery) {
-      const found = ALL_CATEGORIES.find(c => 
-        c.slug === targetCatQuery.toLowerCase() || 
+      const found = categories.find(c =>
+        c.slug === targetCatQuery.toLowerCase() ||
         c.name.toLowerCase() === targetCatQuery.toLowerCase() ||
         (targetCatQuery.toLowerCase() === "skincare" && c.slug === "skin") ||
         (targetCatQuery.toLowerCase() === "haircare" && c.slug === "hair")
@@ -336,9 +365,9 @@ function ShopPageContent() {
 
     if (brandQuery && brands.length > 0) {
       const qClean = brandQuery.toLowerCase().trim();
-      const matchedBrand = brands.find(b => 
+      const matchedBrand = brands.find(b =>
         b && (
-          b.id === brandQuery || 
+          b.id === brandQuery ||
           (b.name && b.name.toLowerCase() === qClean) ||
           (b.name && generateSlug(b.name) === generateSlug(brandQuery)) ||
           ((b as any).slug && (b as any).slug.toLowerCase() === qClean)
@@ -366,11 +395,11 @@ function ShopPageContent() {
         const formattedCombos = (Array.isArray(comboData) ? comboData : []).filter((c: any) => c.isActive !== false).map((c: any) => {
           const hasFreeGift = Array.isArray(c.items) && c.items.some((it: any) => it.isFreeGift);
           const freeGiftItem = hasFreeGift ? c.items.find((it: any) => it.isFreeGift) : null;
-          const comboCategory = c.category && c.category.name 
-            ? c.category 
+          const comboCategory = c.category && c.category.name
+            ? c.category
             : (c.categoryId ? { id: c.categoryId, name: c.categoryId, slug: String(c.categoryId).toLowerCase().replace(/[^a-z0-9]+/g, "-") } : null);
-          const comboSubcategory = c.subcategory && c.subcategory.name 
-            ? c.subcategory 
+          const comboSubcategory = c.subcategory && c.subcategory.name
+            ? c.subcategory
             : (c.subcategoryId ? { id: c.subcategoryId, name: c.subcategoryId, slug: String(c.subcategoryId).toLowerCase().replace(/[^a-z0-9]+/g, "-") } : null);
 
           return {
@@ -456,7 +485,7 @@ function ShopPageContent() {
         if (activeCategories.length > 0) {
           matchesFilter = activeCategories.some((cat) => {
             const targetCat = cat.toLowerCase();
-            
+
             // Is the product in this parent category?
             let inParent = false;
             if (targetCat === "bogo") inParent = (p.campaignName === "BOGO" || p.category?.name?.toLowerCase().includes("bogo") || p.name?.toLowerCase().includes("bogo"));
@@ -465,17 +494,17 @@ function ShopPageContent() {
             else if (targetCat === "clearance-sale" || targetCat === "clearance sale") inParent = (p.campaignName === "CLEARANCE" || p.category?.name?.toLowerCase().includes("clearance") || p.name?.toLowerCase().includes("clearance"));
             else {
               let matchNames = [targetCat];
-            if (targetCat === "skin" || targetCat === "skincare") matchNames = ["skin", "skincare"];
-            if (targetCat === "hair" || targetCat === "haircare") matchNames = ["hair", "haircare"];
-            if (targetCat === "personal care" || targetCat === "personal-care") matchNames = ["personal care", "personal-care", "hygiene"];
-            if (targetCat === "makeup") matchNames = ["makeup"];
-            inParent = matchNames.some((name) => cName.includes(name) || pName.includes(name));
+              if (targetCat === "skin" || targetCat === "skincare") matchNames = ["skin", "skincare"];
+              if (targetCat === "hair" || targetCat === "haircare") matchNames = ["hair", "haircare"];
+              if (targetCat === "personal care" || targetCat === "personal-care") matchNames = ["personal care", "personal-care", "hygiene"];
+              if (targetCat === "makeup") matchNames = ["makeup"];
+              inParent = matchNames.some((name) => cName.includes(name) || pName.includes(name));
             }
 
             if (!inParent) return false;
 
             // If the parent matches, does it have active subcategories checked?
-            const catObj = ALL_CATEGORIES.find(c => c.name === cat);
+            const catObj = categories.find(c => c.name === cat);
             const activeSubsForThisCat = catObj ? catObj.subs.filter(sub => activeSubcategories.includes(sub)) : [];
 
             if (activeSubsForThisCat.length > 0) {
@@ -593,7 +622,7 @@ function ShopPageContent() {
           Product Categories
         </h3>
         <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
-          {ALL_CATEGORIES.map((cat, idx) => {
+          {categories.map((cat, idx) => {
             const isCatActive = activeCategories.includes(cat.name);
             const isExpanded = expandedCategories.includes(cat.name);
             const catCount = getCategoryCount(cat.name);
@@ -616,7 +645,7 @@ function ShopPageContent() {
                       }}
                       style={{ width: "13px", height: "13px", accentColor: "#e52860", cursor: "pointer", marginRight: "4px", flexShrink: 0 }}
                     />
-                    <div 
+                    <div
                       onClick={() => {
                         if (isExpanded) {
                           setExpandedCategories(expandedCategories.filter(c => c !== cat.name));
@@ -670,7 +699,7 @@ function ShopPageContent() {
                               }}
                               style={{ width: "12px", height: "12px", accentColor: "#e52860", cursor: "pointer", marginRight: "2px", flexShrink: 0 }}
                             />
-                            <span 
+                            <span
                               onClick={() => {
                                 if (isSubActive) {
                                   setActiveSubcategories(activeSubcategories.filter(s => s !== sub));
@@ -738,10 +767,10 @@ function ShopPageContent() {
                     onChange={() => { if (isChecked) setSelectedBrands(selectedBrands.filter((x) => x !== b.name)); else setSelectedBrands([...selectedBrands, b.name]); }}
                     style={{ width: "13px", height: "13px", accentColor: "#e52860", cursor: "pointer", flexShrink: 0 }} />
                   {b.logoUrl && (
-                    <img 
-                      src={b.logoUrl} 
-                      alt={b.name} 
-                      style={{ width: "20px", height: "20px", objectFit: "contain", borderRadius: "4px", backgroundColor: "#fff", border: "1px solid #edf2f7", padding: "1px" }} 
+                    <img
+                      src={b.logoUrl}
+                      alt={b.name}
+                      style={{ width: "20px", height: "20px", objectFit: "contain", borderRadius: "4px", backgroundColor: "#fff", border: "1px solid #edf2f7", padding: "1px" }}
                       onError={(e) => { e.currentTarget.style.display = 'none'; }}
                     />
                   )}
@@ -751,10 +780,10 @@ function ShopPageContent() {
             })}
           {brands.length === 0 && <p style={{ fontSize: "12px", color: "#a0aec0", padding: "6px 0" }}>Loading brands...</p>}
         </div>
-        
+
         {brands.filter((b) => b && (b.name || "").toLowerCase().includes(brandSearchQuery.toLowerCase())).length > 15 && (
-          <button 
-            onClick={() => setShowAllBrands(!showAllBrands)} 
+          <button
+            onClick={() => setShowAllBrands(!showAllBrands)}
             style={{ marginTop: "12px", fontSize: "11.5px", fontWeight: "800", color: "#e52860", background: "none", border: "none", cursor: "pointer", padding: "0", textTransform: "uppercase" }}
           >
             {showAllBrands ? "SHOW LESS" : "SHOW MORE"}
@@ -774,14 +803,14 @@ function ShopPageContent() {
   const bannerTitle = activeSubcategories.length > 0
     ? activeSubcategories.join(", ")
     : activeCategories.length > 0
-    ? activeCategories.join(" & ").toUpperCase() + " COLLECTION"
-    : (pagesConfig?.bannerTitle || "ALL PRODUCTS");
+      ? activeCategories.join(" & ").toUpperCase() + " COLLECTION"
+      : (pagesConfig?.bannerTitle || "ALL PRODUCTS");
 
   const bannerBg = activeSubcategories.length > 0
     ? "#000"
     : activeCategories.length > 0
-    ? "linear-gradient(90deg,#09090b,#18181b 50%,#27272a)"
-    : "linear-gradient(90deg,#132238,#0e1e38)";
+      ? "linear-gradient(90deg,#09090b,#18181b 50%,#27272a)"
+      : "linear-gradient(90deg,#132238,#0e1e38)";
 
   return (
     <>
@@ -928,7 +957,7 @@ function ShopPageContent() {
 
                   return (
                     <div key={p.id} className="product-card" style={{ position: "relative", backgroundColor: "#ffffff", borderRadius: "14px", border: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", transition: "all 0.2s ease", maxWidth: "260px", width: "100%" }}>
-                      
+
                       {/* Top Left Discount Badge (Matches Image 1) */}
                       {isDiscounted && (
                         <span style={{ position: "absolute", top: "10px", left: "0", backgroundColor: "#e2136e", color: "#ffffff", padding: "4px 10px", borderRadius: "0 12px 12px 0", fontSize: "11px", fontWeight: "900", zIndex: 5, boxShadow: "0 2px 6px rgba(226,19,110,0.3)" }}>
@@ -951,9 +980,9 @@ function ShopPageContent() {
                       </div>
 
                       <Link href={getProductUrl(p)} className="card-image" style={{ padding: "16px", display: "flex", justifyContent: "center", alignItems: "center", minHeight: "180px" }}>
-                        <img 
-                          src={primaryImage} 
-                          alt={p.name} 
+                        <img
+                          src={primaryImage}
+                          alt={p.name}
                           loading="lazy"
                           decoding="async"
                           onError={(e) => { e.currentTarget.src = "/placeholder-product.svg"; }}

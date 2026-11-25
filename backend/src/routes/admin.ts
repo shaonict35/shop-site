@@ -13,14 +13,11 @@ import { cleanAllDummyData } from "../clean-dummy-products";
 
 const router = Router();
 
-// POST /api/admin/clean-dummy-data (Admin only)
-router.post("/clean-dummy-data", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const report = await cleanAllDummyData();
-    res.json({ message: "All dummy data cleaned successfully", report });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+// POST /api/admin/clean-dummy-data (Permanently disabled for data safety)
+router.post("/clean-dummy-data", authenticateJWT as any, requireRole(["SuperAdmin"]) as any, async (req: AuthenticatedRequest, res: Response) => {
+  res.status(403).json({
+    error: "Automatic dummy data cleanup is permanently disabled to prevent data loss. Please use verified database migrations."
+  });
 });
 
 // GET /api/admin/reviews (Admin only - Get all or unapproved reviews)
@@ -371,7 +368,7 @@ const handleUpdateUserOrStaff = async (req: AuthenticatedRequest, res: Response)
 
     // Allow user to edit their own profile OR SuperAdmin/Manager to edit any user
     const currentUserId = req.user?.id;
-    const currentUserRole = req.user?.role || "Admin";
+    const currentUserRole = req.user?.role || "Customer";
     const isSelf = currentUserId === id || (doc.exists && doc.data()?.email === req.user?.email);
     const isAuthorizedRole = ["SuperAdmin", "Manager", "Admin"].includes(currentUserRole);
 
@@ -1030,7 +1027,7 @@ router.get("/blogs", async (req: any, res: any) => {
 });
 
 // POST /api/admin/blogs
-router.post("/blogs", async (req: any, res: any) => {
+router.post("/blogs", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: any, res: any) => {
   try {
     const { id, title, description, imageUrl } = req.body || {};
     if (!title) return res.status(400).json({ error: "Title is required" });
@@ -1051,7 +1048,7 @@ router.post("/blogs", async (req: any, res: any) => {
 });
 
 // DELETE /api/admin/blogs/:id
-router.delete("/blogs/:id", async (req: any, res: any) => {
+router.delete("/blogs/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: any, res: any) => {
   try {
     const { id } = req.params;
     await db.collection("blogs").doc(id).delete();
@@ -1086,7 +1083,7 @@ router.get("/brands", async (req: any, res: any) => {
 });
 
 // POST /api/admin/brands (Add/Update Brand with image upload support)
-router.post("/brands", async (req: any, res: any) => {
+router.post("/brands", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: any, res: any) => {
   try {
     const { id, name, logoUrl, originCountry } = req.body || {};
     if (!name) return res.status(400).json({ error: "Brand name is required" });
@@ -1185,11 +1182,11 @@ const handleUpdateBrand = async (req: any, res: any) => {
     res.status(500).json({ error: error.message });
   }
 };
-router.put("/brands/:id", handleUpdateBrand);
-router.patch("/brands/:id", handleUpdateBrand);
+router.put("/brands/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, handleUpdateBrand);
+router.patch("/brands/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, handleUpdateBrand);
 
 // DELETE /api/admin/brands/:id
-router.delete("/brands/:id", async (req: any, res: any) => {
+router.delete("/brands/:id", authenticateJWT as any, requireRole(["SuperAdmin", "Manager", "Admin"]) as any, async (req: any, res: any) => {
   try {
     const { id } = req.params;
     await db.collection("brands").doc(id).delete();

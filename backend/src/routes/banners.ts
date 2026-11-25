@@ -57,28 +57,8 @@ function notifyRealtimeSync(req: Request, type: string, extra?: any) {
 }
 
 async function ensureInitialBanners() {
-  try {
-    // Purge all banners from database as requested (all banners are 100% frontend persistent)
-    const snapshot = await db.collection("banners").get();
-    for (const doc of snapshot.docs) {
-      await doc.ref.delete();
-    }
-    try {
-      await prisma.promoBanner.deleteMany({});
-    } catch (_) {}
-
-    // Clean up upload files
-    if (fs.existsSync(uploadBannersDir)) {
-      const files = fs.readdirSync(uploadBannersDir);
-      for (const file of files) {
-        try {
-          fs.unlinkSync(path.join(uploadBannersDir, file));
-        } catch (_) {}
-      }
-    }
-  } catch (err) {
-    console.error("ensureInitialBanners cleanup error:", err);
-  }
+  // Safe preservation: Never delete banners or uploaded banner files
+  return;
 }
 
 function cleanBannerData(data: any): any {
@@ -116,15 +96,17 @@ function cleanBannerData(data: any): any {
   // ─── GET /api/banners — Public: get all ACTIVE banners ───────────────────────
   router.get("/banners", async (req: AuthenticatedRequest, res: Response) => {
     try {
-      if (!hasEnsuredBanners) {
-        await ensureInitialBanners();
-        hasEnsuredBanners = true;
-      }
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       res.setHeader("Pragma", "no-cache");
       res.setHeader("Expires", "0");
-      // All homepage pictures are 100% frontend persistent; backend returns empty list
-      res.json([]);
+      let bannersList: any[] = [];
+      try {
+        bannersList = await prisma.promoBanner.findMany({
+          where: { isActive: true },
+          orderBy: { sortOrder: "asc" }
+        });
+      } catch (_) {}
+      res.json(bannersList);
     } catch (err) {
       console.error(err);
       res.json([]);
@@ -134,12 +116,14 @@ function cleanBannerData(data: any): any {
   // ─── GET /api/admin/banners & /api/banners/all — Admin: get ALL banners for admin panel list ───
   const getAllBannersHandler = async (req: Request, res: Response) => {
     try {
-      if (!hasEnsuredBanners) {
-        await ensureInitialBanners();
-        hasEnsuredBanners = true;
-      }
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-      res.json([]);
+      let bannersList: any[] = [];
+      try {
+        bannersList = await prisma.promoBanner.findMany({
+          orderBy: { sortOrder: "asc" }
+        });
+      } catch (_) {}
+      res.json(bannersList);
     } catch (err) {
       console.error(err);
       res.json([]);

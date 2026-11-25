@@ -4,6 +4,7 @@ import "./globals.css";
 import { AppProvider } from "../context/AppContext";
 import TrackingScripts from "../components/TrackingScripts";
 import ChatWidget from "../components/ChatWidget";
+import TawkToChat from "../components/TawkToChat";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -202,7 +203,8 @@ export default function RootLayout({
           <GlowLoader />
           <TrackingScripts />
           {children}
-          <ChatWidget />
+          <TawkToChat />
+          <ChatWidget enabled={true} />
           <PromoSocketListener />
         </AppProvider>
       </body>

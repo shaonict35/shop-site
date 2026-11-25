@@ -231,8 +231,8 @@ export default function GlowLoader({
         <div
           style={{
             position: "relative",
-            width: "150px",
-            height: "150px",
+            width: "165px",
+            height: "165px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -245,7 +245,7 @@ export default function GlowLoader({
             className="gg-orbit-outer"
             style={{
               position: "absolute",
-              inset: "-14px",
+              inset: "-16px",
               borderRadius: "50%",
               border: "1.5px solid rgba(230, 59, 122, 0.28)",
               boxShadow: "0 0 16px rgba(230, 59, 122, 0.12)",
@@ -285,8 +285,8 @@ export default function GlowLoader({
           <div
             className="gg-center-circle"
             style={{
-              width: "120px",
-              height: "120px",
+              width: "135px",
+              height: "135px",
               borderRadius: "50%",
               backgroundColor: "#ffffff",
               border: "2.5px solid rgba(230, 59, 122, 0.35)",
@@ -296,7 +296,7 @@ export default function GlowLoader({
               position: "relative",
               zIndex: 10,
               overflow: "hidden",
-              padding: "16px",
+              padding: "20px",
               boxShadow: "0 6px 20px rgba(230, 59, 122, 0.18)",
             }}
           >
@@ -308,8 +308,8 @@ export default function GlowLoader({
                 style={{
                   width: "100%",
                   height: "100%",
-                  maxWidth: "84px",
-                  maxHeight: "84px",
+                  maxWidth: "76px",
+                  maxHeight: "76px",
                   objectFit: "contain",
                   display: "block",
                   margin: "auto",
