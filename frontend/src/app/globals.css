@@ -2166,6 +2166,11 @@ textarea {
     border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
   }
 
+  .footer-col-help>div:first-of-type {
+    align-items: center !important;
+    text-align: center !important;
+  }
+
   .footer-col-help h4 {
     text-align: center !important;
     margin-bottom: 12px !important;
@@ -3425,6 +3430,76 @@ body {
     text-align: left !important;
     white-space: normal !important;
     word-break: break-word !important;
+  }
+
+  .footer-columns .footer-col-help {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+    margin-top: 15px !important;
+    padding-top: 15px !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
+    text-align: center !important;
+    align-items: center !important;
+  }
+  .footer-columns .footer-col-help h4 {
+    text-align: center !important;
+    margin-bottom: 12px !important;
+    font-size: 13px !important;
+  }
+  .footer-columns .footer-help-links {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    column-gap: 20px !important;
+    row-gap: 12px !important;
+    width: 100% !important;
+    max-width: 340px !important;
+    margin: 0 auto 16px auto !important;
+    padding: 0 4px !important;
+    font-size: 11px !important;
+  }
+  .footer-columns .footer-help-links a {
+    font-size: 11px !important;
+    white-space: normal !important;
+  }
+  .footer-columns .footer-help-links a:nth-child(odd) {
+    text-align: left !important;
+  }
+  .footer-columns .footer-help-links a:nth-child(even) {
+    text-align: right !important;
+  }
+  .footer-columns .footer-payments-container {
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 350px !important;
+    margin: 0 auto !important;
+    text-align: center !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+  }
+  .footer-columns .footer-payments-container h4 {
+    text-align: center !important;
+    width: 100% !important;
+  }
+  .footer-columns .footer-payments-cards-row {
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 350px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 4px !important;
+    overflow-x: visible !important;
+  }
+  .footer-columns .footer-payments-cards-row > div {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    max-width: 54px !important;
+    height: 34px !important;
+    padding: 2px 2px !important;
+    box-sizing: border-box !important;
   }
 
   .footer-glowgoodly-text {

@@ -276,7 +276,8 @@ export default function Home() {
 
         // Enhanced Semantic Category Matching (Fixes empty cards for Cosmetics, Skin Care, Bath & Body, Fregnance)
         if ((sub === "skincare" || sub === "skin") && (cleanId.includes("skin") || cleanP.includes("skin"))) return true;
-        if ((sub === "cosmetics" || sub === "makeup") && (cleanId.includes("makeup") || cleanP.includes("makeup") || cleanId.includes("cosmetic") || cleanP.includes("cosmetic"))) return true;
+        if (sub === "cosmetics" && (cleanId.includes("cosmetic") || cleanP.includes("cosmetic") || cleanId.includes("kbeauty") || cleanP.includes("kbeauty"))) return true;
+        if (sub === "makeup" && (cleanId.includes("makeup") || cleanP.includes("makeup"))) return true;
         if ((sub === "bathandbody" || sub === "bathbody" || sub === "personalcare") && (cleanId.includes("personal") || cleanP.includes("personal") || cleanId.includes("bath") || cleanP.includes("bath"))) return true;
         if ((sub === "fragrance" || sub === "fregnance" || sub === "perfume") && (cleanId.includes("fragran") || cleanP.includes("fragran") || cleanId.includes("fregnan") || cleanP.includes("fregnan"))) return true;
         if ((sub === "haircare" || sub === "hair") && (cleanId.includes("hair") || cleanP.includes("hair"))) return true;
@@ -531,7 +532,7 @@ export default function Home() {
             map.set(b.id, {
               ...existing,
               ...b,
-              imageUrl: isDeleted ? "" : (b.imageUrl ?? existing.imageUrl)
+              imageUrl: isDeleted ? "" : (b.imageUrl || existing.imageUrl)
             });
           } else {
             if (!isDeleted) map.set(b.id, b);
@@ -610,7 +611,12 @@ export default function Home() {
                 });
                 idbBanners.forEach((b: any) => {
                   if (b && b.id && !deletedIds.includes(b.id) && !deletedIds.includes(b.page)) {
-                    map.set(b.id, { ...(map.get(b.id) || {}), ...b });
+                    const existing = map.get(b.id) || {};
+                    map.set(b.id, {
+                      ...existing,
+                      ...b,
+                      imageUrl: b.imageUrl || existing.imageUrl
+                    });
                   }
                 });
                 return Array.from(map.values());
@@ -2036,16 +2042,16 @@ export default function Home() {
 
         {/* SHOP BEAUTY PRODUCTS BY CATEGORY Section */}
         {(() => {
-          // 8 Canonical Categories aligned with Admin Panel CARD_SLOTS & Master Banners
+          // 8 Canonical Categories aligned with Admin Panel CARD_SLOTS, Official Banners & Image Assets
           const CANONICAL_CATEGORY_SLOTS = [
-            { slotId: "cat-card-makeup", name: "Makeup", slug: "makeup", pageName: "Category: Makeup", aliases: ["makeup", "cosmetics", "cat-card-makeup", "cat-makeup"] },
-            { slotId: "cat-card-skin", name: "Skin Care", slug: "skincare", pageName: "Category: Skin", aliases: ["skin", "skincare", "skin care", "cat-card-skin", "cat-skin"] },
-            { slotId: "cat-card-hair", name: "Hair Care", slug: "haircare", pageName: "Category: Hair", aliases: ["hair", "haircare", "hair care", "cat-card-hair", "cat-hair"] },
-            { slotId: "cat-card-personal-care", name: "Bath & Body", slug: "personal-care", pageName: "Category: Personal Care", aliases: ["bath", "bath & body", "bath and body", "personal care", "personal-care", "cat-card-personal-care"] },
-            { slotId: "cat-card-mom-baby", name: "Mom & Baby", slug: "mom-baby", pageName: "Category: Mom & Baby", aliases: ["mom", "mom & baby", "mom and baby", "mombaby", "cat-card-mom-baby"] },
-            { slotId: "cat-card-fragrance", name: "Fragrance", slug: "fragrance", pageName: "Category: Fragrance", aliases: ["fragrance", "fregnance", "perfume", "cat-card-fragrance"] },
-            { slotId: "cat-card-undergarments", name: "Undergarments", slug: "undergarments", pageName: "Category: Undergarments", aliases: ["undergarments", "undergarment", "cat-card-undergarments"] },
-            { slotId: "cat-card-combo", name: "Combo Deals", slug: "combo", pageName: "Category: Combo", aliases: ["combo", "combo deals", "combos", "cat-card-combo"] },
+            { slotId: "cat-card-cosmetics", name: "Cosmetics", slug: "cosmetics", pageName: "Category: Cosmetics", defaultImg: "/banners/1795248298104-1.png", aliases: ["cosmetics", "cosmetic", "cat-card-cosmetics", "cat-cosmetics", "kbeauty", "k-beauty"] },
+            { slotId: "cat-card-makeup", name: "Makeup", slug: "makeup", pageName: "Category: Makeup", defaultImg: "/banners/1795246745435-8.png", aliases: ["makeup", "cat-card-makeup", "cat-makeup"] },
+            { slotId: "cat-card-skin", name: "Skin Care", slug: "skincare", pageName: "Category: Skin", defaultImg: "/banners/1795248428897-3.png", aliases: ["skin", "skincare", "skin care", "cat-card-skin", "cat-skin"] },
+            { slotId: "cat-card-hair", name: "Hair Care", slug: "haircare", pageName: "Category: Hair", defaultImg: "/banners/1795248333712-4.png", aliases: ["hair", "haircare", "hair care", "cat-card-hair", "cat-hair"] },
+            { slotId: "cat-card-personal-care", name: "Bath & Body", slug: "personal-care", pageName: "Category: Personal Care", defaultImg: "/banners/1795248447541-2.png", aliases: ["bath", "bath & body", "bath and body", "personal care", "personal-care", "cat-card-personal-care"] },
+            { slotId: "cat-card-mom-baby", name: "Mom & Baby", slug: "mom-baby", pageName: "Category: Mom & Baby", defaultImg: "/banners/1795248375067-5.png", aliases: ["mom", "mom & baby", "mom and baby", "mombaby", "cat-card-mom-baby"] },
+            { slotId: "cat-card-fragrance", name: "Fragrance", slug: "fragrance", pageName: "Category: Fragrance", defaultImg: "/banners/1795248468415-6.png", aliases: ["fragrance", "fregnance", "perfume", "cat-card-fragrance"] },
+            { slotId: "cat-card-undergarments", name: "Undergarments", slug: "undergarments", pageName: "Category: Undergarments", defaultImg: "/banners/1795248459173-7.png", aliases: ["undergarments", "undergarment", "cat-card-undergarments"] },
           ];
 
           return (
@@ -2065,8 +2071,16 @@ export default function Home() {
                     targetLink = bannerInfo.link;
                   }
 
-                  // Priority 3: Fallback to category image from database if banner not uploaded
-                  let catImg = bannerInfo.img ? safeImageUrl(bannerInfo.img, "") : "";
+                  // Priority 2: Look up custom banner image from homepageBanners
+                  const isSlotDeleted = deletedBannerIds.includes(slot.slotId) || deletedBannerIds.includes(slot.pageName);
+                  let catImg = (!isSlotDeleted && bannerInfo.img) ? safeImageUrl(bannerInfo.img, "") : "";
+
+                  // Priority 3: Fallback to preloaded official category artwork (guarantees artwork always shows)
+                  if (!catImg && slot.defaultImg) {
+                    catImg = safeImageUrl(slot.defaultImg, "");
+                  }
+
+                  // Priority 4: Fallback to category image from database
                   if (!catImg) {
                     const matchedCat = categories.find((c: any) => {
                       const cName = (c.name || "").toLowerCase().trim();
@@ -2076,15 +2090,6 @@ export default function Home() {
                     if (matchedCat && (matchedCat.imageUrl || matchedCat.image)) {
                       catImg = safeImageUrl(matchedCat.imageUrl || matchedCat.image, "");
                     }
-                  }
-
-                  // If this slot was explicitly deleted, do not show any image
-                  if (deletedBannerIds.length > 0) {
-                    const isDeleted = slot.aliases.some(a => deletedBannerIds.includes(a)) ||
-                      deletedBannerIds.includes(slot.slotId) ||
-                      deletedBannerIds.includes(slot.pageName) ||
-                      deletedBannerIds.includes(slot.name);
-                    if (isDeleted) catImg = "";
                   }
 
                   return (
@@ -2097,6 +2102,17 @@ export default function Home() {
                       {catImg ? (
                         <img
                           src={catImg}
+                          alt={slot.name}
+                          onError={(e) => {
+                            if (slot.defaultImg && e.currentTarget.src !== slot.defaultImg) {
+                              e.currentTarget.src = slot.defaultImg;
+                            }
+                          }}
+                          style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block", borderRadius: "10px" }}
+                        />
+                      ) : slot.defaultImg ? (
+                        <img
+                          src={slot.defaultImg}
                           alt={slot.name}
                           style={{ width: "100%", height: "auto", aspectRatio: "1 / 1", objectFit: "cover", display: "block", borderRadius: "10px" }}
                         />

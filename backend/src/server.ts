@@ -1,9 +1,11 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
 import compression from "compression";
 import helmet from "helmet";
 import hpp from "hpp";
-import dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
 import { createServer } from "http";
@@ -39,8 +41,6 @@ import { autoSeedDatabase } from "./auto-seed";
 import { initMySQLTables } from "./config/db";
 
 import { globalRateLimiter, authRateLimiter, orderRateLimiter, sanitizeInput, securityHeaders } from "./middleware/security";
-
-dotenv.config();
 
 const app = express();
 app.set("trust proxy", 1);
@@ -174,9 +174,13 @@ io.on("connection", (socket) => {
       try {
         const decoded: any = jwt.verify(token, process.env.JWT_SECRET || "glowgoodly_secret_jwt_key_123456");
         const role = (decoded.role || "").toLowerCase();
+        const cleanDecoded = (decoded.chatId || "").replace(/^chat_/, "");
+        const cleanTarget = targetChatId.replace(/^chat_/, "");
         if (["superadmin", "admin", "manager", "staff", "salesman"].includes(role)) {
           isAuthorized = true;
-        } else if (decoded.chatId === targetChatId || decoded.id === targetChatId || decoded.userId === targetChatId) {
+        } else if (cleanDecoded.length >= 6 && cleanTarget.length >= 6 && cleanDecoded === cleanTarget) {
+          isAuthorized = true;
+        } else if (decoded.id === targetChatId || decoded.userId === targetChatId) {
           isAuthorized = true;
         }
       } catch (_) { }
@@ -190,7 +194,7 @@ io.on("connection", (socket) => {
       socket.join(`chat_${cleanBase}`);
       socket.emit("join_chat_success", { chatId: targetChatId });
     } else {
-      socket.emit("chat_error", { error: "Access Denied: You are not authorized to join this customer chat room." });
+      socket.emit("chat_error", { error: "Access Denied: Cryptographic customer session token required." });
     }
   });
 

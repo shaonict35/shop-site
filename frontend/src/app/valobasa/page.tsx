@@ -6459,6 +6459,7 @@ export default function ValobasaAdminPanel() {
               {/* ═══════════ CATEGORY & CONCERN QUICK UPLOAD & LINK MANAGER SECTION ═══════════ */}
               {(() => {
                 const CARD_SLOTS = [
+                  { id: "cat-card-cosmetics", label: "Cosmetics", emoji: "✨", section: "🛍️ SHOP BY CATEGORY", canonicalPage: "Category: Cosmetics", defaultLink: "/shop?category=cosmetics" },
                   { id: "cat-card-makeup", label: "Makeup / Cosmetics", emoji: "💄", section: "🛍️ SHOP BY CATEGORY", canonicalPage: "Category: Makeup", defaultLink: "/shop?category=makeup" },
                   { id: "cat-card-skin", label: "Skin Care", emoji: "🌸", section: "🛍️ SHOP BY CATEGORY", canonicalPage: "Category: Skin", defaultLink: "/shop?category=skincare" },
                   { id: "cat-card-hair", label: "Hair Care", emoji: "💇", section: "🛍️ SHOP BY CATEGORY", canonicalPage: "Category: Hair", defaultLink: "/shop?category=haircare" },
@@ -13802,16 +13803,53 @@ function LiveChatPanel({ token, staffList }: { token: string | null; staffList?:
       socket.emit("auth_staff", activeToken);
 
       const normalizeId = (id: string) => String(id || "").replace(/^chat_/, "");
+      if (selectedChatId) {
+        socket.emit("join_chat", { chatId: selectedChatId, token: activeToken });
+      }
+
       const handleNewMessage = (newMsg: any) => {
         if (!newMsg || !newMsg.message) return;
         const msgChatId = newMsg.chatId || "";
-        if (selectedChatId && (msgChatId === selectedChatId || normalizeId(msgChatId) === normalizeId(selectedChatId))) {
-          console.log("[Native Support Admin Socket] Received message event:", { id: newMsg?.id, chatId: newMsg?.chatId, sender: newMsg?.sender });
+        const normMsgId = normalizeId(msgChatId);
+
+        if (selectedChatId && (msgChatId === selectedChatId || normMsgId === normalizeId(selectedChatId))) {
+          console.log("[Native Support Admin Socket] Received message event for active thread:", { id: newMsg?.id, chatId: newMsg?.chatId, sender: newMsg?.sender });
           setChatHistory(prev => {
             if (prev.some(m => m.id === newMsg.id)) return prev;
             return [...prev, newMsg];
           });
         }
+
+        // Real-time update or prepend thread in Admin inbox
+        setThreads(prev => {
+          const idx = prev.findIndex(t => t.chatId === msgChatId || normalizeId(t.chatId) === normMsgId);
+          if (idx !== -1) {
+            const updated = [...prev];
+            updated[idx] = {
+              ...updated[idx],
+              lastMessage: newMsg.message,
+              lastSender: newMsg.sender || "Customer",
+              customerName: newMsg.customerName || updated[idx].customerName,
+              customerPhone: newMsg.customerPhone || updated[idx].customerPhone,
+              updatedAt: newMsg.createdAt || new Date().toISOString(),
+            };
+            return updated.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+          } else {
+            const shortCode = normMsgId.slice(-5).toUpperCase();
+            const displayName = newMsg.customerName || (newMsg.customerPhone ? `Customer (${newMsg.customerPhone})` : `Customer #${shortCode}`);
+            const newThread = {
+              id: msgChatId,
+              chatId: msgChatId,
+              displayName,
+              customerName: newMsg.customerName || null,
+              customerPhone: newMsg.customerPhone || null,
+              lastMessage: newMsg.message,
+              lastSender: newMsg.sender || "Customer",
+              updatedAt: newMsg.createdAt || new Date().toISOString(),
+            };
+            return [newThread, ...prev];
+          }
+        });
       };
 
       socket.on("chat:new_message", handleNewMessage);
@@ -13822,19 +13860,35 @@ function LiveChatPanel({ token, staffList }: { token: string | null; staffList?:
 
       socket.on("chat:threads_updated", (payload: any) => {
         if (!payload || !payload.chatId) return;
+        const normPayloadId = normalizeId(payload.chatId);
         setThreads(prev => {
-          const idx = prev.findIndex(t => t.chatId === payload.chatId || `chat_${t.chatId}` === payload.chatId);
+          const idx = prev.findIndex(t => t.chatId === payload.chatId || normalizeId(t.chatId) === normPayloadId);
           if (idx !== -1) {
             const updated = [...prev];
             updated[idx] = {
               ...updated[idx],
               lastMessage: payload.lastMessage || updated[idx].lastMessage,
               lastSender: payload.lastSender || updated[idx].lastSender,
+              customerName: payload.customerName || updated[idx].customerName,
+              customerPhone: payload.customerPhone || updated[idx].customerPhone,
               updatedAt: payload.updatedAt || new Date().toISOString(),
             };
             return updated.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+          } else {
+            const shortCode = normPayloadId.slice(-5).toUpperCase();
+            const displayName = payload.customerName || (payload.customerPhone ? `Customer (${payload.customerPhone})` : `Customer #${shortCode}`);
+            const newThread = {
+              id: payload.chatId,
+              chatId: payload.chatId,
+              displayName,
+              customerName: payload.customerName || null,
+              customerPhone: payload.customerPhone || null,
+              lastMessage: payload.lastMessage || "",
+              lastSender: payload.lastSender || "Customer",
+              updatedAt: payload.updatedAt || new Date().toISOString(),
+            };
+            return [newThread, ...prev];
           }
-          return prev;
         });
       });
     } catch (_) { }

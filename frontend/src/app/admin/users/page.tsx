@@ -27,6 +27,23 @@ import {
 } from "lucide-react";
 import { API_BASE } from "../../../utils/api";
 
+const getAuthHeader = (explicitToken?: string | null): Record<string, string> => {
+  let activeToken = explicitToken;
+  if (!activeToken && typeof window !== "undefined") {
+    activeToken =
+      localStorage.getItem("glowgoodly_token") ||
+      localStorage.getItem("gg_token") ||
+      localStorage.getItem("glowgoodly_auth_token") ||
+      localStorage.getItem("token") ||
+      "";
+  }
+  if (activeToken === "null" || activeToken === "undefined") {
+    activeToken = "";
+  }
+  const cleanToken = activeToken ? String(activeToken).replace(/^Bearer\s+/i, "").trim() : "";
+  return cleanToken ? { Authorization: `Bearer ${cleanToken}` } : {};
+};
+
 interface UserItem {
   id: string;
   name: string;
@@ -83,8 +100,7 @@ export default function UserManagementPage() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const headers: any = {};
-      if (token) headers.Authorization = `Bearer ${token}`;
+      const headers: any = { ...getAuthHeader(token) };
       const res = await fetch(`${API_BASE}/admin/users`, { headers });
       if (res.ok) {
         const data = await res.json();
@@ -212,8 +228,7 @@ export default function UserManagementPage() {
         payload.password = formData.password.trim();
       }
 
-      const headers: any = { "Content-Type": "application/json" };
-      if (token) headers.Authorization = `Bearer ${token}`;
+      const headers: any = { "Content-Type": "application/json", ...getAuthHeader(token) };
 
       const res = await fetch(url, {
         method,
@@ -244,8 +259,7 @@ export default function UserManagementPage() {
     if (!confirm(`Are you sure you want to permanently delete user "${u.name || u.email}"?`)) return;
 
     try {
-      const headers: any = {};
-      if (token) headers.Authorization = `Bearer ${token}`;
+      const headers: any = { ...getAuthHeader(token) };
       const res = await fetch(`${API_BASE}/admin/users/${u.id}`, {
         method: "DELETE",
         headers
@@ -841,8 +855,8 @@ export default function UserManagementPage() {
                                     u.role === "SuperAdmin"
                                       ? "linear-gradient(135deg, #7c3aed, #a855f7)"
                                       : u.role === "Admin"
-                                      ? "linear-gradient(135deg, #4338ca, #6366f1)"
-                                      : "linear-gradient(135deg, #e63b7a, #f43f5e)",
+                                        ? "linear-gradient(135deg, #4338ca, #6366f1)"
+                                        : "linear-gradient(135deg, #e63b7a, #f43f5e)",
                                   color: "#ffffff",
                                   display: "flex",
                                   alignItems: "center",
@@ -1010,8 +1024,8 @@ export default function UserManagementPage() {
                   {modalMode === "edit"
                     ? `Edit User: ${formData.name || formData.email}`
                     : modalAccountType === "admin"
-                    ? "Add New Administrator / Staff"
-                    : "Add New Customer / User"}
+                      ? "Add New Administrator / Staff"
+                      : "Add New Customer / User"}
                 </h2>
                 <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#64748b" }}>
                   {modalMode === "edit"
@@ -1453,10 +1467,10 @@ export default function UserManagementPage() {
                   {submitting
                     ? "Saving..."
                     : modalMode === "edit"
-                    ? "Update User"
-                    : modalAccountType === "admin"
-                    ? "Create Admin Account"
-                    : "Create Customer Account"}
+                      ? "Update User"
+                      : modalAccountType === "admin"
+                        ? "Create Admin Account"
+                        : "Create Customer Account"}
                 </button>
               </div>
             </form>

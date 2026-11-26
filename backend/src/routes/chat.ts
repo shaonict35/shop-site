@@ -88,7 +88,10 @@ export function verifyChatAuthorization(req: Request, targetChatId: string): { a
     // 2. Customer must own the chatId or userId (normalize prefix)
     const cleanDecoded = (decoded.chatId || "").replace(/^chat_/, "");
     const cleanTarget = targetChatId.replace(/^chat_/, "");
-    if (cleanDecoded === cleanTarget || decoded.chatId === targetChatId || decoded.id === targetChatId || decoded.userId === targetChatId) {
+    if (cleanDecoded.length >= 6 && cleanTarget.length >= 6 && cleanDecoded === cleanTarget) {
+      return { authorized: true, isStaff: false };
+    }
+    if (decoded.chatId === targetChatId || decoded.id === targetChatId || decoded.userId === targetChatId) {
       return { authorized: true, isStaff: false };
     }
   } catch (_) {}
@@ -181,16 +184,17 @@ router.post("/chat/send", chatRateLimiter as any, async (req: Request, res: Resp
        return;
     }
 
-    // Verify token ownership if customer is sending (prevent impersonating another chatId)
-    const msgSender = sender || "Customer";
-    if (msgSender === "Customer") {
-      let token = req.headers.authorization?.replace("Bearer ", "");
-      if (!token && req.headers["x-chat-token"]) token = String(req.headers["x-chat-token"]);
-      if (token) {
-        const auth = verifyChatAuthorization(req, cleanChatId);
-        if (!auth.authorized) {
-          return res.status(403).json({ error: "Access Denied: Invalid chat authorization token for this conversation." });
-        }
+    // Verify token ownership and enforce role boundaries
+    const msgSender = sender === "Admin" ? "Admin" : "Customer";
+    if (msgSender === "Admin") {
+      const auth = verifyChatAuthorization(req, cleanChatId);
+      if (!auth.authorized || !auth.isStaff) {
+        return res.status(403).json({ error: "Access Denied: Staff authorization required to send Admin messages." });
+      }
+    } else {
+      const auth = verifyChatAuthorization(req, cleanChatId);
+      if (!auth.authorized) {
+        return res.status(403).json({ error: "Access Denied: Valid chat authorization token required for this conversation." });
       }
     }
 

@@ -18,17 +18,51 @@ export default function ChatWidget({ enabled = true }: { enabled?: boolean }) {
   const pathname = usePathname();
   const [activeEnabled, setActiveEnabled] = useState(enabled);
   const [isOpen, setIsOpen] = useState(false);
-  const [chatId, setChatId] = useState("");
-  const [chatToken, setChatToken] = useState("");
+  const [chatId, setChatId] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      let id = localStorage.getItem("gg_chat_id");
+      if (!id) {
+        id = "chat_" + Math.random().toString(36).substring(2, 11);
+        localStorage.setItem("gg_chat_id", id);
+      }
+      return id;
+    }
+    return "";
+  });
+  const [chatToken, setChatToken] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("gg_chat_token") || "";
+    }
+    return "";
+  });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [showPulse, setShowPulse] = useState(true);
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [isRegistered, setIsRegistered] = useState(false);
-  const [regNameInput, setRegNameInput] = useState("");
-  const [regPhoneInput, setRegPhoneInput] = useState("");
+  const [customerName, setCustomerName] = useState<string>(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("gg_chat_user_name") || "";
+    return "";
+  });
+  const [customerPhone, setCustomerPhone] = useState<string>(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("gg_chat_user_phone") || "";
+    return "";
+  });
+  const [isRegistered, setIsRegistered] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const savedName = localStorage.getItem("gg_chat_user_name");
+      const savedPhone = localStorage.getItem("gg_chat_user_phone");
+      return Boolean(savedName && savedPhone);
+    }
+    return false;
+  });
+  const [regNameInput, setRegNameInput] = useState<string>(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("gg_chat_user_name") || "";
+    return "";
+  });
+  const [regPhoneInput, setRegPhoneInput] = useState<string>(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("gg_chat_user_phone") || "";
+    return "";
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -44,144 +78,178 @@ export default function ChatWidget({ enabled = true }: { enabled?: boolean }) {
     }
   }, [enabled]);
 
-  // Initialize Chat ID and User Info + Cryptographic Session Token
+  // Ensure Chat ID and Cryptographic Session Token are synced with backend
   useEffect(() => {
-    if (!activeEnabled) return;
-    if (typeof window !== "undefined") {
-      let id = localStorage.getItem("gg_chat_id");
-      if (!id) {
-        id = "chat_" + Math.random().toString(36).substring(2, 11);
-        localStorage.setItem("gg_chat_id", id);
-      }
+    if (typeof window === "undefined") return;
+
+    let id = chatId;
+    if (!id) {
+      id = localStorage.getItem("gg_chat_id") || ("chat_" + Math.random().toString(36).substring(2, 11));
+      localStorage.setItem("gg_chat_id", id);
       setChatId(id);
-
-      const savedToken = localStorage.getItem("gg_chat_token") || "";
-      if (savedToken) setChatToken(savedToken);
-
-      // Verify or initialize session token from backend
-      fetch(`${API_BASE}/chat/session`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-chat-token": chatToken || (typeof window !== "undefined" ? localStorage.getItem("gg_chat_token") || "" : "")
-        },
-        body: JSON.stringify({ chatId: id })
-      })
-        .then(r => r.json())
-        .then(data => {
-          if (data?.chatToken) {
-            localStorage.setItem("gg_chat_token", data.chatToken);
-            setChatToken(data.chatToken);
-          }
-        })
-        .catch(() => { });
-
-      const savedName = localStorage.getItem("gg_chat_user_name");
-      const savedPhone = localStorage.getItem("gg_chat_user_phone");
-      if (savedName && savedPhone) {
-        setCustomerName(savedName);
-        setCustomerPhone(savedPhone);
-        setRegNameInput(savedName);
-        setRegPhoneInput(savedPhone);
-        setIsRegistered(true);
-      }
     }
-  }, []);
+
+    const savedToken = localStorage.getItem("gg_chat_token") || chatToken || "";
+    if (savedToken && !chatToken) {
+      setChatToken(savedToken);
+    }
+
+    // Verify or initialize session token from backend
+    fetch(`${API_BASE}/chat/session`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-chat-token": savedToken
+      },
+      body: JSON.stringify({ chatId: id })
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data?.chatToken) {
+          localStorage.setItem("gg_chat_token", data.chatToken);
+          setChatToken(data.chatToken);
+        }
+      })
+      .catch((e) => {
+        console.warn("[Native Support] Session init offline warning:", e);
+      });
+  }, [chatId]);
 
   // Real-time pure Socket.io message synchronization (Zero HTTP polling)
   useEffect(() => {
     if (!chatId || !isOpen || !isRegistered) return;
 
-    const currentToken = chatToken || (typeof window !== "undefined" ? localStorage.getItem("gg_chat_token") || "" : "");
+    let isSubscribed = true;
+    let socket: any = null;
 
-    // 1. Fetch past conversation history ONCE when opened with chat authorization token
-    const fetchHistory = async () => {
+    const setupChatSession = async () => {
+      let activeToken = chatToken || (typeof window !== "undefined" ? localStorage.getItem("gg_chat_token") || "" : "");
+      
+      // If token is missing, obtain cryptographic session token from backend before connecting
+      if (!activeToken) {
+        try {
+          const sRes = await fetch(`${API_BASE}/chat/session`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chatId })
+          });
+          if (sRes.ok) {
+            const sData = await sRes.json();
+            if (sData?.chatToken) {
+              activeToken = sData.chatToken;
+              if (typeof window !== "undefined") localStorage.setItem("gg_chat_token", activeToken);
+              if (isSubscribed) setChatToken(activeToken);
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (!isSubscribed || !activeToken) return;
+
+      // 1. Fetch past conversation history ONCE when opened with verified chat authorization token
       try {
         const res = await fetch(`${API_BASE}/chat/history/${chatId}`, {
-          headers: { "x-chat-token": currentToken }
+          headers: { "x-chat-token": activeToken }
         });
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data)) {
+          if (Array.isArray(data) && isSubscribed) {
             setMessages(data);
           }
         }
-      } catch (e) {
-        // Silently fail — backend might be temporarily offline
+      } catch (e) { }
+
+      // 2. Pure real-time Socket.io listeners with token authentication
+      try {
+        socket = io(API_ROOT, {
+          auth: { token: activeToken },
+          transports: ["websocket", "polling"],
+          reconnection: true,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 2000,
+        });
+
+        socket.on("connect", () => {
+          console.log("[Native Support Socket] Customer connected:", socket.id, "Joining conversation room:", chatId);
+          socket.emit("join_chat", { chatId, token: activeToken });
+        });
+
+        socket.on("reconnect", () => {
+          console.log("[Native Support Socket] Customer reconnected. Re-authenticating room:", chatId);
+          socket.emit("join_chat", { chatId, token: activeToken });
+        });
+
+        socket.emit("join_chat", { chatId, token: activeToken });
+
+        socket.on("chat_error", (err: any) => {
+          console.warn("[Native Support Socket] Join chat error:", err);
+          // Automatically renew session token with backend and retry room join
+          fetch(`${API_BASE}/chat/session`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chatId })
+          })
+            .then(r => r.json())
+            .then(data => {
+              if (data?.chatToken && isSubscribed) {
+                if (typeof window !== "undefined") localStorage.setItem("gg_chat_token", data.chatToken);
+                setChatToken(data.chatToken);
+                activeToken = data.chatToken;
+                socket.emit("join_chat", { chatId, token: data.chatToken });
+              }
+            })
+            .catch(() => {});
+        });
+
+        const normalizeId = (id: string) => String(id || "").replace(/^chat_/, "");
+        const handleIncomingMessage = (newMsg: any) => {
+          if (!newMsg || !newMsg.message) return;
+          const msgChatId = newMsg.chatId || "";
+          if (msgChatId === chatId || normalizeId(msgChatId) === normalizeId(chatId)) {
+            console.log("[Native Support] Customer received message:", { id: newMsg.id, chatId: newMsg.chatId, sender: newMsg.sender });
+            setMessages((prev) => {
+              if (newMsg.id && prev.some((m) => m.id === newMsg.id)) {
+                return prev;
+              }
+              return [...prev, newMsg];
+            });
+          }
+        };
+
+        socket.on("chat:new_message", handleIncomingMessage);
+        socket.on("new_chat_message", handleIncomingMessage);
+        socket.on("admin_reply", handleIncomingMessage);
+        socket.on("receive_message", handleIncomingMessage);
+
+        // BFCache graceful lifecycle handling
+        const handlePageHide = () => {
+          try {
+            if (socket) socket.disconnect();
+          } catch (_) { }
+        };
+        const handlePageShow = (e: PageTransitionEvent) => {
+          try {
+            if (e.persisted && socket && !socket.connected) {
+              socket.connect();
+            }
+          } catch (_) { }
+        };
+        window.addEventListener("pagehide", handlePageHide);
+        window.addEventListener("pageshow", handlePageShow);
+      } catch (err) {
+        console.warn("Socket.io chat connection failed:", err);
       }
     };
-    fetchHistory();
 
-    // 2. Pure real-time Socket.io listeners for incoming customer and admin replies
-    let socket: any = null;
-    try {
-      socket = io(API_ROOT, {
-        auth: { token: currentToken },
-        transports: ["websocket", "polling"],
-        reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 2000,
-      });
-
-      socket.on("connect", () => {
-        console.log("[Native Support Socket] Customer connected:", socket.id, "Joining conversation room:", chatId);
-      });
-
-      socket.emit("join_chat", { chatId, token: currentToken });
-
-      const normalizeId = (id: string) => String(id || "").replace(/^chat_/, "");
-      const handleIncomingMessage = (newMsg: any) => {
-        if (!newMsg || !newMsg.message) return;
-        const msgChatId = newMsg.chatId || "";
-        if (msgChatId === chatId || normalizeId(msgChatId) === normalizeId(chatId)) {
-          console.log("[Native Support] Customer received message:", { id: newMsg.id, chatId: newMsg.chatId, sender: newMsg.sender });
-          setMessages((prev) => {
-            if (newMsg.id && prev.some((m) => m.id === newMsg.id)) {
-              return prev;
-            }
-            return [...prev, newMsg];
-          });
-        }
-      };
-
-      socket.on("chat:new_message", handleIncomingMessage);
-      socket.on("new_chat_message", handleIncomingMessage);
-      socket.on("admin_reply", handleIncomingMessage);
-      socket.on("receive_message", handleIncomingMessage);
-
-      // BFCache graceful lifecycle handling
-      const handlePageHide = () => {
-        try {
-          if (socket) socket.disconnect();
-        } catch (_) { }
-      };
-      const handlePageShow = (e: PageTransitionEvent) => {
-        try {
-          if (e.persisted && socket && !socket.connected) {
-            socket.connect();
-          }
-        } catch (_) { }
-      };
-      window.addEventListener("pagehide", handlePageHide);
-      window.addEventListener("pageshow", handlePageShow);
-
-      return () => {
-        window.removeEventListener("pagehide", handlePageHide);
-        window.removeEventListener("pageshow", handlePageShow);
-        if (socket) {
-          socket.disconnect();
-        }
-      };
-    } catch (err) {
-      console.warn("Socket.io chat connection failed:", err);
-    }
+    setupChatSession();
 
     return () => {
+      isSubscribed = false;
       if (socket) {
         socket.disconnect();
       }
     };
-  }, [chatId, isOpen, isRegistered]);
+  }, [chatId, isOpen, isRegistered, chatToken]);
 
   // Handle start chat with customer name & phone + send instant Bengali auto-reply
   const handleStartChatWithInfo = async (e: React.FormEvent) => {
@@ -214,20 +282,22 @@ export default function ChatWidget({ enabled = true }: { enabled?: boolean }) {
     setMessages((prev) => [...prev, autoMsg]);
 
     try {
-      await fetch(`${API_BASE}/chat/send`, {
+      const sRes = await fetch(`${API_BASE}/chat/session`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-chat-token": chatToken || (typeof window !== "undefined" ? localStorage.getItem("gg_chat_token") || "" : "")
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chatId,
-          message: autoReplyText,
-          sender: "Admin",
           customerName: name,
           customerPhone: phone,
         }),
       });
+      if (sRes.ok) {
+        const sData = await sRes.json();
+        if (sData?.chatToken) {
+          if (typeof window !== "undefined") localStorage.setItem("gg_chat_token", sData.chatToken);
+          setChatToken(sData.chatToken);
+        }
+      }
     } catch (err) { }
   };
 
@@ -243,47 +313,84 @@ export default function ChatWidget({ enabled = true }: { enabled?: boolean }) {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputValue.trim() || !chatId || isSending) return;
+    if (!inputValue.trim() || isSending) return;
+
+    let activeChatId = chatId;
+    if (!activeChatId && typeof window !== "undefined") {
+      activeChatId = localStorage.getItem("gg_chat_id") || ("chat_" + Math.random().toString(36).substring(2, 11));
+      localStorage.setItem("gg_chat_id", activeChatId);
+      setChatId(activeChatId);
+    }
+    if (!activeChatId) return;
 
     const msgText = inputValue.trim();
     setInputValue("");
     setIsSending(true);
-    console.log("[Native Support] Customer initiating send for conversation:", chatId);
+    console.log("[Native Support] Customer initiating send for conversation:", activeChatId);
 
     // Optimistic UI — show message immediately
     const optimisticMsg: ChatMessage = {
       id: "temp_" + Date.now(),
-      chatId,
+      chatId: activeChatId,
       sender: "Customer",
       message: msgText,
       createdAt: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, optimisticMsg]);
 
-    try {
+    const sendPayload = async (tokenToSend: string) => {
       const res = await fetch(`${API_BASE}/chat/send`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-chat-token": chatToken || (typeof window !== "undefined" ? localStorage.getItem("gg_chat_token") || "" : "")
+          "x-chat-token": tokenToSend
         },
         body: JSON.stringify({
-          chatId,
+          chatId: activeChatId,
           message: msgText,
           sender: "Customer",
-          customerName,
-          customerPhone,
+          customerName: customerName || undefined,
+          customerPhone: customerPhone || undefined,
         }),
       });
+      return res;
+    };
+
+    try {
+      const currentToken = chatToken || (typeof window !== "undefined" ? localStorage.getItem("gg_chat_token") || "" : "");
+      let res = await sendPayload(currentToken);
+      console.log("[Native Support] /chat/send response status:", res.status);
+
+      // If token expired or mismatch (403), renew session and retry once
+      if (res.status === 403) {
+        console.warn("[Native Support] Token rejected (403). Renewing session token with backend...");
+        const sRes = await fetch(`${API_BASE}/chat/session`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chatId: activeChatId })
+        });
+        if (sRes.ok) {
+          const sData = await sRes.json();
+          if (sData?.chatToken) {
+            if (typeof window !== "undefined") localStorage.setItem("gg_chat_token", sData.chatToken);
+            setChatToken(sData.chatToken);
+            res = await sendPayload(sData.chatToken);
+            console.log("[Native Support] Retry with renewed token status:", res.status);
+          }
+        }
+      }
+
       if (res.ok) {
         const newMsg = await res.json();
         // Replace optimistic message with server response
         setMessages((prev) =>
           prev.map((m) => (m.id === optimisticMsg.id ? newMsg : m))
         );
+      } else {
+        console.error("[Native Support] Send failed with status:", res.status);
       }
-    } catch (e) {
-      console.error("Failed to send message", e);
+    } catch (e: any) {
+      console.error("[Native Support] Failed to send message network error:", e?.message);
     } finally {
       setIsSending(false);
     }

@@ -92,6 +92,11 @@ export default function Footer() {
         }}
       >
         <style dangerouslySetInnerHTML={{ __html: `
+          .footer-help-links {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+          }
           .footer-payments-container {
             margin-top: 20px;
             width: 100%;
@@ -120,9 +125,19 @@ export default function Footer() {
               width: 100%;
             }
             .footer-payments-cards-row {
-              margin-left: -30px;
-              width: calc(100% + 30px);
-              max-width: 235px;
+              display: flex !important;
+              flex-direction: row !important;
+              flex-wrap: nowrap !important;
+              justify-content: flex-start !important;
+              align-items: center !important;
+              margin-left: 0 !important;
+              width: 100% !important;
+              max-width: 320px !important;
+              gap: 4px !important;
+            }
+            .footer-payments-cards-row > div {
+              flex: 1 1 0 !important;
+              min-width: 0 !important;
             }
           }
           @media (max-width: 768px) {
@@ -131,21 +146,22 @@ export default function Footer() {
               text-align: center !important;
               align-items: center !important;
               width: 100% !important;
-              margin-top: 10px !important;
+              margin-top: 15px !important;
               padding-top: 15px !important;
               border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
             }
             .footer-col-help h4 {
               text-align: center !important;
               margin-bottom: 12px !important;
+              font-size: 13px !important;
             }
             .footer-help-links {
               display: grid !important;
               grid-template-columns: 1fr 1fr !important;
-              column-gap: 16px !important;
-              row-gap: 10px !important;
+              column-gap: 20px !important;
+              row-gap: 12px !important;
               width: 100% !important;
-              max-width: 350px !important;
+              max-width: 340px !important;
               margin: 0 auto 16px auto !important;
               padding: 0 4px !important;
               font-size: 11px !important;
@@ -164,7 +180,8 @@ export default function Footer() {
             .footer-payments-container {
               margin-left: 0 !important;
               width: 100% !important;
-              max-width: 100% !important;
+              max-width: 350px !important;
+              margin: 0 auto !important;
               text-align: center !important;
               display: flex !important;
               flex-direction: column !important;
@@ -175,27 +192,24 @@ export default function Footer() {
               width: 100% !important;
             }
             .footer-payments-cards-row {
-              margin-left: 0 !important;
+              margin: 0 auto !important;
               width: 100% !important;
-              max-width: 360px !important;
+              max-width: 350px !important;
               display: flex !important;
+              flex-direction: row !important;
               flex-wrap: nowrap !important;
-              justify-content: center !important;
+              justify-content: space-between !important;
               align-items: center !important;
               gap: 4px !important;
-              overflow-x: auto !important;
-              scrollbar-width: none !important;
-              -ms-overflow-style: none !important;
-            }
-            .footer-payments-cards-row::-webkit-scrollbar {
-              display: none !important;
+              overflow-x: visible !important;
             }
             .footer-payments-cards-row > div {
               flex: 1 1 0 !important;
-              min-width: 44px !important;
-              max-width: 56px !important;
+              min-width: 0 !important;
+              max-width: 54px !important;
               height: 34px !important;
-              padding: 2px 3px !important;
+              padding: 2px 2px !important;
+              box-sizing: border-box !important;
             }
           }
         ` }} />
@@ -315,7 +329,7 @@ export default function Footer() {
               <h4 style={{ fontSize: "12px", fontWeight: "800", color: "#e52860", textTransform: "uppercase", letterSpacing: "0.5px", cursor: "default", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#ff6ba8")} onMouseLeave={(e) => (e.currentTarget.style.color = "#e52860")}>
                 Help
               </h4>
-              <div className="footer-help-links" style={{ display: "flex", flexDirection: "column", gap: "8px", fontWeight: "700" }}>
+              <div className="footer-help-links" style={{ fontWeight: "700" }}>
                 <Link href="/contact" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>CONTACT US</Link>
                 <Link href="/points" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>POINTS</Link>
                 <Link href="/faq" style={{ color: "#ffffff", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#e52860")} onMouseLeave={(e) => (e.currentTarget.style.color = "#ffffff")}>FAQS</Link>
@@ -331,7 +345,7 @@ export default function Footer() {
                   PAYMENTS ACCEPTED
                 </h4>
                 {/* All 6 cards in ONE SINGLE LINE */}
-                <div className="footer-payments-cards-row">
+                <div className="footer-payments-cards-row" style={{ display: "flex", flexDirection: "row", flexWrap: "nowrap", alignItems: "center", width: "100%", gap: "4px" }}>
                   {/* 1. bKash Card (Official Vector) */}
                   <div
                     title="bKash"

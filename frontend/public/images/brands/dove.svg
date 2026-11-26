@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" width="200" height="60">
+  <rect width="200" height="60" fill="transparent"/>
+  <path d="M72 38c6-1 12-5 16-10 2-2 4-5 7-6 4-1 9 1 12 4 4 4 6 10 5 15-1 4-4 8-8 10-5 2-10 2-15 0-6-3-11-8-17-13z" fill="#d4af37" opacity="0.85"/>
+  <text x="118" y="38" font-family="'Palatino Linotype', 'Book Antiqua', Georgia, serif" font-size="28" font-weight="700" font-style="italic" fill="#0c2340" text-anchor="middle" letter-spacing="0.5">
+    Dove
+  </text>
+</svg>
